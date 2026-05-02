@@ -1,80 +1,119 @@
-# Weekly Life Pool - Chrome Extension
+# Weekly Life Pool
 
-A planning layer for Google Calendar that lets you drag activities from a predefined pool into your weekly schedule.
+A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool of recurring activities organized by calendar, then drag them onto any time slot to instantly create events.
 
-## Project Structure
+---
+
+## Features
+
+- **Activity pool** — store reusable items (tasks, routines, habits) grouped by your Google Calendars
+- **Drag-and-drop creation** — drag any item onto the calendar grid; an event is created at the exact time and date you drop it
+- **Time snapping** — drops snap to the nearest 15-minute slot with a live tooltip showing day + time while hovering
+- **Loading overlay** — a pulsing placeholder in the calendar's color appears at the drop location and fades out once Google Calendar renders the real event; tracks the column as you scroll
+- **Category chips** — quickly switch which calendar an item belongs to before adding it
+- **Hide categories** — collapse calendars you don't need to reduce sidebar noise; state survives page refresh
+- **Collapsible sidebar** — collapse to a 40 px icon strip when you need the full screen
+- **Collapsible input form** — toggle the add-item form open/closed with the pencil icon; preference is saved
+- **Persistent storage** — pool items, hidden categories, and all UI state are saved to Chrome local storage
+
+---
+
+## How it works
 
 ```
-weekly-life-pool/
-├── src/
-│   ├── content.tsx          # Main sidebar component
-│   ├── content.css          # Sidebar styling
-│   ├── background.ts        # Background service worker (API calls)
-│   └── components/
-│       └── PoolSidebar.tsx   # Pool UI component
-├── manifest.json            # Chrome extension config
-├── package.json
-├── tsconfig.json
-└── vite.config.ts           # Build configuration
+Google Calendar page
+└── Content script (content.tsx)
+    ├── Injects the React sidebar into the page
+    ├── Shifts Google Calendar's layout right to make room
+    ├── Listens for drag events over calendar cells
+    └── Sends CREATE_EVENT to the background worker on drop
+
+Background service worker (background.ts)
+├── Authenticates with Google via chrome.identity (OAuth 2.0)
+├── Fetches the user's calendar list  →  LIST_CALENDARS
+└── Creates events via Google Calendar API v3  →  CREATE_EVENT
 ```
 
-## Setup & Running
+When you drop an item the content script:
+1. Shows a pulsing event-shaped placeholder at the drop position
+2. Asks the background worker to create the event via the Calendar API
+3. Watches the calendar DOM with a `MutationObserver` for the new event element
+4. Fades the placeholder out once the real event appears (12 s fallback timeout)
 
-### 1. Install Dependencies
+---
+
+## Tech stack
+
+| Layer | Library / Tool |
+|---|---|
+| UI | React 19, TypeScript |
+| Styling | Tailwind CSS v4 + custom `wlp-*` CSS classes with `!important` |
+| Build | Vite 8 + `@tailwindcss/vite` |
+| Extension APIs | `chrome.storage`, `chrome.identity`, `chrome.runtime` |
+| Calendar API | Google Calendar API v3 |
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 18+
+- A Google Cloud project with the **Google Calendar API** enabled and an OAuth 2.0 client ID configured for a Chrome extension
+
+### Install and build
+
 ```bash
 npm install
+npm run build        # outputs to dist/
 ```
 
-### 2. Build the Extension
-```bash
-npm run build
-```
+For development with automatic rebuilds on save:
 
-This creates a `dist/` folder with the compiled files.
-
-### 3. Load in Chrome
-1. Open `chrome://extensions`
-2. Enable "Developer mode" (top right)
-3. Click "Load unpacked"
-4. Select the `dist/` folder
-
-### 4. Watch Mode (for development)
 ```bash
 npm run watch
 ```
 
-This rebuilds automatically when you change files.
+### Load the extension in Chrome
 
-### 5. Test
-- Go to https://calendar.google.com
-- You should see a "Weekly Pool" sidebar on the left
-- Try adding items and dragging them
+1. Navigate to `chrome://extensions`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked** and select the `dist/` folder
+4. Open [Google Calendar](https://calendar.google.com) — the sidebar appears on the left
 
-## Next Steps
+---
 
-### TODO:
-- [ ] Set up Google OAuth (Calendar API authentication)
-- [ ] Implement drag-and-drop to create events on the calendar
-- [ ] Detect which time slot user drops item into
-- [ ] Call Google Calendar API to create the event
-- [ ] Add visual feedback when event is created
-- [ ] Handle edge cases (errors, duplicate items, etc.)
+## Project structure
 
-### Key Features to Build:
-1. **Detect calendar time slots** - Figure out which day/time user is dragging to
-2. **Create events via API** - Make actual Google Calendar events
-3. **Drag-and-drop interaction** - Make the UX smooth
-4. **Settings/persistence** - Save pool items to Chrome storage
+```
+src/
+├── background.ts          # Service worker — OAuth + Google Calendar API calls
+├── content.tsx            # Content script — sidebar injection, drag/drop, loading overlay
+├── content.css            # Sidebar styles (Tailwind utilities + wlp-* override classes)
+└── components/
+    └── PoolSidebar.tsx    # React sidebar component
 
-## Notes
+manifest.json              # Extension manifest v3
+vite.config.ts             # Vite build config (two entry points: content + background)
+```
 
-- The sidebar currently loads a sample pool (Social, Food, Health)
-- Items are saved to Chrome's local storage
-- The background worker is set up for API calls but not integrated yet
-- Next phase: wire up the Google Calendar API for actual event creation
+---
 
-## Useful Links
+## Design notes
 
-- [Chrome Extension API](https://developer.chrome.com/docs/extensions/)
-- [Google Calendar API](https://developers.google.com/calendar/api)
-- [React TypeScript](https://react-typescript-cheatsheet.netlify.app/)
+**CSS `!important` overrides** — All spacing and layout classes on sidebar elements use named `wlp-*` CSS classes defined in `content.css` with `!important`. This is intentional: Google Calendar's own global stylesheet overrides Tailwind utility classes injected by a content script, so the only reliable way to guarantee padding and margin values is explicit `!important` declarations.
+
+**Datekey conversion** — Google Calendar encodes dates as integer "datekeys" (not simple epoch days). Each month boundary adds +2 extra to the counter (e.g. Apr 30 = 28830, May 1 = 28833). The conversion formula in `content.tsx` was reverse-engineered from observed values.
+
+**Scroll-tracking overlay** — The loading placeholder uses `position: fixed` but attaches a scroll listener in capture mode that re-reads `getBoundingClientRect()` on the target cell on every scroll event, keeping the overlay pinned to the correct calendar column even as the user scrolls.
+
+---
+
+## Permissions
+
+| Permission | Reason |
+|---|---|
+| `storage` | Persist pool items, hidden categories, and UI state |
+| `identity` | OAuth 2.0 token for Google Calendar API |
+| `https://calendar.google.com/*` | Inject the sidebar into Google Calendar |
+| `https://www.googleapis.com/auth/calendar` | Create events and list calendars |

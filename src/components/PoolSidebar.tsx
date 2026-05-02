@@ -424,8 +424,9 @@ const PoolSidebar: React.FC = () => {
                           key={item.id}
                           draggable
                           onDragStart={(e) => {
-                            e.dataTransfer?.setData('poolItem', JSON.stringify(item));
-                            document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item } }));
+                            const payload = { ...item, color: category.color };
+                            e.dataTransfer?.setData('poolItem', JSON.stringify(payload));
+                            document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item: payload } }));
                           }}
                           onDragEnd={() =>
                             document.dispatchEvent(new CustomEvent('poolDragEnd'))

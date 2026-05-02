@@ -7,6 +7,7 @@ interface DropPoolItem {
   id: string;
   name: string;
   calendarId: string;
+  color?: string;
 }
 
 const SIDEBAR_WIDTH   = 280;
@@ -155,18 +156,127 @@ function getPreview(): HTMLElement {
   }
   return previewEl;
 }
-function showPreview(cell: Element, clientY: number, itemName: string): void {
-  const el   = getPreview();
+function showPreview(cell: Element, clientY: number, itemName: string, color = '#4285f4'): void {
+  const el = getPreview();
   const { snapped } = timeFromDrop(cell, clientY);
   const rect = cell.getBoundingClientRect();
-  el.style.top    = `${rect.top + snapped}px`;
-  el.style.left   = `${rect.left + 2}px`;
-  el.style.width  = `${rect.width - 4}px`;
-  el.style.height = `${PIXELS_PER_HOUR}px`;
-  el.style.display = 'block';
+  Object.assign(el.style, {
+    top: `${rect.top + snapped}px`, left: `${rect.left + 2}px`,
+    width: `${rect.width - 4}px`,  height: `${PIXELS_PER_HOUR}px`,
+    display: 'block', opacity: '1', animation: 'none',
+    background: color + '33',
+    border: `2px solid ${color}`,
+    borderRadius: '2px', color, padding: '2px 6px',
+  });
   el.textContent = itemName;
 }
-function hidePreview(): void { if (previewEl) previewEl.style.display = 'none'; }
+function hidePreview(): void {
+  if (isLoading) return; // don't clobber the loading overlay
+  if (previewEl) previewEl.style.display = 'none';
+}
+
+// ── Drop loading overlay ──────────────────────────────────────────────────────
+
+let isLoading          = false;
+let loadingCell:       Element | null = null;
+let loadingSnapped:    number = 0;
+let loadingScrollCleanup: (() => void) | null = null;
+let eventObserver:     MutationObserver | null = null;
+let eventTimeout:      ReturnType<typeof setTimeout> | null = null;
+
+function applyLoadingPosition(): void {
+  if (!previewEl || !loadingCell) return;
+  const rect = loadingCell.getBoundingClientRect();
+  previewEl.style.top   = `${rect.top  + loadingSnapped}px`;
+  previewEl.style.left  = `${rect.left + 2}px`;
+  previewEl.style.width = `${rect.width - 4}px`;
+}
+
+function showLoading(cell: Element, clientY: number, item: DropPoolItem): void {
+  const el        = getPreview();
+  const { snapped } = timeFromDrop(cell, clientY);
+  const rect      = cell.getBoundingClientRect();
+  const calColor  = item.color ?? '#4285f4';
+
+  loadingCell    = cell;
+  loadingSnapped = snapped;
+
+  Object.assign(el.style, {
+    top: `${rect.top + snapped}px`, left: `${rect.left + 2}px`,
+    width: `${rect.width - 4}px`,  height: `${PIXELS_PER_HOUR}px`,
+    display: 'block', opacity: '1',
+    background: calColor, border: 'none', borderRadius: '4px',
+    padding: '4px 8px', fontSize: '12px', fontWeight: '500',
+    color: '#fff', boxSizing: 'border-box',
+    overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+    animation: 'wlp-event-loading 1.1s ease-in-out infinite',
+    transition: 'opacity 0.35s ease',
+  });
+  el.textContent = item.name;
+  isLoading = true;
+
+  // Keep the overlay anchored to the cell as the user scrolls
+  const onScroll = () => applyLoadingPosition();
+  document.addEventListener('scroll', onScroll, true);
+  loadingScrollCleanup = () => document.removeEventListener('scroll', onScroll, true);
+}
+
+function hideLoading(fadeOut = false): void {
+  isLoading   = false;
+  loadingCell = null;
+  loadingScrollCleanup?.();
+  loadingScrollCleanup = null;
+
+  const el = previewEl;
+  if (!el) return;
+  if (fadeOut) {
+    el.style.animation = 'none';
+    el.style.opacity   = '0';
+    setTimeout(() => {
+      if (!el) return;
+      el.style.display   = 'none';
+      el.style.opacity   = '1';
+      el.style.animation = 'none';
+    }, 350);
+  } else {
+    el.style.display   = 'none';
+    el.style.animation = 'none';
+  }
+}
+
+function waitForEvent(itemName: string): void {
+  if (eventObserver) { eventObserver.disconnect(); eventObserver = null; }
+  if (eventTimeout)  { clearTimeout(eventTimeout);  eventTimeout  = null; }
+
+  const root = document.querySelector('[role="main"]') ?? document.body;
+
+  // Fallback: give up after 12 s
+  eventTimeout = setTimeout(() => {
+    eventObserver?.disconnect();
+    eventObserver = null;
+    hideLoading(true);
+  }, 12000);
+
+  eventObserver = new MutationObserver((mutations) => {
+    for (const mut of mutations) {
+      for (const node of mut.addedNodes) {
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        const el = node as Element;
+        if (el.closest?.('#weekly-life-pool-sidebar')) continue;
+        if ((el.textContent ?? '').includes(itemName)) {
+          clearTimeout(eventTimeout!);
+          eventObserver!.disconnect();
+          eventObserver = null;
+          eventTimeout  = null;
+          hideLoading(true);
+          return;
+        }
+      }
+    }
+  });
+
+  eventObserver.observe(root, { childList: true, subtree: true });
+}
 
 // ── Custom events ─────────────────────────────────────────────────────────────
 
@@ -204,7 +314,7 @@ function setupListeners(): void {
         const { hours, minutes } = timeFromDrop(cell, e.clientY);
         const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         showTooltip(e.clientX, e.clientY, `${draggingItem.name}  ·  ${day}, ${formatTime(hours, minutes)}`);
-        showPreview(cell, e.clientY, draggingItem.name);
+        showPreview(cell, e.clientY, draggingItem.name, draggingItem.color);
       }
     }
   });
@@ -215,7 +325,8 @@ function setupListeners(): void {
     const raw = e.dataTransfer?.getData('poolItem');
     if (!raw) return;
     e.preventDefault();
-    hideTooltip(); hidePreview();
+    hideTooltip();
+    // Note: hidePreview() deliberately skipped here — showLoading() takes over the element
 
     let item: DropPoolItem;
     try { item = JSON.parse(raw); } catch { return; }
@@ -230,6 +341,9 @@ function setupListeners(): void {
     const start = new Date(date); start.setHours(hours, minutes, 0, 0);
     const end   = new Date(start); end.setHours(hours + 1, minutes, 0, 0);
 
+    // Show pulsing placeholder at the exact drop position immediately
+    showLoading(cell, e.clientY, item);
+
     dispatchPoolEvent('creating', item.name);
     chrome.runtime.sendMessage(
       {
@@ -242,8 +356,14 @@ function setupListeners(): void {
         },
       },
       (response) => {
-        if (response?.success) dispatchPoolEvent('created', item.name);
-        else dispatchPoolEvent('error', item.name, response?.error);
+        if (response?.success) {
+          dispatchPoolEvent('created', item.name);
+          // Watch for GCal to render the event, then fade out the placeholder
+          waitForEvent(item.name);
+        } else {
+          dispatchPoolEvent('error', item.name, response?.error);
+          hideLoading(true);
+        }
       }
     );
   });

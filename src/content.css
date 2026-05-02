@@ -5,6 +5,11 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes wlp-event-loading {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 0.9; }
+}
+
 /* Google Sans → Roboto fallback to match Google Calendar's typeface */
 .wlp-sidebar {
   font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
