@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Weekly Life Pool",
+  "version": "0.1.0",
+  "description": "Plan your week with a pool of life activities in Google Calendar",
+  "permissions": ["storage", "identity"],
+  "host_permissions": ["https://calendar.google.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://calendar.google.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "oauth2": {
+    "client_id": "495067373971-m9qf8idgt02conel0dlf464ki13f4thh.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/calendar"]
+  }
+}
