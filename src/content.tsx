@@ -408,7 +408,7 @@ function readChip(target: EventTarget | null): CapturedChip | null {
 
 // Hand the chip to the background worker, which finds the real event and returns
 // only the reusable parts of it - never the date it happened to be on.
-function captureChip(chip: CapturedChip): void {
+function captureChip(chip: CapturedChip, onDone?: (ok: boolean) => void): void {
   const dayStart = new Date(chip.date); dayStart.setHours(0, 0, 0, 0);
   const dayEnd   = new Date(dayStart);  dayEnd.setDate(dayEnd.getDate() + 1);
 
@@ -427,13 +427,18 @@ function captureChip(chip: CapturedChip): void {
     (response: any) => {
       if (response?.success) {
         document.dispatchEvent(new CustomEvent('poolCapture', { detail: response.data }));
+        onDone?.(true);
       } else {
         dispatchPoolEvent('error', chip.title, response?.error ?? 'Could not read that event');
+        onDone?.(false);
       }
     }
   );
 
-  if (!sent) dispatchPoolEvent('error', chip.title, 'Extension reloaded - refresh the page');
+  if (!sent) {
+    dispatchPoolEvent('error', chip.title, 'Extension reloaded - refresh the page');
+    onDone?.(false);
+  }
 }
 
 // Reloading the extension orphans any content script already on the page:
@@ -469,41 +474,107 @@ function recentChip(): CapturedChip | null {
   return clickedChip;
 }
 
-function buildCaptureButton(chip: CapturedChip): HTMLElement {
-  const wrap = document.createElement('div');
-  wrap.className = 'wlp-capture-bar';
+// Material "add" glyph - the same one the sidebar's own add button uses, so the
+// two add affordances read as the same action.
+const ADD_ICON =
+  '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+  '<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>';
 
+const DONE_ICON =
+  '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+  '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+
+function buildCaptureButton(chip: CapturedChip, iconOnly: boolean): HTMLElement {
   const button = document.createElement('button');
   button.id = CAPTURE_BUTTON_ID;
   button.type = 'button';
-  button.className = 'wlp-capture-btn';
-  button.textContent = 'Add to pool';
-  button.title = `Save "${chip.title}" to the Weekly Pool as a reusable block`;
+  button.className = iconOnly ? 'wlp-capture-icon' : 'wlp-capture-btn';
+  button.setAttribute('aria-label', 'Add to pool');
+  button.title = `Add "${chip.title}" to the Weekly Pool`;
+  button.innerHTML = iconOnly ? ADD_ICON : '';
+  if (!iconOnly) button.textContent = 'Add to pool';
 
   button.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     button.disabled = true;
-    button.textContent = 'Adding…';
-    captureChip(chip);
+    if (!iconOnly) button.textContent = 'Adding…';
+
+    captureChip(chip, (ok) => {
+      if (ok) {
+        button.classList.add('wlp-capture-done');
+        if (iconOnly) button.innerHTML = DONE_ICON;
+        else button.textContent = 'Added';
+        return;
+      }
+      // Let the user try again; the sidebar toast says what went wrong.
+      button.disabled = false;
+      if (!iconOnly) button.textContent = 'Add to pool';
+    });
   });
 
-  wrap.appendChild(button);
-  return wrap;
+  return button;
 }
 
-// Only dialogs opened right after clicking a chip get the button. That keeps it
-// out of Google's other dialogs (settings, search, create-event) without having
-// to recognise each one.
+// Google's dialog has a row of icon buttons (edit, delete, email, more, close).
+// Its markup is undocumented and its labels are localised, so the row is found
+// structurally: whichever element is the direct parent of the most button-like
+// children is the toolbar.
+function findActionRow(dialog: Element): Element | null {
+  const buttons = dialog.querySelectorAll('button, [role="button"]');
+  const counts = new Map<Element, number>();
+
+  buttons.forEach((b) => {
+    const parent = b.parentElement;
+    if (!parent || b.id === CAPTURE_BUTTON_ID) return;
+    counts.set(parent, (counts.get(parent) ?? 0) + 1);
+  });
+
+  let best: Element | null = null;
+  let bestCount = 0;
+  counts.forEach((count, parent) => {
+    if (count > bestCount) { best = parent; bestCount = count; }
+  });
+
+  // Two buttons could be an unrelated pair; three is a toolbar.
+  return bestCount >= 3 ? best : null;
+}
+
+function insertCaptureButton(dialog: Element, chip: CapturedChip): boolean {
+  if (dialog.querySelector(`#${CAPTURE_BUTTON_ID}`)) return true;
+
+  const row = findActionRow(dialog);
+  if (row) {
+    row.insertBefore(buildCaptureButton(chip, true), row.firstChild);
+    return true;
+  }
+  return false;
+}
+
+// The dialog's contents render progressively, so the toolbar may not exist yet
+// when the dialog node is first seen. Retry briefly before falling back to a
+// plain button appended to the dialog root.
+const ROW_RETRY_MS = [0, 60, 160, 320, 640];
+
 function decorateDialog(dialog: Element): void {
   if (dialog.querySelector(`#${CAPTURE_BUTTON_ID}`)) return;
 
   const chip = recentChip();
   if (!chip) return;
 
-  // Appended to the dialog root rather than slotted into Google's action row,
-  // so this does not depend on the dialog's internal structure.
-  dialog.appendChild(buildCaptureButton(chip));
+  ROW_RETRY_MS.forEach((delay, i) => {
+    setTimeout(() => {
+      if (!dialog.isConnected) return;
+      if (insertCaptureButton(dialog, chip)) return;
+
+      if (i === ROW_RETRY_MS.length - 1 && !dialog.querySelector(`#${CAPTURE_BUTTON_ID}`)) {
+        const bar = document.createElement('div');
+        bar.className = 'wlp-capture-bar';
+        bar.appendChild(buildCaptureButton(chip, false));
+        dialog.appendChild(bar);
+      }
+    }, delay);
+  });
 }
 
 function setupCapture(): void {

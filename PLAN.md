@@ -16,7 +16,7 @@ names they were discussed under.
 | Stale-token retry: 401 → `removeCachedAuthToken` → replay once | `src/background.ts` |
 | Month-view / all-day drop guard | `src/content.tsx` |
 | **Phase 1** — per-item duration | `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css` |
-| **Capture** — "Add to pool" button in Google's event dialog | `src/background.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx` |
+| **Capture** — "Add to pool" icon button in Google's event dialog | `src/background.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx` |
 
 ---
 
@@ -56,8 +56,9 @@ migration step. Do not add a required field to `PoolItem`.
 
 ## Capture — save an existing event as a block *(done)*
 
-Clicking an event in Google Calendar opens its detail dialog; that dialog gets an
-**Add to pool** button which saves the event as a reusable block. Only the
+Clicking an event in Google Calendar opens its detail dialog; an **Add to pool**
+icon button is inserted into that dialog's action row, alongside edit / delete /
+close, and saves the event as a reusable block. Only the
 reusable parts are kept — name, calendar, description, location, length, and how
 often it repeats. The date it sat on is discarded: the block is a template, not a
 copy.
@@ -95,10 +96,22 @@ after a chip click, is not duplicated on repeated mutations, sends the right
 title/day/start minute, and the resolved template reaches the sidebar with its
 duration and repeat intact.
 
-**Still unverified against the real Google Calendar** — the chip selector
-(`[data-eventid], [data-eventchip]`) and the assumption that the detail popup
-carries `role="dialog"`. If the button never appears, those are the two things to
-check.
+**Confirmed against the real Google Calendar:** the detail popup does carry
+`role="dialog"`, and the chip selector (`[data-eventid], [data-eventchip]`) does
+match its event chips — the button appeared and worked on a live calendar.
+
+**Finding the action row.** Google's dialog markup is undocumented and its button
+labels are localised, so `findActionRow` works structurally: whichever element is
+the direct parent of the most button-like children is the toolbar, requiring at
+least three so an unrelated pair cannot be mistaken for one. The dialog renders
+progressively, so insertion is retried over ~640 ms before falling back to a
+plain button appended to the dialog root.
+
+**Styling inside someone else's DOM.** Every property on the injected button is
+pinned with `!important`, including width, height and `flex`. The first version
+set only colour and padding and was stretched by the dialog's own layout into an
+oversized blob — inside Google's DOM, anything left unset is inherited from
+whatever container it lands in.
 
 ---
 
