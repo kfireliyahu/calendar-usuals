@@ -9,6 +9,9 @@ interface DropPoolItem {
   calendarId: string;
   color?: string;
   durationMin?: number;
+  description?: string;
+  location?: string;
+  repeat?: { freq: string; interval?: number };
 }
 
 const SIDEBAR_WIDTH   = 280;
@@ -319,8 +322,155 @@ function waitForEvent(itemName: string): void {
 
 // ── Custom events ─────────────────────────────────────────────────────────────
 
-function dispatchPoolEvent(type: 'creating' | 'created' | 'error', itemName: string, error?: string): void {
+function dispatchPoolEvent(type: 'creating' | 'created' | 'capturing' | 'error', itemName: string, error?: string): void {
   document.dispatchEvent(new CustomEvent('poolEvent', { detail: { type, itemName, error } }));
+}
+
+// ── Capturing an existing calendar event into the pool ───────────────────────
+//
+// Google Calendar's event chips carry internal, undocumented ids, and it is not
+// safe to assume they use HTML5 drag-and-drop at all - Google may drive their
+// dragging from raw pointer events, in which case dragstart/drop never fire.
+// So the capture is driven by mousedown/mouseup, which happen either way, and
+// the event is identified through the Calendar API by day + title + start time
+// rather than by scraping an id. The dragstart/drop path is wired up too, so the
+// gesture also works if the chips are native draggables.
+
+const CHIP_SELECTOR = '[data-eventid], [data-eventchip]';
+const SIDEBAR_ID = 'weekly-life-pool-sidebar';
+
+interface CapturedChip {
+  title: string;
+  date: Date;
+  startMin: number | null;
+}
+
+let pendingChip: CapturedChip | null = null;
+
+function isInsideSidebar(target: EventTarget | null): boolean {
+  return !!(target as Element | null)?.closest?.(`#${SIDEBAR_ID}`);
+}
+
+function getSidebar(): HTMLElement | null {
+  return document.getElementById(SIDEBAR_ID);
+}
+
+// Chip text is "7:00am Gym" or similar, and aria-label usually leads with the
+// title before a comma. Strip clock fragments so what is left can be matched
+// against the event's real summary.
+function stripTimes(text: string): string {
+  return text
+    .replace(/\d{1,2}(:\d{2})?\s*(–|—|-|to)\s*\d{1,2}(:\d{2})?\s*(am|pm)?/gi, ' ')
+    .replace(/\d{1,2}:\d{2}\s*(am|pm)?/gi, ' ')
+    .replace(/\d{1,2}\s*(am|pm)/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function chipTitle(chip: Element): string {
+  const label = chip.getAttribute('aria-label') ?? '';
+  const raw = label || chip.textContent || '';
+  return stripTimes(label ? raw.split(',')[0] : raw);
+}
+
+// A chip is positioned within its day column, so its distance from the top of
+// that column is its start time in minutes - the same 1 px = 1 min relationship
+// the drop handler relies on.
+function chipStartMinute(chip: Element): number | null {
+  const column = chip.closest('[data-datekey]');
+  if (!column || !isTimeGridCell(column)) return null;
+  const offset = chip.getBoundingClientRect().top - column.getBoundingClientRect().top;
+  if (!Number.isFinite(offset) || offset < 0) return null;
+  return Math.round(offset);
+}
+
+function readChip(target: EventTarget | null): CapturedChip | null {
+  const chip = (target as Element | null)?.closest?.(CHIP_SELECTOR);
+  if (!chip || isInsideSidebar(chip)) return null;
+
+  const date = dateFromCell(chip);
+  const title = chipTitle(chip);
+  if (!date || !title) return null;
+
+  return { title, date, startMin: chipStartMinute(chip) };
+}
+
+function setSidebarArmed(armed: boolean): void {
+  getSidebar()?.classList.toggle('wlp-capture-target', armed);
+}
+
+// Hand the chip to the background worker, which finds the real event and returns
+// only the reusable parts of it - never the date it happened to be on.
+function captureChip(chip: CapturedChip): void {
+  const dayStart = new Date(chip.date); dayStart.setHours(0, 0, 0, 0);
+  const dayEnd   = new Date(dayStart);  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  dispatchPoolEvent('capturing', chip.title);
+
+  chrome.runtime.sendMessage(
+    {
+      type: 'RESOLVE_EVENT',
+      data: {
+        dayStartISO: dayStart.toISOString(),
+        dayEndISO:   dayEnd.toISOString(),
+        title:       chip.title,
+        startMin:    chip.startMin,
+      },
+    },
+    (response) => {
+      if (response?.success) {
+        document.dispatchEvent(new CustomEvent('poolCapture', { detail: response.data }));
+      } else {
+        dispatchPoolEvent('error', chip.title, response?.error ?? 'Could not read that event');
+      }
+    }
+  );
+}
+
+function setupCapture(): void {
+  document.addEventListener('mousedown', (e) => {
+    // Purely observational: preventing the default here would break Google
+    // Calendar's own click and drag handling.
+    pendingChip = readChip(e.target);
+  }, true);
+
+  document.addEventListener('mousemove', (e) => {
+    if (!pendingChip) return;
+    setSidebarArmed(isInsideSidebar(e.target));
+  }, true);
+
+  document.addEventListener('mouseup', (e) => {
+    const chip = pendingChip;
+    pendingChip = null;
+    setSidebarArmed(false);
+    if (chip && isInsideSidebar(e.target)) captureChip(chip);
+  }, true);
+
+  // Native drag path, in case the chips are real HTML5 draggables.
+  document.addEventListener('dragstart', (e) => {
+    if (isInsideSidebar(e.target)) return; // our own pool items
+    pendingChip = readChip(e.target) ?? pendingChip;
+  }, true);
+
+  document.addEventListener('dragover', (e: DragEvent) => {
+    if (!pendingChip || !isInsideSidebar(e.target)) return;
+    e.preventDefault(); // accept the drop
+    setSidebarArmed(true);
+  });
+
+  document.addEventListener('drop', (e: DragEvent) => {
+    const chip = pendingChip;
+    if (!chip || !isInsideSidebar(e.target)) return;
+    e.preventDefault();
+    pendingChip = null;
+    setSidebarArmed(false);
+    captureChip(chip);
+  });
+}
+
+function rruleFor(repeat: { freq: string; interval?: number }): string {
+  const interval = repeat.interval && repeat.interval > 1 ? `;INTERVAL=${repeat.interval}` : '';
+  return `RRULE:FREQ=${repeat.freq}${interval}`;
 }
 
 // ── Drop listeners ────────────────────────────────────────────────────────────
@@ -401,6 +551,9 @@ function setupListeners(): void {
           calendarId: item.calendarId,
           start: { dateTime: start.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
           end:   { dateTime: end.toISOString(),   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+          ...(item.description ? { description: item.description } : {}),
+          ...(item.location    ? { location:    item.location }    : {}),
+          ...(item.repeat      ? { recurrence: [rruleFor(item.repeat)] } : {}),
         },
       },
       (response) => {
@@ -431,6 +584,7 @@ function injectSidebar(): void {
   try {
     ReactDOM.createRoot(sidebarEl).render(<PoolSidebar />);
     setupListeners();
+    setupCapture();
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get('sidebarCollapsed', (r) => adjustLayout(r.sidebarCollapsed === true));
     } else {

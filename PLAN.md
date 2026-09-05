@@ -16,6 +16,7 @@ names they were discussed under.
 | Stale-token retry: 401 → `removeCachedAuthToken` → replay once | `src/background.ts` |
 | Month-view / all-day drop guard | `src/content.tsx` |
 | **Phase 1** — per-item duration | `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css` |
+| **Capture** — drag an existing event into the pool to save it as a block | `src/background.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx` |
 
 ---
 
@@ -33,9 +34,12 @@ interface PoolItem {
   // phase 1 (done)
   durationMin?: number;      // undefined => 60
 
-  // phase 5
+  // capture (done) - also the start of phase 5
   description?: string;
   location?: string;
+  repeat?: { freq: string; interval?: number };
+
+  // phase 5 (remaining)
   colorId?: string;          // Google Calendar event colorId
   reminderMin?: number;      // popup reminder, minutes before
 
@@ -47,6 +51,39 @@ interface PoolItem {
 **Migration rule:** every new field is optional, and every reader treats
 `undefined` as today's behaviour. Items already in storage keep working with no
 migration step. Do not add a required field to `PoolItem`.
+
+---
+
+## Capture — drag an event into the pool *(done)*
+
+Dragging an existing calendar event onto the sidebar saves it as a reusable
+block. Only the reusable parts are kept — name, calendar, description, location,
+length, and how often it repeats. The date it happened to sit on is discarded,
+which is the whole point: the block is a template, not a copy.
+
+**Two assumptions were designed around rather than guessed at:**
+
+1. *Google Calendar's chips may not be HTML5 draggables.* Google may drive their
+   dragging from raw pointer events, in which case `dragstart` / `drop` never
+   fire. The capture is therefore driven by `mousedown` / `mouseup`, which happen
+   either way; the native drag path is wired up as well, so the gesture works
+   under both implementations.
+2. *Chip element ids are internal and undocumented.* Rather than reverse-engineer
+   `data-eventid`, the event is looked up through the API by things that can be
+   read reliably: the day (existing datekey conversion), the chip's title text,
+   and its start minute (the chip's offset in the day column, the same
+   1 px = 1 min relationship the drop handler uses). `scoreCandidate` requires a
+   title match and uses start time only to break ties between same-named events.
+
+**Recurrence is normalised, not copied.** `readRecurrence` keeps only `FREQ` and
+`INTERVAL`, deliberately dropping `BYDAY`, `UNTIL` and `COUNT`: a block should
+repeat from whichever day it is later dropped on, and an inherited `UNTIL` in the
+past would produce a series with no instances.
+
+**Still to verify against a real calendar** — the chip selector
+(`[data-eventid], [data-eventchip]`) is the one part that cannot be checked
+without Google Calendar's live DOM. If capture does nothing, that selector is
+what to inspect first.
 
 ---
 
@@ -94,7 +131,9 @@ reason the sidebar exists.
 Make a pool item carry its whole configuration, not just a name, so dropping it
 produces the event you would otherwise have typed by hand.
 
-- Fields: `description`, `location`, `colorId`, `reminderMin`.
+- Remaining fields: `colorId`, `reminderMin`. `description` and `location` are
+  already on `PoolItem` and already sent on drop — capture put them there — but
+  nothing edits them yet, which is what this phase adds.
 - These map straight onto the `events.insert` body — `description`, `location`,
   `colorId`, and
   `reminders: { useDefault: false, overrides: [{ method: 'popup', minutes }] }`.

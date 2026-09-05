@@ -5,6 +5,21 @@ interface PoolItem {
   name: string;
   calendarId: string;
   durationMin?: number;
+  description?: string;
+  location?: string;
+  // Only how often the source event repeated. The series' own anchor day and end
+  // date are deliberately not kept - a pool block repeats from wherever it lands.
+  repeat?: { freq: string; interval?: number };
+}
+
+// What the content script hands back after resolving a dragged calendar event.
+interface EventTemplate {
+  name: string;
+  calendarId: string;
+  durationMin: number;
+  description?: string;
+  location?: string;
+  repeat?: { freq: string; interval?: number };
 }
 
 interface PoolCategory {
@@ -40,6 +55,17 @@ function formatDuration(min: number): string {
   const hours = Math.floor(min / 60);
   const mins  = min % 60;
   return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+}
+
+const FREQ_LABELS: Record<string, string> = {
+  DAILY: 'day', WEEKLY: 'week', MONTHLY: 'month', YEARLY: 'year',
+};
+
+function formatRepeat(repeat: { freq: string; interval?: number }): string {
+  const unit = FREQ_LABELS[repeat.freq] ?? repeat.freq.toLowerCase();
+  return repeat.interval && repeat.interval > 1
+    ? `Repeats every ${repeat.interval} ${unit}s`
+    : `Repeats every ${unit}`;
 }
 
 // Shape of what we keep in chrome.storage.local. Every key is optional because
@@ -95,6 +121,15 @@ const PoolSidebar: React.FC = () => {
   const collapsedReady = useRef(false);
   const formReady = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // One timer for every toast source, so a pending clear from an earlier toast
+  // cannot wipe a newer one.
+  const showToast = (message: string, type: Toast['type'], holdMs = 3000) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    if (holdMs > 0) toastTimer.current = setTimeout(() => setToast(null), holdMs);
+  };
 
   // ── Collapsed state ──────────────────────────────────────────────────────────
 
@@ -131,23 +166,80 @@ const PoolSidebar: React.FC = () => {
   // ── Drop toast listener ──────────────────────────────────────────────────────
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
     const handler = (e: Event) => {
       const { type, itemName, error: err } = (e as CustomEvent).detail;
-      clearTimeout(timer);
       if (type === 'creating') {
-        setToast({ message: `Adding "${itemName}"…`, type: 'info' });
+        showToast(`Adding "${itemName}"…`, 'info', 0);
+      } else if (type === 'capturing') {
+        showToast(`Saving "${itemName}" to pool…`, 'info', 0);
       } else if (type === 'created') {
-        setToast({ message: `"${itemName}" added!`, type: 'success' });
-        timer = setTimeout(() => setToast(null), 3000);
+        showToast(`"${itemName}" added!`, 'success');
       } else if (type === 'error') {
-        setToast({ message: err ?? 'Failed to create event', type: 'error' });
-        timer = setTimeout(() => setToast(null), 5000);
+        showToast(err ?? 'Failed to create event', 'error', 5000);
       }
     };
     document.addEventListener('poolEvent', handler);
-    return () => { document.removeEventListener('poolEvent', handler); clearTimeout(timer); };
+    return () => {
+      document.removeEventListener('poolEvent', handler);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
   }, []);
+
+  // ── Captured calendar events ────────────────────────────────────────────────
+
+  // The content script resolves a dragged calendar event into a reusable
+  // template; this turns it into a pool item.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tpl = (e as CustomEvent).detail as EventTemplate;
+
+      // Decided from current state rather than inside the updater, so the toast
+      // below reports what actually happened.
+      const target =
+        categories.find((c) => c.calendarId === tpl.calendarId) ??
+        categories.find((c) => c.calendarId === newItemCategory) ??
+        categories.find((c) => !c.hidden);
+
+      if (!target) {
+        showToast('No calendar to save into', 'error', 5000);
+        return;
+      }
+
+      const duplicate = target.items.some(
+        (i) => i.name.trim().toLowerCase() === tpl.name.trim().toLowerCase()
+      );
+      if (duplicate) {
+        showToast(`"${tpl.name}" is already in the pool`, 'info');
+        return;
+      }
+
+      setCategories((prev) =>
+        prev.map((cat) =>
+          cat.calendarId === target.calendarId
+            ? {
+                ...cat,
+                items: [
+                  ...cat.items,
+                  {
+                    id: Date.now().toString(),
+                    name: tpl.name,
+                    calendarId: target.calendarId,
+                    durationMin: tpl.durationMin,
+                    description: tpl.description,
+                    location: tpl.location,
+                    repeat: tpl.repeat,
+                  },
+                ],
+              }
+            : cat
+        )
+      );
+      showToast(`"${tpl.name}" saved to pool`, 'success');
+    };
+
+    document.addEventListener('poolCapture', handler);
+    return () => document.removeEventListener('poolCapture', handler);
+  }, [categories, newItemCategory]);
 
   // ── Calendar fetch ───────────────────────────────────────────────────────────
 
@@ -501,6 +593,8 @@ const PoolSidebar: React.FC = () => {
                           key={item.id}
                           draggable
                           onDragStart={(e) => {
+                            // Spreading the item carries duration, description,
+                            // location and repeat through to the drop handler.
                             const payload = { ...item, color: category.color };
                             e.dataTransfer?.setData('poolItem', JSON.stringify(payload));
                             document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item: payload } }));
@@ -511,7 +605,20 @@ const PoolSidebar: React.FC = () => {
                           className="wlp-item group flex items-center justify-between bg-white border border-[#e8eaed] rounded-[6px] text-[13px] text-[#202124] cursor-grab select-none transition-all duration-150 hover:border-[#c5c9ce] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing active:opacity-70"
                           style={{ borderLeft: `3px solid ${category.color}` }}
                         >
-                          <span className="flex-1 truncate">{item.name}</span>
+                          <span className="flex-1 truncate" title={item.description || item.name}>
+                            {item.name}
+                          </span>
+                          {item.repeat && (
+                            <span
+                              className="wlp-repeat"
+                              title={formatRepeat(item.repeat)}
+                              aria-label={formatRepeat(item.repeat)}
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                              </svg>
+                            </span>
+                          )}
                           <DurationSelect
                             value={durationOf(item)}
                             onChange={(min) => setItemDuration(item.id, min)}
