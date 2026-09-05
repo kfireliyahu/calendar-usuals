@@ -16,7 +16,7 @@ names they were discussed under.
 | Stale-token retry: 401 → `removeCachedAuthToken` → replay once | `src/background.ts` |
 | Month-view / all-day drop guard | `src/content.tsx` |
 | **Phase 1** — per-item duration | `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css` |
-| **Capture** — drag an existing event into the pool to save it as a block | `src/background.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx` |
+| **Capture** — "Add to pool" button in Google's event dialog | `src/background.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx` |
 
 ---
 
@@ -54,36 +54,51 @@ migration step. Do not add a required field to `PoolItem`.
 
 ---
 
-## Capture — drag an event into the pool *(done)*
+## Capture — save an existing event as a block *(done)*
 
-Dragging an existing calendar event onto the sidebar saves it as a reusable
-block. Only the reusable parts are kept — name, calendar, description, location,
-length, and how often it repeats. The date it happened to sit on is discarded,
-which is the whole point: the block is a template, not a copy.
+Clicking an event in Google Calendar opens its detail dialog; that dialog gets an
+**Add to pool** button which saves the event as a reusable block. Only the
+reusable parts are kept — name, calendar, description, location, length, and how
+often it repeats. The date it sat on is discarded: the block is a template, not a
+copy.
 
-**Two assumptions were designed around rather than guessed at:**
+**Why a button and not a drag.** Dragging an event onto the sidebar was tried
+first and abandoned. It depended on Google Calendar's chips being HTML5
+draggables, which cannot be confirmed — Google may drive their dragging from raw
+pointer events, in which case `dragstart` / `drop` never fire and the gesture
+silently does nothing. A dialog is a DOM node that either appears or does not, so
+the button is observable and testable.
 
-1. *Google Calendar's chips may not be HTML5 draggables.* Google may drive their
-   dragging from raw pointer events, in which case `dragstart` / `drop` never
-   fire. The capture is therefore driven by `mousedown` / `mouseup`, which happen
-   either way; the native drag path is wired up as well, so the gesture works
-   under both implementations.
-2. *Chip element ids are internal and undocumented.* Rather than reverse-engineer
-   `data-eventid`, the event is looked up through the API by things that can be
-   read reliably: the day (existing datekey conversion), the chip's title text,
-   and its start minute (the chip's offset in the day column, the same
-   1 px = 1 min relationship the drop handler uses). `scoreCandidate` requires a
-   title match and uses start time only to break ties between same-named events.
+**The dialog is only a place to put the button.** The event is identified from
+the chip that was *clicked*, not from the dialog's contents: a chip's position in
+its day column yields an exact date and start minute, whereas the dialog states
+them as localised prose that would have to be parsed. `readChip` records the chip
+on click (capture phase, so it survives Google stopping the event), and the
+button is injected only into a dialog opened within 3 s of that click — which
+also keeps it out of Google's settings, search and create-event dialogs without
+having to recognise each one.
+
+**Resolution avoids Google's internal ids.** `resolveEventTemplate` looks the
+event up through the API by day + title + start minute rather than decoding
+`data-eventid`. `scoreCandidate` requires a title match and uses start time only
+to break ties between same-named events, so small pixel discrepancies are
+harmless.
 
 **Recurrence is normalised, not copied.** `readRecurrence` keeps only `FREQ` and
-`INTERVAL`, deliberately dropping `BYDAY`, `UNTIL` and `COUNT`: a block should
-repeat from whichever day it is later dropped on, and an inherited `UNTIL` in the
-past would produce a series with no instances.
+`INTERVAL`, dropping `BYDAY`, `UNTIL` and `COUNT`: a block should repeat from
+whichever day it is later dropped on, and an inherited `UNTIL` in the past would
+produce a series with no instances.
 
-**Still to verify against a real calendar** — the chip selector
-(`[data-eventid], [data-eventchip]`) is the one part that cannot be checked
-without Google Calendar's live DOM. If capture does nothing, that selector is
-what to inspect first.
+**Verified end-to-end** against the built bundle with a stubbed `chrome` API and
+a synthetic calendar DOM: the button stays out of unrelated dialogs, appears
+after a chip click, is not duplicated on repeated mutations, sends the right
+title/day/start minute, and the resolved template reaches the sidebar with its
+duration and repeat intact.
+
+**Still unverified against the real Google Calendar** — the chip selector
+(`[data-eventid], [data-eventchip]`) and the assumption that the detail popup
+carries `role="dialog"`. If the button never appears, those are the two things to
+check.
 
 ---
 

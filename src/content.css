@@ -179,10 +179,37 @@
   color: #5f6368 !important;
 }
 
-/* Sidebar highlight while a calendar event is being dragged onto it */
-.wlp-capture-target .wlp-sidebar {
-  box-shadow: inset 0 0 0 2px #4285f4 !important;
-  background: rgba(66, 133, 244, 0.04) !important;
+/* "Add to pool" bar injected into Google's event dialog. Appended to the dialog
+   root, so it must not assume anything about the dialog's own layout. */
+.wlp-capture-bar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  padding: 8px 16px 14px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.wlp-capture-btn {
+  font-family: 'Google Sans', 'Roboto', -apple-system, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #ffffff !important;
+  background: #4285f4 !important;
+  border: none !important;
+  border-radius: 100px !important;
+  padding: 8px 18px !important;
+  cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+
+.wlp-capture-btn:hover:not(:disabled) {
+  background: #3367d6 !important;
+}
+
+.wlp-capture-btn:disabled {
+  background: #dadce0 !important;
+  color: #5f6368 !important;
+  cursor: default !important;
 }
 
 /* Duration select — add form and pool item rows */

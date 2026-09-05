@@ -406,10 +406,6 @@ function readChip(target: EventTarget | null): CapturedChip | null {
   return { title, date, startMin: chipStartMinute(chip) };
 }
 
-function setSidebarArmed(armed: boolean): void {
-  getSidebar()?.classList.toggle('wlp-capture-target', armed);
-}
-
 // Hand the chip to the background worker, which finds the real event and returns
 // only the reusable parts of it - never the date it happened to be on.
 function captureChip(chip: CapturedChip): void {
@@ -428,7 +424,7 @@ function captureChip(chip: CapturedChip): void {
         startMin:    chip.startMin,
       },
     },
-    (response) => {
+    (response: any) => {
       if (response?.success) {
         document.dispatchEvent(new CustomEvent('poolCapture', { detail: response.data }));
       } else {
@@ -453,45 +449,92 @@ function sendToBackground(message: unknown, onResponse: (response: any) => void)
   }
 }
 
-function setupCapture(): void {
-  document.addEventListener('mousedown', (e) => {
-    // Purely observational: preventing the default here would break Google
-    // Calendar's own click and drag handling.
-    pendingChip = readChip(e.target);
-  }, true);
+// Google Calendar opens a detail dialog when an event chip is clicked. Rather
+// than intercepting a drag - whose implementation cannot be relied on - we add
+// an "Add to pool" button to that dialog.
+//
+// The dialog itself is only used as the place to put the button. The event is
+// identified from the chip that was clicked, because a chip's position in its
+// day column gives an exact date and start time, while the dialog states them
+// as localised prose that would have to be parsed.
 
-  document.addEventListener('mousemove', (e) => {
-    if (!pendingChip) return;
-    setSidebarArmed(isInsideSidebar(e.target));
-  }, true);
+const CAPTURE_BUTTON_ID = 'wlp-add-to-pool';
+const CHIP_CLICK_TTL_MS = 3000;
 
-  document.addEventListener('mouseup', (e) => {
-    const chip = pendingChip;
-    pendingChip = null;
-    setSidebarArmed(false);
-    if (chip && isInsideSidebar(e.target)) captureChip(chip);
-  }, true);
+let clickedChip: CapturedChip | null = null;
+let clickedChipAt = 0;
 
-  // Native drag path, in case the chips are real HTML5 draggables.
-  document.addEventListener('dragstart', (e) => {
-    if (isInsideSidebar(e.target)) return; // our own pool items
-    pendingChip = readChip(e.target) ?? pendingChip;
-  }, true);
+function recentChip(): CapturedChip | null {
+  if (!clickedChip || Date.now() - clickedChipAt > CHIP_CLICK_TTL_MS) return null;
+  return clickedChip;
+}
 
-  document.addEventListener('dragover', (e: DragEvent) => {
-    if (!pendingChip || !isInsideSidebar(e.target)) return;
-    e.preventDefault(); // accept the drop
-    setSidebarArmed(true);
-  });
+function buildCaptureButton(chip: CapturedChip): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'wlp-capture-bar';
 
-  document.addEventListener('drop', (e: DragEvent) => {
-    const chip = pendingChip;
-    if (!chip || !isInsideSidebar(e.target)) return;
+  const button = document.createElement('button');
+  button.id = CAPTURE_BUTTON_ID;
+  button.type = 'button';
+  button.className = 'wlp-capture-btn';
+  button.textContent = 'Add to pool';
+  button.title = `Save "${chip.title}" to the Weekly Pool as a reusable block`;
+
+  button.addEventListener('click', (e) => {
     e.preventDefault();
-    pendingChip = null;
-    setSidebarArmed(false);
+    e.stopPropagation();
+    button.disabled = true;
+    button.textContent = 'Adding…';
     captureChip(chip);
   });
+
+  wrap.appendChild(button);
+  return wrap;
+}
+
+// Only dialogs opened right after clicking a chip get the button. That keeps it
+// out of Google's other dialogs (settings, search, create-event) without having
+// to recognise each one.
+function decorateDialog(dialog: Element): void {
+  if (dialog.querySelector(`#${CAPTURE_BUTTON_ID}`)) return;
+
+  const chip = recentChip();
+  if (!chip) return;
+
+  // Appended to the dialog root rather than slotted into Google's action row,
+  // so this does not depend on the dialog's internal structure.
+  dialog.appendChild(buildCaptureButton(chip));
+}
+
+function setupCapture(): void {
+  // Capture phase, so the chip is recorded even if Google stops the event.
+  document.addEventListener('click', (e) => {
+    const chip = readChip(e.target);
+    if (!chip) return;
+    clickedChip = chip;
+    clickedChipAt = Date.now();
+  }, true);
+
+  const scan = (root: ParentNode) => {
+    const dialogs = root.querySelectorAll?.('[role="dialog"]');
+    dialogs?.forEach(decorateDialog);
+  };
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mut of mutations) {
+      for (const node of mut.addedNodes) {
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        const el = node as Element;
+        if (el.matches?.('[role="dialog"]')) decorateDialog(el);
+        scan(el);
+      }
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // The dialog can already be open when the script loads.
+  scan(document);
 }
 
 function rruleFor(repeat: { freq: string; interval?: number }): string {
