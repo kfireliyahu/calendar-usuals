@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output — reproduce with `npm run build`
+dist/
+
+# Local editor / tool state
+.claude/settings.local.json
+*.local
+
+# Environment
+.env
+.env.*
+
+# OS / logs
+.DS_Store
+Thumbs.db
+*.log
