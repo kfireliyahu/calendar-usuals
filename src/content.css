@@ -165,6 +165,50 @@
   cursor: not-allowed !important;
 }
 
+/* Duration select — add form and pool item rows */
+.wlp-duration {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #5f6368 !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: right !important;
+  box-shadow: none !important;
+  flex-shrink: 0 !important;
+}
+
+.wlp-duration:hover {
+  color: #202124 !important;
+}
+
+.wlp-duration:focus-visible {
+  outline: 1px solid #4285f4 !important;
+  border-radius: 3px !important;
+}
+
+/* In the add row it divides the text field from the add button. */
+.wlp-input-row .wlp-duration {
+  padding: 9px 8px 9px 6px !important;
+  border-left: 1px solid #e8eaed !important;
+}
+
+/* On an item row it reads as a label until the row is hovered. */
+.wlp-item .wlp-duration {
+  color: #9aa0a6 !important;
+  margin-left: 8px !important;
+}
+
+.wlp-item:hover .wlp-duration {
+  color: #5f6368 !important;
+}
+
 /* ── Category list ─────────────────────────────────────────────────────────── */
 .wlp-cat-group {
   margin-bottom: 10px !important;

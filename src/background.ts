@@ -19,43 +19,73 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 async function listCalendars() {
-  const token = await getAccessToken();
-
-  const response = await fetch(
-    'https://www.googleapis.com/calendar/v3/users/me/calendarList',
-    { headers: { Authorization: `Bearer ${token}` } }
+  const response = await authedFetch(
+    'https://www.googleapis.com/calendar/v3/users/me/calendarList'
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to list calendars: ${response.statusText}`);
+    throw new Error(`Failed to list calendars: ${await describeError(response)}`);
   }
 
   return response.json();
 }
 
 async function createCalendarEvent(eventData: any) {
-  const token = await getAccessToken();
-
   // calendarId is passed in the payload but must not appear in the event body
   const { calendarId = 'primary', ...eventBody } = eventData;
 
-  const response = await fetch(
+  const response = await authedFetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(eventBody),
     }
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to create event: ${response.statusText}`);
+    throw new Error(`Failed to create event: ${await describeError(response)}`);
   }
 
   return response.json();
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+// chrome.identity caches access tokens, and it hands back a cached token even
+// after Google has expired or revoked it. Without this retry, one stale token
+// makes every call fail until the user reloads the extension: drop the bad token
+// from the cache, ask for a fresh one, and replay the request exactly once.
+async function authedFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  let token = await getAccessToken();
+  let response = await fetch(url, withAuth(init, token));
+
+  if (response.status === 401) {
+    await removeCachedAuthToken(token);
+    token = await getAccessToken();
+    response = await fetch(url, withAuth(init, token));
+  }
+
+  return response;
+}
+
+function withAuth(init: RequestInit, token: string): RequestInit {
+  return {
+    ...init,
+    headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
+  };
+}
+
+// The API puts the useful part in the body; statusText alone is just "Unauthorized".
+async function describeError(response: Response): Promise<string> {
+  try {
+    const body = await response.json();
+    const message = body?.error?.message;
+    if (message) return `${message} (${response.status})`;
+  } catch {
+    // Body was not JSON — fall through to the status line.
+  }
+  return response.statusText || `HTTP ${response.status}`;
 }
 
 async function getAccessToken(): Promise<string> {
@@ -69,5 +99,11 @@ async function getAccessToken(): Promise<string> {
         reject(new Error('Failed to get auth token'));
       }
     });
+  });
+}
+
+async function removeCachedAuthToken(token: string): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.identity.removeCachedAuthToken({ token }, () => resolve());
   });
 }

@@ -8,60 +8,74 @@ interface DropPoolItem {
   name: string;
   calendarId: string;
   color?: string;
+  durationMin?: number;
 }
 
 const SIDEBAR_WIDTH   = 280;
 const COLLAPSED_WIDTH = 40;
 const PIXELS_PER_HOUR = 60; // 1 px = 1 minute
 
+// Items saved before durations existed have no durationMin, so every read goes
+// through here rather than reading the field directly.
+const DEFAULT_DURATION_MIN = 60;
+function durationOf(item: { durationMin?: number }): number {
+  return item.durationMin ?? DEFAULT_DURATION_MIN;
+}
+
 // ── Datekey → Date ────────────────────────────────────────────────────────────
 //
-// Google Calendar's datekey is NOT a simple days-since-epoch counter.
-// Every month boundary adds +2 extra to the key (the transition is +3, not +1).
-// Verified: April 30 = 28830, May 1 = 28833 (+3), May 2 = 28834 (+1 normal).
+// Google Calendar's data-datekey is a bit-packed date, NOT a day counter:
 //
-// Formula: datekey = jan1_dk(year) + cumulative_days_in_year + 2 × (month − 1)
-// Derived base: Jan 1 2026 = 28705
+//   datekey = ((year - 1970) << 9) | (month << 5) | day     (month and day 1-based)
+//
+// i.e. 512 per year, 32 per month, 1 per day. Spot checks:
+//   Jan  1 2026 = 28672 + 32  + 1  = 28705
+//   Apr 30 2026 = 28672 + 128 + 30 = 28830
+//   May  1 2026 = 28672 + 160 + 1  = 28833
+//   Sep  6 2026 = 28672 + 288 + 6  = 28966
+//
+// The old "days since epoch + 2 per month boundary" approximation drifted by a
+// day or more inside any week that crossed a month, and could land in the wrong
+// month/year entirely.
 
-const DAYS_IN_MONTH_NORMAL = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-const BASE_YEAR    = 2026;
-const BASE_JAN1_DK = 28705;
+const DATEKEY_EPOCH_YEAR = 1970;
+
+function datekeyToDate(datekey: string): Date | null {
+  const dk = parseInt(datekey, 10);
+  if (!Number.isFinite(dk) || dk <= 0) {
+    console.warn('[WeeklyPool] Invalid datekey:', datekey);
+    return null;
+  }
+
+  const year  = DATEKEY_EPOCH_YEAR + (dk >> 9);
+  const month = (dk >> 5) & 0b1111; // 1-12
+  const day   = dk & 0b11111;       // 1-31
+
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
+    console.warn('[WeeklyPool] Unresolvable datekey:', dk, { year, month, day });
+    return null;
+  }
+
+  return new Date(year, month - 1, day);
+}
 
 function isLeapYear(y: number): boolean {
   return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
 }
 function daysInMonth(year: number, month: number): number {
-  return month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH_NORMAL[month - 1];
+  const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month === 2 && isLeapYear(year) ? 29 : DAYS[month - 1];
 }
-function jan1Datekey(year: number): number {
-  let dk = BASE_JAN1_DK;
-  if (year > BASE_YEAR) {
-    for (let y = BASE_YEAR; y < year; y++) dk += (isLeapYear(y) ? 366 : 365) + 24;
-  } else if (year < BASE_YEAR) {
-    for (let y = BASE_YEAR - 1; y >= year; y--) dk -= (isLeapYear(y) ? 366 : 365) + 24;
-  }
-  return dk;
+
+// The datekey usually lives on the [role="gridcell"] itself, but in some views
+// (all-day row, month grid) it sits on an ancestor, so walk up to find it.
+function findDatekey(cell: Element): string | null {
+  const el = cell.closest('[data-datekey]');
+  return el ? el.getAttribute('data-datekey') : null;
 }
-function monthStartDk(year: number, month: number): number {
-  let days = 0;
-  for (let m = 1; m < month; m++) days += daysInMonth(year, m);
-  return jan1Datekey(year) + days + 2 * (month - 1);
-}
-function datekeyToDate(datekey: string): Date {
-  const dk = parseInt(datekey, 10);
-  let year = BASE_YEAR + Math.round((dk - BASE_JAN1_DK) / 389.5);
-  for (let i = 0; i < 20; i++) {
-    if (dk < jan1Datekey(year))      { year--; continue; }
-    if (dk >= jan1Datekey(year + 1)) { year++; continue; }
-    break;
-  }
-  for (let m = 1; m <= 12; m++) {
-    const start = monthStartDk(year, m);
-    const end   = start + daysInMonth(year, m) - 1;
-    if (dk >= start && dk <= end) return new Date(year, m - 1, dk - start + 1);
-  }
-  console.warn('[WeeklyPool] Unresolvable datekey:', dk);
-  return new Date(year, 0, 1);
+function dateFromCell(cell: Element): Date | null {
+  const datekey = findDatekey(cell);
+  return datekey ? datekeyToDate(datekey) : null;
 }
 
 // ── Layout ────────────────────────────────────────────────────────────────────
@@ -94,6 +108,18 @@ function adjustLayout(collapsed: boolean): void {
 
 // ── Time helper ───────────────────────────────────────────────────────────────
 
+// timeFromDrop reads a drop offset as "minutes since midnight", which only holds
+// in the week/day time grid, where a gridcell is one whole day column at
+// PIXELS_PER_HOUR (24 h => ~1440 px). Month-view cells and the all-day row are
+// also [role="gridcell"] with a datekey, but they are a fraction of that height,
+// so the same arithmetic there yields an arbitrary time. Require most of a full
+// day's height before trusting the offset.
+const TIME_GRID_MIN_HEIGHT = 20 * PIXELS_PER_HOUR;
+
+function isTimeGridCell(cell: Element): boolean {
+  return cell.getBoundingClientRect().height >= TIME_GRID_MIN_HEIGHT;
+}
+
 function timeFromDrop(cell: Element, clientY: number): { hours: number; minutes: number; snapped: number } {
   const pixelY = clientY - cell.getBoundingClientRect().top;
   const snapped = Math.round(pixelY / 15) * 15;
@@ -107,6 +133,18 @@ function formatTime(hours: number, minutes: number): string {
   const period = hours < 12 ? 'AM' : 'PM';
   const h = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
   return `${h}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+// "7:00 - 8:30 AM" when both ends share a meridiem, "11:30 AM - 12:15 PM" when
+// they do not. Wraps past midnight for a block that runs into the next day.
+function formatRange(hours: number, minutes: number, durationMin: number): string {
+  const endTotal = (hours * 60 + minutes + durationMin) % (24 * 60);
+  const endHours = Math.floor(endTotal / 60);
+  const endMins  = endTotal % 60;
+  const start = formatTime(hours, minutes);
+  const end   = formatTime(endHours, endMins);
+  const samePeriod = (hours < 12) === (endHours < 12);
+  return `${samePeriod ? start.replace(/ [AP]M$/, '') : start} - ${end}`;
 }
 
 // ── Hover tooltip ─────────────────────────────────────────────────────────────
@@ -156,13 +194,14 @@ function getPreview(): HTMLElement {
   }
   return previewEl;
 }
-function showPreview(cell: Element, clientY: number, itemName: string, color = '#4285f4'): void {
+function showPreview(cell: Element, clientY: number, itemName: string, color = '#4285f4', durationMin = DEFAULT_DURATION_MIN): void {
   const el = getPreview();
   const { snapped } = timeFromDrop(cell, clientY);
   const rect = cell.getBoundingClientRect();
+  // 1 px = 1 min in the time grid, so the block's pixel height is its duration.
   Object.assign(el.style, {
     top: `${rect.top + snapped}px`, left: `${rect.left + 2}px`,
-    width: `${rect.width - 4}px`,  height: `${PIXELS_PER_HOUR}px`,
+    width: `${rect.width - 4}px`,  height: `${durationMin}px`,
     display: 'block', opacity: '1', animation: 'none',
     background: color + '33',
     border: `2px solid ${color}`,
@@ -203,7 +242,7 @@ function showLoading(cell: Element, clientY: number, item: DropPoolItem): void {
 
   Object.assign(el.style, {
     top: `${rect.top + snapped}px`, left: `${rect.left + 2}px`,
-    width: `${rect.width - 4}px`,  height: `${PIXELS_PER_HOUR}px`,
+    width: `${rect.width - 4}px`,  height: `${durationOf(item)}px`,
     display: 'block', opacity: '1',
     background: calColor, border: 'none', borderRadius: '4px',
     padding: '4px 8px', fontSize: '12px', fontWeight: '500',
@@ -306,15 +345,23 @@ function setupListeners(): void {
     if (!isPoolDrag(e)) return;
     const cell = (e.target as Element).closest('[role="gridcell"]');
     if (!cell) { hideTooltip(); hidePreview(); return; }
+    // Deliberately no preventDefault() outside the time grid: without it the
+    // browser refuses the drop, so the user gets a "no drop" cursor and the
+    // tooltip below explains where to aim instead.
+    if (!isTimeGridCell(cell)) {
+      hidePreview();
+      if (draggingItem) showTooltip(e.clientX, e.clientY, 'Switch to Day or Week view to drop here');
+      return;
+    }
     e.preventDefault();
     if (draggingItem) {
-      const datekey = cell.getAttribute('data-datekey');
-      const date = datekey ? datekeyToDate(datekey) : null;
+      const date = dateFromCell(cell);
       if (date) {
         const { hours, minutes } = timeFromDrop(cell, e.clientY);
+        const duration = durationOf(draggingItem);
         const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        showTooltip(e.clientX, e.clientY, `${draggingItem.name}  ·  ${day}, ${formatTime(hours, minutes)}`);
-        showPreview(cell, e.clientY, draggingItem.name, draggingItem.color);
+        showTooltip(e.clientX, e.clientY, `${draggingItem.name}  ·  ${day}, ${formatRange(hours, minutes, duration)}`);
+        showPreview(cell, e.clientY, draggingItem.name, draggingItem.color, duration);
       }
     }
   });
@@ -324,6 +371,7 @@ function setupListeners(): void {
     if (!cell) return;
     const raw = e.dataTransfer?.getData('poolItem');
     if (!raw) return;
+    if (!isTimeGridCell(cell)) return;
     e.preventDefault();
     hideTooltip();
     // Note: hidePreview() deliberately skipped here — showLoading() takes over the element
@@ -331,15 +379,15 @@ function setupListeners(): void {
     let item: DropPoolItem;
     try { item = JSON.parse(raw); } catch { return; }
 
-    const datekey = cell.getAttribute('data-datekey');
-    if (!datekey) { console.warn('[WeeklyPool] No data-datekey on cell', cell); return; }
-
-    const date = datekeyToDate(datekey);
-    console.log(`[WeeklyPool] Drop → datekey=${datekey} → ${date.toDateString()}`);
+    const date = dateFromCell(cell);
+    if (!date) { console.warn('[WeeklyPool] Could not resolve a date for cell', cell); return; }
+    console.log(`[WeeklyPool] Drop → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
 
     const { hours, minutes } = timeFromDrop(cell, e.clientY);
     const start = new Date(date); start.setHours(hours, minutes, 0, 0);
-    const end   = new Date(start); end.setHours(hours + 1, minutes, 0, 0);
+    // Millisecond arithmetic rather than setHours(h + n): it reads the same way
+    // for any duration and rolls into the next day correctly.
+    const end   = new Date(start.getTime() + durationOf(item) * 60_000);
 
     // Show pulsing placeholder at the exact drop position immediately
     showLoading(cell, e.clientY, item);

@@ -4,6 +4,7 @@ interface PoolItem {
   id: string;
   name: string;
   calendarId: string;
+  durationMin?: number;
 }
 
 interface PoolCategory {
@@ -25,10 +26,65 @@ interface Toast {
   type: 'info' | 'success' | 'error';
 }
 
+// Items saved before durations existed have no durationMin, so it is read through
+// durationOf() everywhere rather than off the field directly.
+const DEFAULT_DURATION_MIN = 60;
+const DURATION_PRESETS = [15, 30, 45, 60, 90, 120];
+
+function durationOf(item: PoolItem): number {
+  return item.durationMin ?? DEFAULT_DURATION_MIN;
+}
+
+function formatDuration(min: number): string {
+  if (min < 60) return `${min}m`;
+  const hours = Math.floor(min / 60);
+  const mins  = min % 60;
+  return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+}
+
+// Shape of what we keep in chrome.storage.local. Every key is optional because
+// storage is empty on a fresh install, so each read needs a fallback.
+interface StoredState {
+  poolItems?: Record<string, PoolItem[]>;
+  hiddenCategories?: string[];
+  sidebarCollapsed?: boolean;
+  formOpen?: boolean;
+}
+
+// Compact duration control. A native <select> so it stays keyboard accessible
+// without a custom dropdown; content.css strips the arrow to fit the 280px rail.
+const DurationSelect: React.FC<{
+  value: number;
+  onChange: (min: number) => void;
+}> = ({ value, onChange }) => {
+  // A stored value outside the presets still has to appear as an option, or the
+  // select would quietly display a duration the item does not have.
+  const options = DURATION_PRESETS.includes(value)
+    ? DURATION_PRESETS
+    : [...DURATION_PRESETS, value].sort((a, b) => a - b);
+
+  return (
+    <select
+      value={value}
+      title="Duration"
+      onChange={(e) => onChange(Number(e.target.value))}
+      // Pool item rows are draggable: without this, pressing the select would
+      // start a drag instead of opening the menu.
+      onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      className="wlp-duration"
+    >
+      {options.map((min) => (
+        <option key={min} value={min}>{formatDuration(min)}</option>
+      ))}
+    </select>
+  );
+};
+
 const PoolSidebar: React.FC = () => {
   const [categories, setCategories] = useState<PoolCategory[]>([]);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('');
+  const [newItemDuration, setNewItemDuration] = useState(DEFAULT_DURATION_MIN);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -44,7 +100,7 @@ const PoolSidebar: React.FC = () => {
 
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage) return;
-    chrome.storage.local.get(['sidebarCollapsed', 'formOpen'], (result) => {
+    chrome.storage.local.get<StoredState>(['sidebarCollapsed', 'formOpen'], (result) => {
       collapsedReady.current = true;
       formReady.current = true;
       setCollapsed(result.sidebarCollapsed === true);
@@ -119,7 +175,7 @@ const PoolSidebar: React.FC = () => {
 
       const entries: CalendarListEntry[] = response.data.items ?? [];
 
-      chrome.storage.local.get(['poolItems', 'hiddenCategories'], (result) => {
+      chrome.storage.local.get<StoredState>(['poolItems', 'hiddenCategories'], (result) => {
         const stored: Record<string, PoolItem[]> = result.poolItems ?? {};
         const hiddenIds: string[] = result.hiddenCategories ?? [];
         const newCategories: PoolCategory[] = entries.map((cal) => ({
@@ -160,12 +216,32 @@ const PoolSidebar: React.FC = () => {
     setCategories((prev) =>
       prev.map((cat) =>
         cat.calendarId === newItemCategory
-          ? { ...cat, items: [...cat.items, { id: Date.now().toString(), name: newItemName, calendarId: newItemCategory }] }
+          ? {
+              ...cat,
+              items: [
+                ...cat.items,
+                {
+                  id: Date.now().toString(),
+                  name: newItemName,
+                  calendarId: newItemCategory,
+                  durationMin: newItemDuration,
+                },
+              ],
+            }
           : cat
       )
     );
     setNewItemName('');
     inputRef.current?.focus();
+  };
+
+  const setItemDuration = (id: string, durationMin: number) => {
+    setCategories((prev) =>
+      prev.map((cat) => ({
+        ...cat,
+        items: cat.items.map((item) => (item.id === id ? { ...item, durationMin } : item)),
+      }))
+    );
   };
 
   const deleteItem = (id: string) => {
@@ -367,6 +443,7 @@ const PoolSidebar: React.FC = () => {
                         </svg>
                       </button>
                     )}
+                    <DurationSelect value={newItemDuration} onChange={setNewItemDuration} />
                     <button
                       onClick={addItem}
                       disabled={!newItemName.trim()}
@@ -435,6 +512,10 @@ const PoolSidebar: React.FC = () => {
                           style={{ borderLeft: `3px solid ${category.color}` }}
                         >
                           <span className="flex-1 truncate">{item.name}</span>
+                          <DurationSelect
+                            value={durationOf(item)}
+                            onChange={(min) => setItemDuration(item.id, min)}
+                          />
                           <button
                             onClick={() => deleteItem(item.id)}
                             title="Remove"
