@@ -23,6 +23,10 @@ function copyStatic(): Plugin {
 export default defineConfig({
   plugins: [tailwindcss(), react(), copyStatic()],
   build: {
+    // Content scripts are minified onto one line, so an uncaught error reports
+    // as content.js:9 with no useful frames. Source maps make DevTools resolve
+    // stack traces back to the .tsx that threw.
+    sourcemap: true,
     rollupOptions: {
       input: {
         content: resolve(__dirname, 'src/content.tsx'),

@@ -347,8 +347,19 @@ interface CapturedChip {
 
 let pendingChip: CapturedChip | null = null;
 
+// An event target is not always an Element: dragging or dropping over text hands
+// back a text node, which has no closest(). Resolving to the parent element
+// rather than bailing out matters here - a drop aimed at an item's label is a
+// drop on the sidebar, and treating it as "not the sidebar" silently lost it.
+function closestFrom(target: EventTarget | null, selector: string): Element | null {
+  const node = target as Node | null;
+  if (!node) return null;
+  const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+  return el?.closest(selector) ?? null;
+}
+
 function isInsideSidebar(target: EventTarget | null): boolean {
-  return !!(target as Element | null)?.closest?.(`#${SIDEBAR_ID}`);
+  return closestFrom(target, `#${SIDEBAR_ID}`) !== null;
 }
 
 function getSidebar(): HTMLElement | null {
@@ -385,7 +396,7 @@ function chipStartMinute(chip: Element): number | null {
 }
 
 function readChip(target: EventTarget | null): CapturedChip | null {
-  const chip = (target as Element | null)?.closest?.(CHIP_SELECTOR);
+  const chip = closestFrom(target, CHIP_SELECTOR);
   if (!chip || isInsideSidebar(chip)) return null;
 
   const date = dateFromCell(chip);
@@ -407,7 +418,7 @@ function captureChip(chip: CapturedChip): void {
 
   dispatchPoolEvent('capturing', chip.title);
 
-  chrome.runtime.sendMessage(
+  const sent = sendToBackground(
     {
       type: 'RESOLVE_EVENT',
       data: {
@@ -425,6 +436,21 @@ function captureChip(chip: CapturedChip): void {
       }
     }
   );
+
+  if (!sent) dispatchPoolEvent('error', chip.title, 'Extension reloaded - refresh the page');
+}
+
+// Reloading the extension orphans any content script already on the page:
+// chrome.runtime.id becomes undefined and sendMessage throws "Extension context
+// invalidated". Surface that as a failed send rather than an uncaught error.
+function sendToBackground(message: unknown, onResponse: (response: any) => void): boolean {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.id) return false;
+  try {
+    chrome.runtime.sendMessage(message, onResponse);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function setupCapture(): void {
@@ -493,7 +519,7 @@ function setupListeners(): void {
 
   document.addEventListener('dragover', (e: DragEvent) => {
     if (!isPoolDrag(e)) return;
-    const cell = (e.target as Element).closest('[role="gridcell"]');
+    const cell = closestFrom(e.target, '[role="gridcell"]');
     if (!cell) { hideTooltip(); hidePreview(); return; }
     // Deliberately no preventDefault() outside the time grid: without it the
     // browser refuses the drop, so the user gets a "no drop" cursor and the
@@ -517,7 +543,7 @@ function setupListeners(): void {
   });
 
   document.addEventListener('drop', (e: DragEvent) => {
-    const cell = (e.target as Element).closest('[role="gridcell"]');
+    const cell = closestFrom(e.target, '[role="gridcell"]');
     if (!cell) return;
     const raw = e.dataTransfer?.getData('poolItem');
     if (!raw) return;
@@ -543,7 +569,7 @@ function setupListeners(): void {
     showLoading(cell, e.clientY, item);
 
     dispatchPoolEvent('creating', item.name);
-    chrome.runtime.sendMessage(
+    const sent = sendToBackground(
       {
         type: 'CREATE_EVENT',
         data: {
@@ -567,6 +593,11 @@ function setupListeners(): void {
         }
       }
     );
+
+    if (!sent) {
+      dispatchPoolEvent('error', item.name, 'Extension reloaded - refresh the page');
+      hideLoading(true);
+    }
   });
 }
 
