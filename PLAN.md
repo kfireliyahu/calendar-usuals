@@ -16,7 +16,6 @@ names they were discussed under.
 | Stale-token retry: 401 → `removeCachedAuthToken` → replay once | `src/background.ts` |
 | Month-view / all-day drop guard | `src/content.tsx` |
 | **Phase 1** — per-item duration | `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css` |
-| **Capture** — "Add to pool" icon button in Google's event dialog | `src/background.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx` |
 
 ---
 
@@ -34,12 +33,9 @@ interface PoolItem {
   // phase 1 (done)
   durationMin?: number;      // undefined => 60
 
-  // capture (done) - also the start of phase 5
+  // phase 5
   description?: string;
   location?: string;
-  repeat?: { freq: string; interval?: number };
-
-  // phase 5 (remaining)
   colorId?: string;          // Google Calendar event colorId
   reminderMin?: number;      // popup reminder, minutes before
 
@@ -51,67 +47,6 @@ interface PoolItem {
 **Migration rule:** every new field is optional, and every reader treats
 `undefined` as today's behaviour. Items already in storage keep working with no
 migration step. Do not add a required field to `PoolItem`.
-
----
-
-## Capture — save an existing event as a block *(done)*
-
-Clicking an event in Google Calendar opens its detail dialog; an **Add to pool**
-icon button is inserted into that dialog's action row, alongside edit / delete /
-close, and saves the event as a reusable block. Only the
-reusable parts are kept — name, calendar, description, location, length, and how
-often it repeats. The date it sat on is discarded: the block is a template, not a
-copy.
-
-**Why a button and not a drag.** Dragging an event onto the sidebar was tried
-first and abandoned. It depended on Google Calendar's chips being HTML5
-draggables, which cannot be confirmed — Google may drive their dragging from raw
-pointer events, in which case `dragstart` / `drop` never fire and the gesture
-silently does nothing. A dialog is a DOM node that either appears or does not, so
-the button is observable and testable.
-
-**The dialog is only a place to put the button.** The event is identified from
-the chip that was *clicked*, not from the dialog's contents: a chip's position in
-its day column yields an exact date and start minute, whereas the dialog states
-them as localised prose that would have to be parsed. `readChip` records the chip
-on click (capture phase, so it survives Google stopping the event), and the
-button is injected only into a dialog opened within 3 s of that click — which
-also keeps it out of Google's settings, search and create-event dialogs without
-having to recognise each one.
-
-**Resolution avoids Google's internal ids.** `resolveEventTemplate` looks the
-event up through the API by day + title + start minute rather than decoding
-`data-eventid`. `scoreCandidate` requires a title match and uses start time only
-to break ties between same-named events, so small pixel discrepancies are
-harmless.
-
-**Recurrence is normalised, not copied.** `readRecurrence` keeps only `FREQ` and
-`INTERVAL`, dropping `BYDAY`, `UNTIL` and `COUNT`: a block should repeat from
-whichever day it is later dropped on, and an inherited `UNTIL` in the past would
-produce a series with no instances.
-
-**Verified end-to-end** against the built bundle with a stubbed `chrome` API and
-a synthetic calendar DOM: the button stays out of unrelated dialogs, appears
-after a chip click, is not duplicated on repeated mutations, sends the right
-title/day/start minute, and the resolved template reaches the sidebar with its
-duration and repeat intact.
-
-**Confirmed against the real Google Calendar:** the detail popup does carry
-`role="dialog"`, and the chip selector (`[data-eventid], [data-eventchip]`) does
-match its event chips — the button appeared and worked on a live calendar.
-
-**Finding the action row.** Google's dialog markup is undocumented and its button
-labels are localised, so `findActionRow` works structurally: whichever element is
-the direct parent of the most button-like children is the toolbar, requiring at
-least three so an unrelated pair cannot be mistaken for one. The dialog renders
-progressively, so insertion is retried over ~640 ms before falling back to a
-plain button appended to the dialog root.
-
-**Styling inside someone else's DOM.** Every property on the injected button is
-pinned with `!important`, including width, height and `flex`. The first version
-set only colour and padding and was stretched by the dialog's own layout into an
-oversized blob — inside Google's DOM, anything left unset is inherited from
-whatever container it lands in.
 
 ---
 
@@ -159,9 +94,7 @@ reason the sidebar exists.
 Make a pool item carry its whole configuration, not just a name, so dropping it
 produces the event you would otherwise have typed by hand.
 
-- Remaining fields: `colorId`, `reminderMin`. `description` and `location` are
-  already on `PoolItem` and already sent on drop — capture put them there — but
-  nothing edits them yet, which is what this phase adds.
+- Fields: `description`, `location`, `colorId`, `reminderMin`.
 - These map straight onto the `events.insert` body — `description`, `location`,
   `colorId`, and
   `reminders: { useDefault: false, overrides: [{ method: 'popup', minutes }] }`.
@@ -195,6 +128,12 @@ phases 2–3 are what actually improve daily use. Build it if the tool sticks.
 ## Not in this plan
 
 Tracked so they are not silently forgotten:
+
+- **Capturing an existing calendar event into the pool** — built and removed.
+  Both a drag onto the sidebar and an "Add to pool" button in Google's event
+  dialog worked, but it cost a second API round trip, a DOM observer on Google's
+  dialog markup, and template fields on `PoolItem` that nothing else used. Not
+  worth that surface area for a pool you fill once; typing the item is faster.
 
 - **Undo after drop** — 5-second undo in the existing toast, using the event id
   the API returns. Cheap, and it matters more once shift-drop can create an

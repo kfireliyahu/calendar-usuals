@@ -9,9 +9,6 @@ interface DropPoolItem {
   calendarId: string;
   color?: string;
   durationMin?: number;
-  description?: string;
-  location?: string;
-  repeat?: { freq: string; interval?: number };
 }
 
 const SIDEBAR_WIDTH   = 280;
@@ -322,123 +319,20 @@ function waitForEvent(itemName: string): void {
 
 // ── Custom events ─────────────────────────────────────────────────────────────
 
-function dispatchPoolEvent(type: 'creating' | 'created' | 'capturing' | 'error', itemName: string, error?: string): void {
+function dispatchPoolEvent(type: 'creating' | 'created' | 'error', itemName: string, error?: string): void {
   document.dispatchEvent(new CustomEvent('poolEvent', { detail: { type, itemName, error } }));
 }
 
-// ── Capturing an existing calendar event into the pool ───────────────────────
-//
-// Google Calendar's event chips carry internal, undocumented ids, and it is not
-// safe to assume they use HTML5 drag-and-drop at all - Google may drive their
-// dragging from raw pointer events, in which case dragstart/drop never fire.
-// So the capture is driven by mousedown/mouseup, which happen either way, and
-// the event is identified through the Calendar API by day + title + start time
-// rather than by scraping an id. The dragstart/drop path is wired up too, so the
-// gesture also works if the chips are native draggables.
-
-const CHIP_SELECTOR = '[data-eventid], [data-eventchip]';
-const SIDEBAR_ID = 'weekly-life-pool-sidebar';
-
-interface CapturedChip {
-  title: string;
-  date: Date;
-  startMin: number | null;
-}
-
-let pendingChip: CapturedChip | null = null;
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
 // An event target is not always an Element: dragging or dropping over text hands
 // back a text node, which has no closest(). Resolving to the parent element
-// rather than bailing out matters here - a drop aimed at an item's label is a
-// drop on the sidebar, and treating it as "not the sidebar" silently lost it.
+// rather than bailing out keeps a drop aimed at text working.
 function closestFrom(target: EventTarget | null, selector: string): Element | null {
   const node = target as Node | null;
   if (!node) return null;
   const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
   return el?.closest(selector) ?? null;
-}
-
-function isInsideSidebar(target: EventTarget | null): boolean {
-  return closestFrom(target, `#${SIDEBAR_ID}`) !== null;
-}
-
-function getSidebar(): HTMLElement | null {
-  return document.getElementById(SIDEBAR_ID);
-}
-
-// Chip text is "7:00am Gym" or similar, and aria-label usually leads with the
-// title before a comma. Strip clock fragments so what is left can be matched
-// against the event's real summary.
-function stripTimes(text: string): string {
-  return text
-    .replace(/\d{1,2}(:\d{2})?\s*(–|—|-|to)\s*\d{1,2}(:\d{2})?\s*(am|pm)?/gi, ' ')
-    .replace(/\d{1,2}:\d{2}\s*(am|pm)?/gi, ' ')
-    .replace(/\d{1,2}\s*(am|pm)/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function chipTitle(chip: Element): string {
-  const label = chip.getAttribute('aria-label') ?? '';
-  const raw = label || chip.textContent || '';
-  return stripTimes(label ? raw.split(',')[0] : raw);
-}
-
-// A chip is positioned within its day column, so its distance from the top of
-// that column is its start time in minutes - the same 1 px = 1 min relationship
-// the drop handler relies on.
-function chipStartMinute(chip: Element): number | null {
-  const column = chip.closest('[data-datekey]');
-  if (!column || !isTimeGridCell(column)) return null;
-  const offset = chip.getBoundingClientRect().top - column.getBoundingClientRect().top;
-  if (!Number.isFinite(offset) || offset < 0) return null;
-  return Math.round(offset);
-}
-
-function readChip(target: EventTarget | null): CapturedChip | null {
-  const chip = closestFrom(target, CHIP_SELECTOR);
-  if (!chip || isInsideSidebar(chip)) return null;
-
-  const date = dateFromCell(chip);
-  const title = chipTitle(chip);
-  if (!date || !title) return null;
-
-  return { title, date, startMin: chipStartMinute(chip) };
-}
-
-// Hand the chip to the background worker, which finds the real event and returns
-// only the reusable parts of it - never the date it happened to be on.
-function captureChip(chip: CapturedChip, onDone?: (ok: boolean) => void): void {
-  const dayStart = new Date(chip.date); dayStart.setHours(0, 0, 0, 0);
-  const dayEnd   = new Date(dayStart);  dayEnd.setDate(dayEnd.getDate() + 1);
-
-  dispatchPoolEvent('capturing', chip.title);
-
-  const sent = sendToBackground(
-    {
-      type: 'RESOLVE_EVENT',
-      data: {
-        dayStartISO: dayStart.toISOString(),
-        dayEndISO:   dayEnd.toISOString(),
-        title:       chip.title,
-        startMin:    chip.startMin,
-      },
-    },
-    (response: any) => {
-      if (response?.success) {
-        document.dispatchEvent(new CustomEvent('poolCapture', { detail: response.data }));
-        onDone?.(true);
-      } else {
-        dispatchPoolEvent('error', chip.title, response?.error ?? 'Could not read that event');
-        onDone?.(false);
-      }
-    }
-  );
-
-  if (!sent) {
-    dispatchPoolEvent('error', chip.title, 'Extension reloaded - refresh the page');
-    onDone?.(false);
-  }
 }
 
 // Reloading the extension orphans any content script already on the page:
@@ -452,165 +346,6 @@ function sendToBackground(message: unknown, onResponse: (response: any) => void)
   } catch {
     return false;
   }
-}
-
-// Google Calendar opens a detail dialog when an event chip is clicked. Rather
-// than intercepting a drag - whose implementation cannot be relied on - we add
-// an "Add to pool" button to that dialog.
-//
-// The dialog itself is only used as the place to put the button. The event is
-// identified from the chip that was clicked, because a chip's position in its
-// day column gives an exact date and start time, while the dialog states them
-// as localised prose that would have to be parsed.
-
-const CAPTURE_BUTTON_ID = 'wlp-add-to-pool';
-const CHIP_CLICK_TTL_MS = 3000;
-
-let clickedChip: CapturedChip | null = null;
-let clickedChipAt = 0;
-
-function recentChip(): CapturedChip | null {
-  if (!clickedChip || Date.now() - clickedChipAt > CHIP_CLICK_TTL_MS) return null;
-  return clickedChip;
-}
-
-// Material "add" glyph - the same one the sidebar's own add button uses, so the
-// two add affordances read as the same action.
-const ADD_ICON =
-  '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
-  '<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>';
-
-const DONE_ICON =
-  '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
-  '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
-
-function buildCaptureButton(chip: CapturedChip, iconOnly: boolean): HTMLElement {
-  const button = document.createElement('button');
-  button.id = CAPTURE_BUTTON_ID;
-  button.type = 'button';
-  button.className = iconOnly ? 'wlp-capture-icon' : 'wlp-capture-btn';
-  button.setAttribute('aria-label', 'Add to pool');
-  button.title = `Add "${chip.title}" to the Weekly Pool`;
-  button.innerHTML = iconOnly ? ADD_ICON : '';
-  if (!iconOnly) button.textContent = 'Add to pool';
-
-  button.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    button.disabled = true;
-    if (!iconOnly) button.textContent = 'Adding…';
-
-    captureChip(chip, (ok) => {
-      if (ok) {
-        button.classList.add('wlp-capture-done');
-        if (iconOnly) button.innerHTML = DONE_ICON;
-        else button.textContent = 'Added';
-        return;
-      }
-      // Let the user try again; the sidebar toast says what went wrong.
-      button.disabled = false;
-      if (!iconOnly) button.textContent = 'Add to pool';
-    });
-  });
-
-  return button;
-}
-
-// Google's dialog has a row of icon buttons (edit, delete, email, more, close).
-// Its markup is undocumented and its labels are localised, so the row is found
-// structurally: whichever element is the direct parent of the most button-like
-// children is the toolbar.
-function findActionRow(dialog: Element): Element | null {
-  const buttons = dialog.querySelectorAll('button, [role="button"]');
-  const counts = new Map<Element, number>();
-
-  buttons.forEach((b) => {
-    const parent = b.parentElement;
-    if (!parent || b.id === CAPTURE_BUTTON_ID) return;
-    counts.set(parent, (counts.get(parent) ?? 0) + 1);
-  });
-
-  let best: Element | null = null;
-  let bestCount = 0;
-  counts.forEach((count, parent) => {
-    if (count > bestCount) { best = parent; bestCount = count; }
-  });
-
-  // Two buttons could be an unrelated pair; three is a toolbar.
-  return bestCount >= 3 ? best : null;
-}
-
-function insertCaptureButton(dialog: Element, chip: CapturedChip): boolean {
-  if (dialog.querySelector(`#${CAPTURE_BUTTON_ID}`)) return true;
-
-  const row = findActionRow(dialog);
-  if (row) {
-    row.insertBefore(buildCaptureButton(chip, true), row.firstChild);
-    return true;
-  }
-  return false;
-}
-
-// The dialog's contents render progressively, so the toolbar may not exist yet
-// when the dialog node is first seen. Retry briefly before falling back to a
-// plain button appended to the dialog root.
-const ROW_RETRY_MS = [0, 60, 160, 320, 640];
-
-function decorateDialog(dialog: Element): void {
-  if (dialog.querySelector(`#${CAPTURE_BUTTON_ID}`)) return;
-
-  const chip = recentChip();
-  if (!chip) return;
-
-  ROW_RETRY_MS.forEach((delay, i) => {
-    setTimeout(() => {
-      if (!dialog.isConnected) return;
-      if (insertCaptureButton(dialog, chip)) return;
-
-      if (i === ROW_RETRY_MS.length - 1 && !dialog.querySelector(`#${CAPTURE_BUTTON_ID}`)) {
-        const bar = document.createElement('div');
-        bar.className = 'wlp-capture-bar';
-        bar.appendChild(buildCaptureButton(chip, false));
-        dialog.appendChild(bar);
-      }
-    }, delay);
-  });
-}
-
-function setupCapture(): void {
-  // Capture phase, so the chip is recorded even if Google stops the event.
-  document.addEventListener('click', (e) => {
-    const chip = readChip(e.target);
-    if (!chip) return;
-    clickedChip = chip;
-    clickedChipAt = Date.now();
-  }, true);
-
-  const scan = (root: ParentNode) => {
-    const dialogs = root.querySelectorAll?.('[role="dialog"]');
-    dialogs?.forEach(decorateDialog);
-  };
-
-  const observer = new MutationObserver((mutations) => {
-    for (const mut of mutations) {
-      for (const node of mut.addedNodes) {
-        if (node.nodeType !== Node.ELEMENT_NODE) continue;
-        const el = node as Element;
-        if (el.matches?.('[role="dialog"]')) decorateDialog(el);
-        scan(el);
-      }
-    }
-  });
-
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // The dialog can already be open when the script loads.
-  scan(document);
-}
-
-function rruleFor(repeat: { freq: string; interval?: number }): string {
-  const interval = repeat.interval && repeat.interval > 1 ? `;INTERVAL=${repeat.interval}` : '';
-  return `RRULE:FREQ=${repeat.freq}${interval}`;
 }
 
 // ── Drop listeners ────────────────────────────────────────────────────────────
@@ -691,9 +426,6 @@ function setupListeners(): void {
           calendarId: item.calendarId,
           start: { dateTime: start.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
           end:   { dateTime: end.toISOString(),   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-          ...(item.description ? { description: item.description } : {}),
-          ...(item.location    ? { location:    item.location }    : {}),
-          ...(item.repeat      ? { recurrence: [rruleFor(item.repeat)] } : {}),
         },
       },
       (response) => {
@@ -729,7 +461,6 @@ function injectSidebar(): void {
   try {
     ReactDOM.createRoot(sidebarEl).render(<PoolSidebar />);
     setupListeners();
-    setupCapture();
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get('sidebarCollapsed', (r) => adjustLayout(r.sidebarCollapsed === true));
     } else {
