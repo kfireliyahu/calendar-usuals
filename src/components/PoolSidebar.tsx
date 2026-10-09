@@ -88,6 +88,14 @@ const SYNC_FULL_HOLD_MS = 8000;
 // sidebar, and neither drop handler can be fooled by the other's payload.
 const REORDER_TYPE = 'poolreorder';
 
+// After the extension is reloaded or updated, the sidebar already on this page
+// keeps running, but its chrome.* calls throw "Extension context invalidated".
+// One thrown from an effect makes React unmount the whole sidebar and leaves
+// Google Calendar shifted right of an empty gap, so those calls check first.
+function extensionAlive(): boolean {
+  return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
+}
+
 function isReorderDrag(e: React.DragEvent): boolean {
   return Array.from(e.dataTransfer.types).some((t) => t.toLowerCase() === REORDER_TYPE);
 }
@@ -469,7 +477,7 @@ const PoolSidebar: React.FC = () => {
 
   useEffect(() => {
     if (!collapsedReady.current) return;
-    if (typeof chrome !== 'undefined' && chrome.storage) {
+    if (extensionAlive()) {
       chrome.storage.local.set({ sidebarCollapsed: collapsed });
     }
     document.dispatchEvent(new CustomEvent('poolSidebarToggle', { detail: { collapsed } }));
@@ -477,7 +485,7 @@ const PoolSidebar: React.FC = () => {
 
   useEffect(() => {
     if (!formReady.current) return;
-    if (typeof chrome !== 'undefined' && chrome.storage) {
+    if (extensionAlive()) {
       chrome.storage.local.set({ formOpen });
     }
   }, [formOpen]);
@@ -593,6 +601,11 @@ const PoolSidebar: React.FC = () => {
 
     if (typeof chrome === 'undefined' || !chrome.runtime) {
       setFetchError('Chrome extension API not available');
+      setLoading(false);
+      return;
+    }
+    if (!extensionAlive()) {
+      setFetchError('Extension reloaded - refresh the page');
       setLoading(false);
       return;
     }
