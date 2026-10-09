@@ -51,7 +51,7 @@
   --wlp-success-text:    #188038;
   --wlp-success-border:  #b6dfc2;
   --wlp-error-bg:        #fce8e6;
-  --wlp-error-text:      #d33427;
+  --wlp-error-text:      #c5221f;  /* 4.9:1 on --wlp-error-bg, so the toast meets AA */
   --wlp-error-border:    #f5c6c3;
   --wlp-tooltip-bg:      #202124;
   --wlp-tooltip-text:    #ffffff;
@@ -523,7 +523,10 @@
 .wlp-cat-show:focus-visible,
 .wlp-toast-undo:focus-visible,
 .wlp-schedule-btn:focus-visible,
-.wlp-schedule-repeat input:focus-visible {
+.wlp-schedule-repeat input:focus-visible,
+.wlp-cat-chip:focus-visible,
+.wlp-swatch:focus-visible,
+.wlp-dup-btn:focus-visible {
   outline: 2px solid var(--wlp-focus) !important;
   outline-offset: 2px !important;
 }

@@ -158,6 +158,7 @@ const ItemDetails: React.FC<{
     <textarea
       rows={2}
       placeholder="Description"
+      aria-label={`Description for ${item.name}`}
       value={item.description ?? ''}
       onChange={(e) => onChange({ description: e.target.value })}
       className="wlp-field"
@@ -165,6 +166,7 @@ const ItemDetails: React.FC<{
     <input
       type="text"
       placeholder="Location"
+      aria-label={`Location for ${item.name}`}
       value={item.location ?? ''}
       onChange={(e) => onChange({ location: e.target.value })}
       className="wlp-field"
@@ -1193,6 +1195,7 @@ const PoolSidebar: React.FC = () => {
                                   // typing extends the old name.
                                   onFocus={(e) => e.currentTarget.select()}
                                   value={editingName}
+                                  aria-label={`Rename ${item.name}`}
                                   onChange={(e) => setEditingName(e.target.value)}
                                   onBlur={commitRename}
                                   onKeyDown={(e) => {
