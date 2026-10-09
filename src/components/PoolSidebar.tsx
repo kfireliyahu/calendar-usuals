@@ -156,6 +156,8 @@ const ItemDetails: React.FC<{
       <button
         type="button"
         title="Calendar colour"
+        aria-label="Calendar colour"
+        aria-pressed={!item.colorId}
         onClick={() => onChange({ colorId: undefined })}
         className={`wlp-swatch${item.colorId ? '' : ' wlp-swatch-on'}`}
         style={{ backgroundColor: categoryColor }}
@@ -165,6 +167,8 @@ const ItemDetails: React.FC<{
           key={c.id}
           type="button"
           title={c.name}
+          aria-label={c.name}
+          aria-pressed={item.colorId === c.id}
           onClick={() => onChange({ colorId: c.id })}
           className={`wlp-swatch${item.colorId === c.id ? ' wlp-swatch-on' : ''}`}
           style={{ backgroundColor: c.hex }}
@@ -332,7 +336,6 @@ const PoolSidebar: React.FC = () => {
   const [toast, setToast] = useState<Toast | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [formOpen, setFormOpen] = useState(true);
-  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -837,6 +840,7 @@ const PoolSidebar: React.FC = () => {
           <button
             onClick={() => setCollapsed(false)}
             title="Show Weekly Pool"
+            aria-label="Show Weekly Pool"
             className={iconBtnCls}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -868,6 +872,8 @@ const PoolSidebar: React.FC = () => {
               <button
                 onClick={() => setFormOpen((v) => !v)}
                 title={formOpen ? 'Hide input' : 'Add items'}
+                aria-label="Add items"
+                aria-expanded={formOpen}
                 className={iconBtnCls}
                 style={{ color: formOpen ? '#4285f4' : undefined }}
               >
@@ -879,6 +885,7 @@ const PoolSidebar: React.FC = () => {
               <button
                 onClick={() => { setPickedId(null); setCollapsed(true); }}
                 title="Hide sidebar"
+                aria-label="Hide sidebar"
                 className={iconBtnCls}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -976,6 +983,7 @@ const PoolSidebar: React.FC = () => {
                         onClick={() => { setNewItemName(''); inputRef.current?.focus(); }}
                         tabIndex={-1}
                         title="Clear"
+                        aria-label="Clear"
                         className="wlp-input-clear"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
@@ -988,6 +996,7 @@ const PoolSidebar: React.FC = () => {
                       onClick={addItem}
                       disabled={!newItemName.trim()}
                       title="Add (Enter)"
+                      aria-label="Add item"
                       className="wlp-input-add"
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -1036,8 +1045,6 @@ const PoolSidebar: React.FC = () => {
                   <div key={category.calendarId} className="wlp-cat-group">
                     <div
                       className="wlp-cat-header flex items-center gap-[7px]"
-                      onMouseEnter={() => setHoveredCategory(category.calendarId)}
-                      onMouseLeave={() => setHoveredCategory(null)}
                       onDragOver={(e) => handleCategoryDragOver(e, category.calendarId)}
                     >
                       <span
@@ -1050,8 +1057,8 @@ const PoolSidebar: React.FC = () => {
                       <button
                         onClick={() => toggleCategoryHidden(category.calendarId)}
                         title="Hide category"
-                        style={{ opacity: hoveredCategory === category.calendarId ? 1 : 0 }}
-                        className="shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[#9aa0a6] transition-all duration-150 hover:text-[#5f6368]"
+                        aria-label={`Hide ${category.name}`}
+                        className="wlp-cat-hide shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[#9aa0a6] transition-all duration-150 hover:text-[#5f6368]"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
@@ -1157,6 +1164,8 @@ const PoolSidebar: React.FC = () => {
                               <button
                                 onClick={() => setExpandedId(expanded ? null : item.id)}
                                 title={expanded ? 'Hide details' : 'Edit details'}
+                                aria-label={`Details for ${item.name}`}
+                                aria-expanded={expanded}
                                 className={`wlp-item-expand${hasTemplate(item) ? ' wlp-item-expand-on' : ''}`}
                                 style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
                               >
@@ -1166,8 +1175,9 @@ const PoolSidebar: React.FC = () => {
                               </button>
                               <button
                                 onClick={() => deleteItem(item.id)}
-                                title="Remove"
-                                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-[0] ml-[4px] transition-all duration-150 hover:text-[#d33427] hover:scale-110"
+                                title="Delete"
+                                aria-label={`Delete ${item.name}`}
+                                className="wlp-item-delete opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-[0] ml-[4px] transition-all duration-150 hover:text-[#d33427] hover:scale-110"
                               >
                                 ×
                               </button>
@@ -1223,7 +1233,8 @@ const PoolSidebar: React.FC = () => {
                         <button
                           onClick={() => toggleCategoryHidden(cat.calendarId)}
                           title="Show category"
-                          className="shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[#9aa0a6] hover:text-[#5f6368] transition-colors duration-150"
+                          aria-label={`Show ${cat.name}`}
+                          className="wlp-cat-show shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[#9aa0a6] hover:text-[#5f6368] transition-colors duration-150"
                         >
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>

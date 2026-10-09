@@ -420,6 +420,9 @@
    Calendar's stylesheet does with outlines. */
 .wlp-item-schedule:focus-visible,
 .wlp-item-expand:focus-visible,
+.wlp-item-delete:focus-visible,
+.wlp-cat-hide:focus-visible,
+.wlp-cat-show:focus-visible,
 .wlp-toast-undo:focus-visible,
 .wlp-schedule-btn:focus-visible,
 .wlp-schedule-repeat input:focus-visible {
@@ -428,8 +431,24 @@
 }
 
 .wlp-item-schedule:focus-visible,
-.wlp-item-expand:focus-visible {
+.wlp-item-expand:focus-visible,
+.wlp-item-delete:focus-visible,
+.wlp-cat-hide:focus-visible,
+.wlp-cat-show:focus-visible {
   border-radius: 3px !important;
+}
+
+/* The category's hide control only shows on hover, so it would be invisible
+   to a keyboard user tabbing onto it. Focus anywhere in the header reveals it
+   as hovering does, the way the row's delete button shows on focus. */
+.wlp-cat-hide {
+  opacity: 0 !important;
+}
+
+.wlp-cat-header:hover .wlp-cat-hide,
+.wlp-cat-header:focus-within .wlp-cat-hide,
+.wlp-cat-hide:focus-visible {
+  opacity: 1 !important;
 }
 
 /* ── Schedule form ─────────────────────────────────────────────────────────── */
