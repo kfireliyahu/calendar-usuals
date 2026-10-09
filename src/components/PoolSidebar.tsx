@@ -746,12 +746,12 @@ const PoolSidebar: React.FC = () => {
 
   // ── Shared styles ────────────────────────────────────────────────────────────
 
-  const sidebarCls = `wlp-sidebar fixed left-0 top-0 h-screen border-r border-[#dadce0]/60 flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-in-out ${
+  const sidebarCls = `wlp-sidebar fixed left-0 top-0 h-screen border-r border-[#dadce0]/60 flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${
     collapsed ? 'w-[40px]' : 'w-[280px]'
   }`;
 
   const iconBtnCls =
-    'w-7 h-7 flex items-center justify-center rounded-full text-[#5f6368] cursor-pointer border-none bg-transparent hover:bg-[#f1f3f4] transition-colors duration-150 shrink-0';
+    'w-[28px] h-[28px] flex items-center justify-center rounded-full text-[#5f6368] cursor-pointer border-none bg-transparent hover:bg-[#f1f3f4] transition-colors duration-150 shrink-0';
 
   const toastColors: Record<Toast['type'], string> = {
     info:    'bg-[#e8f0fe] text-[#1a73e8] border-[#c5d8fc]',
@@ -761,7 +761,7 @@ const PoolSidebar: React.FC = () => {
 
   const renderToast = (t: Toast) => (
     <div
-      className={`px-4 py-[9px] text-[12px] border-b flex items-center gap-[10px] ${toastColors[t.type]} [animation:wlp-fadein_200ms_ease]`}
+      className={`px-[16px] py-[9px] text-[12px] border-b flex items-center gap-[10px] ${toastColors[t.type]} [animation:wlp-fadein_200ms_ease]`}
     >
       <span className="flex-1 min-w-[0]">{t.message}</span>
       {t.undo && (
@@ -787,7 +787,7 @@ const PoolSidebar: React.FC = () => {
 
       {/* ── Collapsed strip ─────────────────────────────────────────────────── */}
       {collapsed ? (
-        <div className="flex flex-col items-center pt-2">
+        <div className="flex flex-col items-center pt-[8px]">
           <button
             onClick={() => setCollapsed(false)}
             title="Show Weekly Pool"
@@ -813,7 +813,7 @@ const PoolSidebar: React.FC = () => {
                 <circle cx="12" cy="15" r="1.1" fill="#4285f4"/>
                 <circle cx="16" cy="15" r="1.1" fill="#4285f4"/>
               </svg>
-              <h2 className="m-0 text-[14px] font-medium text-[#202124] tracking-[0.1px]">
+              <h2 className="m-[0] text-[14px] font-[500] text-[#202124] tracking-[0.1px]">
                 Weekly Pool
               </h2>
             </div>
@@ -851,11 +851,11 @@ const PoolSidebar: React.FC = () => {
 
           {/* Error */}
           {!loading && fetchError && (
-            <div className="p-4 flex flex-col gap-3">
+            <div className="p-[16px] flex flex-col gap-[12px]">
               <p className="text-[13px] text-[#d33427]">{fetchError}</p>
               <button
                 onClick={fetchCalendars}
-                className="px-3 py-2 bg-[#4285f4] text-white border-none rounded-md text-[13px] font-medium cursor-pointer hover:bg-[#3367d6] transition-colors duration-150"
+                className="px-[12px] py-[8px] bg-[#4285f4] text-[#fff] border-none rounded-[6px] text-[13px] font-[500] cursor-pointer hover:bg-[#3367d6] transition-colors duration-150"
               >
                 Retry
               </button>
@@ -972,7 +972,7 @@ const PoolSidebar: React.FC = () => {
 
               {/* Category list */}
               <div
-                className="flex-1 overflow-y-auto py-3"
+                className="flex-1 overflow-y-auto py-[12px]"
                 onDragOver={(e) => { if (isReorderDrag(e) && !wasHandled(e)) setDropTarget(null); }}
                 onDrop={handleListDrop}
               >
@@ -988,14 +988,14 @@ const PoolSidebar: React.FC = () => {
                         className="w-[10px] h-[10px] rounded-full shrink-0"
                         style={{ backgroundColor: category.color }}
                       />
-                      <h3 className="flex-1 m-0 text-[11px] font-semibold text-[#5f6368] uppercase tracking-[0.6px]">
+                      <h3 className="flex-1 m-[0] text-[11px] font-[600] text-[#5f6368] uppercase tracking-[0.6px]">
                         {category.name}
                       </h3>
                       <button
                         onClick={() => toggleCategoryHidden(category.calendarId)}
                         title="Hide category"
                         style={{ opacity: hoveredCategory === category.calendarId ? 1 : 0 }}
-                        className="shrink-0 bg-transparent border-none cursor-pointer p-0 text-[#9aa0a6] transition-all duration-150 hover:text-[#5f6368]"
+                        className="shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[#9aa0a6] transition-all duration-150 hover:text-[#5f6368]"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
@@ -1043,7 +1043,7 @@ const PoolSidebar: React.FC = () => {
                                 setDropTarget(null);
                                 document.dispatchEvent(new CustomEvent('poolDragEnd'));
                               }}
-                              className={`wlp-item group flex items-center justify-between bg-white border border-[#e8eaed] rounded-[6px] text-[13px] text-[#202124] cursor-grab select-none transition-all duration-150 hover:border-[#c5c9ce] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
+                              className={`wlp-item group flex items-center justify-between bg-[#fff] border border-[#e8eaed] rounded-[6px] text-[13px] text-[#202124] cursor-grab select-none transition-all duration-150 hover:border-[#c5c9ce] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
                                 draggingId === item.id ? ' opacity-40' : ''
                               }${picked ? ' wlp-item-picked' : ''}`}
                               style={{ borderLeft: `3px solid ${eventColorHex(item.colorId, category.color)}` }}
@@ -1111,7 +1111,7 @@ const PoolSidebar: React.FC = () => {
                               <button
                                 onClick={() => deleteItem(item.id)}
                                 title="Remove"
-                                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-0 ml-1 transition-all duration-150 hover:text-[#d33427] hover:scale-110"
+                                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-[0] ml-[4px] transition-all duration-150 hover:text-[#d33427] hover:scale-110"
                               >
                                 ×
                               </button>
@@ -1140,7 +1140,7 @@ const PoolSidebar: React.FC = () => {
                       {category.items.length === 0 && (
                         <p
                           onDragOver={(e) => handleCategoryDragOver(e, category.calendarId)}
-                          className={`wlp-empty px-4 py-1 text-[12px] text-[#9aa0a6] italic${
+                          className={`wlp-empty px-[16px] py-[4px] text-[12px] text-[#9aa0a6] italic${
                             dropTarget?.calendarId === category.calendarId ? ' wlp-drop-empty' : ''
                           }`}
                         >
@@ -1151,23 +1151,23 @@ const PoolSidebar: React.FC = () => {
                   </div>
                 ))}
                 {visibleCategories.length === 0 && hiddenCategories.length === 0 && (
-                  <p className="px-5 pt-5 text-[13px] text-[#5f6368]">No calendars found.</p>
+                  <p className="px-[20px] pt-[20px] text-[13px] text-[#5f6368]">No calendars found.</p>
                 )}
 
                 {/* Hidden categories restore strip */}
                 {hiddenCategories.length > 0 && (
                   <div className="wlp-hidden-strip border-t border-[#dadce0]/60">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.6px] text-[#9aa0a6] mb-2">
+                    <p className="text-[11px] font-[600] uppercase tracking-[0.6px] text-[#9aa0a6] mb-[8px]">
                       Hidden ({hiddenCategories.length})
                     </p>
                     {hiddenCategories.map((cat) => (
-                      <div key={cat.calendarId} className="wlp-hidden-row flex items-center gap-2">
+                      <div key={cat.calendarId} className="wlp-hidden-row flex items-center gap-[8px]">
                         <span className="w-[8px] h-[8px] rounded-full shrink-0 opacity-40" style={{ backgroundColor: cat.color }} />
                         <span className="flex-1 text-[12px] text-[#9aa0a6] truncate">{cat.name}</span>
                         <button
                           onClick={() => toggleCategoryHidden(cat.calendarId)}
                           title="Show category"
-                          className="shrink-0 bg-transparent border-none cursor-pointer p-0 text-[#9aa0a6] hover:text-[#5f6368] transition-colors duration-150"
+                          className="shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[#9aa0a6] hover:text-[#5f6368] transition-colors duration-150"
                         >
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
