@@ -348,11 +348,13 @@ function waitForEvent(eventId: string | undefined, itemName: string): void {
 // ── Custom events ─────────────────────────────────────────────────────────────
 
 // What the sidebar needs to undo a drop. It rides on 'created' next to
-// itemName, which every event type still carries.
+// itemName, which every event type still carries. itemId tells the sidebar
+// which row to return keyboard focus to once Undo has removed itself.
 interface CreatedEvent {
   eventId:    string;
   calendarId: string;
   recurring:  boolean;
+  itemId:     string;
 }
 
 function dispatchPoolEvent(
@@ -463,7 +465,7 @@ function createFromItem(
         const { id, calendarId } = response.data ?? {};
         dispatchPoolEvent('created', item.name, {
           recurring,
-          event: id && calendarId ? { eventId: id, calendarId, recurring } : undefined,
+          event: id && calendarId ? { eventId: id, calendarId, recurring, itemId: item.id } : undefined,
         });
         // Watch for GCal to render the event, then fade out the placeholder
         if (anchor) waitForEvent(id, item.name);

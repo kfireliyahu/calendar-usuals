@@ -544,7 +544,11 @@
 
 /* These controls strip the browser's own button look with !important, so
    keyboard focus is drawn explicitly rather than left to whatever Google
-   Calendar's stylesheet does with outlines. */
+   Calendar's stylesheet does with outlines. The round icon buttons in the
+   header and the collapsed strip keep their circle, and the ring follows it;
+   the collapsed strip leaves about 5 px either side of its button, room
+   enough for the ring. */
+.wlp-icon-btn:focus-visible,
 .wlp-item-schedule:focus-visible,
 .wlp-item-expand:focus-visible,
 .wlp-item-delete:focus-visible,
@@ -555,6 +559,18 @@
 .wlp-schedule-repeat input:focus-visible {
   outline: 2px solid var(--wlp-focus) !important;
   outline-offset: 2px !important;
+}
+
+/* The toast region takes focus only when Undo removed the button that had it
+   and the item's row is gone. The ring is drawn inside, because the region
+   spans the sidebar's full width and an outside ring would be clipped. */
+.wlp-toast-area:focus-visible {
+  outline: 2px solid var(--wlp-focus) !important;
+  outline-offset: -2px !important;
+}
+
+.wlp-toast-area:focus:not(:focus-visible) {
+  outline: none !important;
 }
 
 .wlp-item-schedule:focus-visible,

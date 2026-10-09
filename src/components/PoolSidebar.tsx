@@ -37,6 +37,7 @@ interface UndoTarget {
   eventId: string;
   calendarId: string;
   recurring: boolean;
+  itemId?: string;
 }
 
 // The undo target lives on the toast itself, so any newer toast — the next
@@ -102,10 +103,13 @@ function wasHandled(e: React.DragEvent): boolean {
 
 // Compact duration control. A native <select> so it stays keyboard accessible
 // without a custom dropdown; content.css strips the arrow to fit the 280px rail.
+// title is only a tooltip for the pointer; label is the select's accessible
+// name, and says which item it belongs to, since every row has one.
 const DurationSelect: React.FC<{
   value: number;
+  label: string;
   onChange: (min: number) => void;
-}> = ({ value, onChange }) => {
+}> = ({ value, label, onChange }) => {
   // A stored value outside the presets still has to appear as an option, or the
   // select would quietly display a duration the item does not have.
   const options = DURATION_PRESETS.includes(value)
@@ -116,6 +120,7 @@ const DurationSelect: React.FC<{
     <select
       value={value}
       title="Duration"
+      aria-label={label}
       onChange={(e) => onChange(Number(e.target.value))}
       // Pool item rows are draggable: without this, pressing the select would
       // start a drag instead of opening the menu.
@@ -186,6 +191,7 @@ const ItemDetails: React.FC<{
     <div className="wlp-details-row">
       <select
         title="Reminder"
+        aria-label={`Reminder for ${item.name}`}
         value={item.reminderMin === undefined ? '' : String(item.reminderMin)}
         onChange={(e) =>
           onChange({ reminderMin: e.target.value === '' ? undefined : Number(e.target.value) })
@@ -406,7 +412,22 @@ const PoolSidebar: React.FC = () => {
 
   // Deletes the event the last drop created. A recurring event's id is the
   // series, so its Undo removes every instance, and the toast says so.
-  const undoDrop = (target: UndoTarget) => {
+  // Undo replaces itself with "Removing…", and a focused element that goes
+  // away leaves focus on the page body, so a keyboard user is moved first: to
+  // the item's schedule button, the natural place to try again, or to the
+  // toast region when that row is gone. A click focuses the button too, but
+  // not :focus-visible, and a pointer user is left alone.
+  //
+  // On the toast region, focus holds every toast that follows, the way it
+  // does on Undo itself, until it moves on.
+  const keepUndoFocus = (button: HTMLElement, target: UndoTarget) => {
+    if (!button.matches(':focus-visible')) return;
+    const row = target.itemId ? scheduleButtons.current.get(target.itemId) : undefined;
+    (row ?? toastArea.current)?.focus();
+  };
+
+  const undoDrop = (target: UndoTarget, button: HTMLElement) => {
+    keepUndoFocus(button, target);
     const fail = (err?: string) => showToast(err ?? 'Failed to remove event', 'error', 5000);
     if (typeof chrome === 'undefined' || !chrome.runtime?.id) {
       fail('Extension reloaded - refresh the page');
@@ -835,7 +856,7 @@ const PoolSidebar: React.FC = () => {
   }`;
 
   const iconBtnCls =
-    'w-[28px] h-[28px] flex items-center justify-center rounded-full text-[var(--wlp-text-secondary)] cursor-pointer border-none bg-transparent hover:bg-[var(--wlp-hover)] transition-colors duration-150 shrink-0';
+    'wlp-icon-btn w-[28px] h-[28px] flex items-center justify-center rounded-full text-[var(--wlp-text-secondary)] cursor-pointer border-none bg-transparent hover:bg-[var(--wlp-hover)] transition-colors duration-150 shrink-0';
 
   const toastColors: Record<Toast['type'], string> = {
     info:    'bg-[var(--wlp-info-bg)] text-[var(--wlp-info-text)] border-[var(--wlp-info-border)]',
@@ -850,7 +871,7 @@ const PoolSidebar: React.FC = () => {
       <span className="flex-1 min-w-[0]">{t.message}</span>
       {t.undo && (
         <button
-          onClick={() => undoDrop(t.undo!)}
+          onClick={(e) => undoDrop(t.undo!, e.currentTarget)}
           title={t.undo.recurring ? 'Remove the whole weekly series' : 'Remove this event'}
           className="wlp-toast-undo"
         >
@@ -1028,7 +1049,7 @@ const PoolSidebar: React.FC = () => {
                         </svg>
                       </button>
                     )}
-                    <DurationSelect value={newItemDuration} onChange={setNewItemDuration} />
+                    <DurationSelect value={newItemDuration} label="Duration of new item" onChange={setNewItemDuration} />
                     <button
                       onClick={addItem}
                       disabled={!newItemName.trim()}
@@ -1055,14 +1076,17 @@ const PoolSidebar: React.FC = () => {
                   region stays mounted and empty between toasts. An error goes
                   in a role="alert" instead, which is announced on insertion and
                   interrupts, since it means the event was not created. Both
-                  sit in one plain wrapper that pauses the toast's timer. */}
+                  sit in one plain wrapper that pauses the toast's timer. It
+                  can take focus, though Tab never stops on it, for when Undo
+                  has removed itself and the item's row is gone. */}
               <div
                 ref={toastArea}
+                tabIndex={-1}
                 onMouseEnter={pauseToast}
                 onMouseLeave={resumeToast}
                 onFocus={pauseToast}
                 onBlur={resumeToast}
-                className="shrink-0"
+                className="wlp-toast-area shrink-0"
               >
                 <div role="status" aria-live="polite" aria-atomic="true">
                   {toast && toast.type !== 'error' && renderToast(toast)}
@@ -1175,6 +1199,7 @@ const PoolSidebar: React.FC = () => {
                               )}
                               <DurationSelect
                                 value={durationOf(item)}
+                                label={`Duration of ${item.name}`}
                                 onChange={(min) => updateItem(item.id, { durationMin: min })}
                               />
                               {/* The no-drag way to schedule. A real button, so
