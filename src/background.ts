@@ -47,7 +47,11 @@ async function createCalendarEvent(eventData: any) {
     throw new Error(`Failed to create event: ${await describeError(response)}`);
   }
 
-  return response.json();
+  // The content script needs the id to find the event Google Calendar renders
+  // and to delete it again on Undo. calendarId goes back with it because the
+  // payload may have left it to default to 'primary'.
+  const event = await response.json();
+  return { id: event.id as string, htmlLink: event.htmlLink as string, calendarId };
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────

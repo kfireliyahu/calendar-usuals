@@ -282,38 +282,102 @@ function hideLoading(fadeOut = false): void {
   }
 }
 
-function waitForEvent(itemName: string): void {
-  if (eventObserver) { eventObserver.disconnect(); eventObserver = null; }
-  if (eventTimeout)  { clearTimeout(eventTimeout);  eventTimeout  = null; }
+// ── Finding the created event ─────────────────────────────────────────────────
+//
+// Google Calendar puts a data-eventid on every event chip it renders. It is
+// believed to be base64url of "<eventId> <calendarId>" with the padding
+// stripped (the same string as the eid in an event's htmlLink), and on some
+// views it may be the bare event id. A recurring event renders one chip per
+// instance, whose id is "<eventId>_<instant>". Every form is accepted, and
+// anything that does not decode simply fails to match.
+
+function decodeBase64Url(value: string): string | null {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  try {
+    return atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='));
+  } catch {
+    return null;
+  }
+}
+
+function isSameEvent(id: string, eventId: string): boolean {
+  return id === eventId || id.startsWith(`${eventId}_`);
+}
+
+function chipIsEvent(dataEventId: string, eventId: string): boolean {
+  if (isSameEvent(dataEventId, eventId)) return true;
+  const decoded = decodeBase64Url(dataEventId);
+  return decoded !== null && isSameEvent(decoded.split(' ')[0], eventId);
+}
+
+function containsEventChip(el: Element, eventId: string): boolean {
+  const chips = el.matches('[data-eventid]')
+    ? [el, ...Array.from(el.querySelectorAll('[data-eventid]'))]
+    : Array.from(el.querySelectorAll('[data-eventid]'));
+  return chips.some((chip) => chipIsEvent(chip.getAttribute('data-eventid') ?? '', eventId));
+}
+
+// Matching on the name alone lets any other event with the same name resolve
+// the placeholder, typically when Google Calendar re-renders the column the
+// new event is about to appear in. So a name match only resolves it after this
+// long without an id match, which keeps today's behaviour on any view where the
+// id cannot be read, at the cost of a slightly later fade there.
+const NAME_MATCH_GRACE_MS = 1500;
+const EVENT_WAIT_TIMEOUT_MS = 12000;
+
+let waitingForEventId: string | null = null;
+let nameMatchTimer:    ReturnType<typeof setTimeout> | null = null;
+
+function stopWaiting(): void {
+  eventObserver?.disconnect();
+  eventObserver = null;
+  if (eventTimeout)   { clearTimeout(eventTimeout);   eventTimeout   = null; }
+  if (nameMatchTimer) { clearTimeout(nameMatchTimer); nameMatchTimer = null; }
+  waitingForEventId = null;
+}
+
+function resolvePlaceholder(): void {
+  stopWaiting();
+  hideLoading(true);
+}
+
+function waitForEvent(eventId: string | undefined, itemName: string): void {
+  stopWaiting();
+  waitingForEventId = eventId ?? null;
 
   const root = document.querySelector('[role="main"]') ?? document.body;
 
   // Fallback: give up after 12 s
-  eventTimeout = setTimeout(() => {
-    eventObserver?.disconnect();
-    eventObserver = null;
-    hideLoading(true);
-  }, 12000);
+  eventTimeout = setTimeout(resolvePlaceholder, EVENT_WAIT_TIMEOUT_MS);
+
+  // Google Calendar can learn about the event before our response comes back,
+  // in which case its chip is already on screen and no mutation will follow.
+  if (eventId && containsEventChip(root, eventId)) { resolvePlaceholder(); return; }
 
   eventObserver = new MutationObserver((mutations) => {
+    let nameSeen = false;
     for (const mut of mutations) {
-      for (const node of mut.addedNodes) {
+      // A chip that is recycled rather than re-created only changes its attribute.
+      const nodes = mut.type === 'attributes' ? [mut.target] : Array.from(mut.addedNodes);
+      for (const node of nodes) {
         if (node.nodeType !== Node.ELEMENT_NODE) continue;
         const el = node as Element;
         if (el.closest?.('#weekly-life-pool-sidebar')) continue;
-        if ((el.textContent ?? '').includes(itemName)) {
-          clearTimeout(eventTimeout!);
-          eventObserver!.disconnect();
-          eventObserver = null;
-          eventTimeout  = null;
-          hideLoading(true);
-          return;
-        }
+        if (eventId && containsEventChip(el, eventId)) { resolvePlaceholder(); return; }
+        if (mut.type === 'childList' && (el.textContent ?? '').includes(itemName)) nameSeen = true;
       }
     }
+    // The whole batch is checked for the id first: a re-render usually adds the
+    // new chip and its same-named neighbours together.
+    if (!nameSeen) return;
+    if (!eventId) { resolvePlaceholder(); return; }
+    if (!nameMatchTimer) nameMatchTimer = setTimeout(resolvePlaceholder, NAME_MATCH_GRACE_MS);
   });
 
-  eventObserver.observe(root, { childList: true, subtree: true });
+  eventObserver.observe(root, {
+    childList: true, subtree: true,
+    attributes: true, attributeFilter: ['data-eventid'],
+  });
 }
 
 // ── Custom events ─────────────────────────────────────────────────────────────
@@ -452,7 +516,7 @@ function setupListeners(): void {
         if (response?.success) {
           dispatchPoolEvent('created', item.name);
           // Watch for GCal to render the event, then fade out the placeholder
-          waitForEvent(item.name);
+          waitForEvent(response.data?.id, item.name);
         } else {
           dispatchPoolEvent('error', item.name, response?.error);
           hideLoading(true);
