@@ -128,3 +128,13 @@ scope. The extension only writes events and reads the calendar list, so it never
 asks to read existing events, and never asks to write to a calendar that is merely
 shared with the user. Calendars whose `accessRole` is not `owner` cannot be written
 to under `calendar.events.owned`.
+
+---
+
+## Support
+
+Weekly Life Pool is free and has no ads, accounts or tracking. If it saves you time, you can support it through the **Sponsor** button at the top of this repository.
+
+## License
+
+Weekly Life Pool is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (AGPL-3.0-only). You may use, study, change and share it, as long as what you change stays under the same licence.
