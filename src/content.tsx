@@ -152,6 +152,7 @@ function getPreview(): HTMLElement {
 // from content.css, which shades the event colour for the theme.
 function showPreview(cell: Element, clientY: number, item: DropPoolItem, recurring: boolean): void {
   const el = getPreview();
+  cancelFade();
   el.classList.remove('wlp-preview-loading');
   el.classList.toggle('wlp-preview-recurring', recurring);
   const { snapped } = timeFromDrop(cell, clientY);
@@ -195,6 +196,7 @@ function applyLoadingPosition(): void {
 // the schedule form, which has no pointer, can anchor a placeholder too.
 function showLoading(cell: Element, startMin: number, item: DropPoolItem, recurring: boolean): void {
   const el        = getPreview();
+  cancelFade();
   // The placeholder keeps the repeat glyph but not the dashed border.
   el.classList.add('wlp-preview-loading');
   el.classList.toggle('wlp-preview-recurring', recurring);
@@ -228,6 +230,15 @@ function showLoading(cell: Element, startMin: number, item: DropPoolItem, recurr
   loadingScrollCleanup = () => document.removeEventListener('scroll', onScroll, true);
 }
 
+// The fade's last step hides the element, which by then may be showing the
+// next drag's preview or the next placement's placeholder. Anything that shows
+// the element again cancels it.
+let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelFade(): void {
+  if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
+}
+
 function hideLoading(fadeOut = false): void {
   isLoading   = false;
   loadingCell = null;
@@ -236,11 +247,12 @@ function hideLoading(fadeOut = false): void {
 
   const el = previewEl;
   if (!el) return;
+  cancelFade();
   if (fadeOut) {
     el.style.animation = 'none';
     el.style.opacity   = '0';
-    setTimeout(() => {
-      if (!el) return;
+    fadeTimer = setTimeout(() => {
+      fadeTimer = null;
       el.style.display   = 'none';
       el.style.opacity   = '1';
       el.style.animation = 'none';
