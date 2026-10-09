@@ -218,7 +218,11 @@ function showLoading(cell: Element, startMin: number, item: DropPoolItem, recurr
   el.textContent = item.name;
   isLoading = true;
 
-  // Keep the overlay anchored to the cell as the user scrolls
+  // Keep the overlay anchored to the cell as the user scrolls. A second
+  // placement can start while the first is still pulsing, and the element is
+  // shared, so the earlier listener is removed rather than left behind for
+  // the life of the page.
+  loadingScrollCleanup?.();
   const onScroll = () => applyLoadingPosition();
   document.addEventListener('scroll', onScroll, true);
   loadingScrollCleanup = () => document.removeEventListener('scroll', onScroll, true);
