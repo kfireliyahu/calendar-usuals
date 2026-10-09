@@ -10,6 +10,7 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 - **Drag-and-drop creation** — drag any item onto the calendar grid; an event is created at the exact time and date you drop it
 - **Shift-drop for weekly** — hold Shift while dropping to create a weekly series with no end date; the tooltip and a dashed, ↻-marked preview show it live as Shift goes down or up
 - **Undo** — the toast after a drop offers Undo for 5 seconds; it deletes the event, or the whole series for a Shift-drop
+- **Schedule without dragging** — each item has a calendar button: Tab to it and press Enter (or click it) to pick the item, then choose a day from the week on screen and a 15-minute start time, or click a time slot in Day or Week view to place it there; Shift-click and the form's Repeat weekly box work like Shift-drop, and Escape cancels
 - **Item templates** — give an item a description, location, event colour and reminder; dropping it creates the event fully configured
 - **Rename in place** — double-click an item's name; Enter or clicking away commits, Escape cancels
 - **Reorder and re-file** — drag an item within its list to reorder it, or onto another calendar's heading to move it there
@@ -95,6 +96,7 @@ npm run watch
 src/
 ├── background.ts          # Service worker — OAuth + Google Calendar API calls
 ├── content.tsx            # Content script — sidebar injection, drag/drop, loading overlay
+├── calendarGrid.ts        # Reads Google Calendar's grid — datekeys, day columns, visible days
 ├── content.css            # Sidebar styles (Tailwind utilities + wlp-* override classes)
 └── components/
     └── PoolSidebar.tsx    # React sidebar component
@@ -109,7 +111,7 @@ vite.config.ts             # Vite build config (two entry points: content + back
 
 **CSS `!important` overrides** — All spacing and layout classes on sidebar elements use named `wlp-*` CSS classes defined in `content.css` with `!important`. This is intentional: Google Calendar's own global stylesheet overrides Tailwind utility classes injected by a content script, so the only reliable way to guarantee padding and margin values is explicit `!important` declarations.
 
-**Datekey conversion** — Google Calendar encodes dates as integer "datekeys" (not simple epoch days). A datekey is bit-packed: `((year - 1970) << 9) | (month << 5) | day`, with month and day 1-based — 512 per year, 32 per month, 1 per day (e.g. Apr 30 2026 = 28830, May 1 2026 = 28833). `content.tsx` unpacks it with shifts and masks. An earlier approximation treated it as days-since-epoch plus a fudge at each month boundary, which drifted by a day or more in any week spanning two months.
+**Datekey conversion** — Google Calendar encodes dates as integer "datekeys" (not simple epoch days). A datekey is bit-packed: `((year - 1970) << 9) | (month << 5) | day`, with month and day 1-based — 512 per year, 32 per month, 1 per day (e.g. Apr 30 2026 = 28830, May 1 2026 = 28833). `calendarGrid.ts` unpacks it with shifts and masks. An earlier approximation treated it as days-since-epoch plus a fudge at each month boundary, which drifted by a day or more in any week spanning two months.
 
 **Scroll-tracking overlay** — The loading placeholder uses `position: fixed` but attaches a scroll listener in capture mode that re-reads `getBoundingClientRect()` on the target cell on every scroll event, keeping the overlay pinned to the correct calendar column even as the user scrolls.
 

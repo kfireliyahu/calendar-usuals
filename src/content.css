@@ -347,6 +347,161 @@
   color: #4285f4 !important;
 }
 
+/* The no-drag schedule control. Muted like the details chevron so the row
+   still reads as a name and a duration first. */
+.wlp-item-schedule {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin: 0 0 0 6px !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: #bdc1c6 !important;
+  cursor: pointer !important;
+  transition: color 0.15s !important;
+}
+
+.wlp-item:hover .wlp-item-schedule {
+  color: #5f6368 !important;
+}
+
+.wlp-item-schedule-on,
+.wlp-item:hover .wlp-item-schedule-on {
+  color: #1a73e8 !important;
+}
+
+/* A picked item waits for a day and time, from the form or a click on the
+   grid, so it has to stand out from every other row until then. A ring rather
+   than a border, so the calendar-colour left border stays as it is. */
+.wlp-item-picked {
+  background: #e8f0fe !important;
+  box-shadow: 0 0 0 2px #1a73e8 !important;
+}
+
+/* These controls strip the browser's own button look with !important, so
+   keyboard focus is drawn explicitly rather than left to whatever Google
+   Calendar's stylesheet does with outlines. */
+.wlp-item-schedule:focus-visible,
+.wlp-item-expand:focus-visible,
+.wlp-toast-undo:focus-visible,
+.wlp-schedule-btn:focus-visible,
+.wlp-schedule-repeat input:focus-visible {
+  outline: 2px solid #1a73e8 !important;
+  outline-offset: 2px !important;
+}
+
+.wlp-item-schedule:focus-visible,
+.wlp-item-expand:focus-visible {
+  border-radius: 3px !important;
+}
+
+/* ── Schedule form ─────────────────────────────────────────────────────────── */
+
+/* Same panel as the template details, so the row's two drop-downs look like
+   one family. */
+.wlp-schedule {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 10px !important;
+  margin: 4px 0 0 !important;
+  border: 1px solid #e8eaed !important;
+  border-radius: 6px !important;
+  background: #f8f9fa !important;
+}
+
+.wlp-schedule-row {
+  display: flex !important;
+  gap: 6px !important;
+}
+
+.wlp-schedule-field {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+
+.wlp-schedule-time {
+  flex: 0 0 92px !important;
+}
+
+.wlp-schedule-label {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #5f6368 !important;
+}
+
+.wlp-schedule .wlp-field {
+  cursor: pointer !important;
+}
+
+.wlp-schedule .wlp-field:focus-visible {
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.35) !important;
+}
+
+.wlp-schedule-repeat {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 12px !important;
+  color: #202124 !important;
+  cursor: pointer !important;
+}
+
+.wlp-schedule-repeat input {
+  margin: 0 !important;
+  accent-color: #1a73e8 !important;
+  cursor: pointer !important;
+}
+
+.wlp-schedule-hint,
+.wlp-form-hint {
+  margin: 0 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  color: #9aa0a6 !important;
+}
+
+.wlp-schedule-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+}
+
+.wlp-schedule-btn {
+  margin: 0 !important;
+  padding: 6px 12px !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #5f6368 !important;
+  cursor: pointer !important;
+  transition: background 0.15s, color 0.15s !important;
+}
+
+.wlp-schedule-btn:hover {
+  background: #f1f3f4 !important;
+  color: #202124 !important;
+}
+
+.wlp-schedule-btn-primary {
+  border-color: #1a73e8 !important;
+  background: #1a73e8 !important;
+  color: #ffffff !important;
+}
+
+.wlp-schedule-btn-primary:hover {
+  background: #1765cc !important;
+  color: #ffffff !important;
+}
+
 /* ── Item template panel ───────────────────────────────────────────────────── */
 
 .wlp-item-details {

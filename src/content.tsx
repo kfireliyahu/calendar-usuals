@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import PoolSidebar from './components/PoolSidebar';
 import { PoolItem, durationOf, eventColorHex } from './poolItem';
+import { dateFromCell, findDatekey, formatTime, isTimeGridCell, timeGridCellFor } from './calendarGrid';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
@@ -10,7 +11,6 @@ type DropPoolItem = PoolItem & { color?: string };
 
 const SIDEBAR_WIDTH   = 280;
 const COLLAPSED_WIDTH = 40;
-const PIXELS_PER_HOUR = 60; // 1 px = 1 minute
 
 const FALLBACK_COLOR = '#4285f4';
 
@@ -18,62 +18,6 @@ const FALLBACK_COLOR = '#4285f4';
 // draws it, so the preview and the loading placeholder use it too.
 function previewColor(item: DropPoolItem): string {
   return eventColorHex(item.colorId, item.color ?? FALLBACK_COLOR);
-}
-
-// ── Datekey → Date ────────────────────────────────────────────────────────────
-//
-// Google Calendar's data-datekey is a bit-packed date, NOT a day counter:
-//
-//   datekey = ((year - 1970) << 9) | (month << 5) | day     (month and day 1-based)
-//
-// i.e. 512 per year, 32 per month, 1 per day. Spot checks:
-//   Jan  1 2026 = 28672 + 32  + 1  = 28705
-//   Apr 30 2026 = 28672 + 128 + 30 = 28830
-//   May  1 2026 = 28672 + 160 + 1  = 28833
-//   Sep  6 2026 = 28672 + 288 + 6  = 28966
-//
-// The old "days since epoch + 2 per month boundary" approximation drifted by a
-// day or more inside any week that crossed a month, and could land in the wrong
-// month/year entirely.
-
-const DATEKEY_EPOCH_YEAR = 1970;
-
-function datekeyToDate(datekey: string): Date | null {
-  const dk = parseInt(datekey, 10);
-  if (!Number.isFinite(dk) || dk <= 0) {
-    console.warn('[WeeklyPool] Invalid datekey:', datekey);
-    return null;
-  }
-
-  const year  = DATEKEY_EPOCH_YEAR + (dk >> 9);
-  const month = (dk >> 5) & 0b1111; // 1-12
-  const day   = dk & 0b11111;       // 1-31
-
-  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
-    console.warn('[WeeklyPool] Unresolvable datekey:', dk, { year, month, day });
-    return null;
-  }
-
-  return new Date(year, month - 1, day);
-}
-
-function isLeapYear(y: number): boolean {
-  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-}
-function daysInMonth(year: number, month: number): number {
-  const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  return month === 2 && isLeapYear(year) ? 29 : DAYS[month - 1];
-}
-
-// The datekey usually lives on the [role="gridcell"] itself, but in some views
-// (all-day row, month grid) it sits on an ancestor, so walk up to find it.
-function findDatekey(cell: Element): string | null {
-  const el = cell.closest('[data-datekey]');
-  return el ? el.getAttribute('data-datekey') : null;
-}
-function dateFromCell(cell: Element): Date | null {
-  const datekey = findDatekey(cell);
-  return datekey ? datekeyToDate(datekey) : null;
 }
 
 // ── Layout ────────────────────────────────────────────────────────────────────
@@ -106,18 +50,9 @@ function adjustLayout(collapsed: boolean): void {
 
 // ── Time helper ───────────────────────────────────────────────────────────────
 
-// timeFromDrop reads a drop offset as "minutes since midnight", which only holds
-// in the week/day time grid, where a gridcell is one whole day column at
-// PIXELS_PER_HOUR (24 h => ~1440 px). Month-view cells and the all-day row are
-// also [role="gridcell"] with a datekey, but they are a fraction of that height,
-// so the same arithmetic there yields an arbitrary time. Require most of a full
-// day's height before trusting the offset.
-const TIME_GRID_MIN_HEIGHT = 20 * PIXELS_PER_HOUR;
-
-function isTimeGridCell(cell: Element): boolean {
-  return cell.getBoundingClientRect().height >= TIME_GRID_MIN_HEIGHT;
-}
-
+// Only meaningful on a time-grid cell (see isTimeGridCell), where 1 px below
+// the cell's top is one minute past midnight. A drop and a click-to-place both
+// read their time through here, so they snap identically.
 function timeFromDrop(cell: Element, clientY: number): { hours: number; minutes: number; snapped: number } {
   const pixelY = clientY - cell.getBoundingClientRect().top;
   const snapped = Math.round(pixelY / 15) * 15;
@@ -126,11 +61,6 @@ function timeFromDrop(cell: Element, clientY: number): { hours: number; minutes:
     minutes: snapped % 60,
     snapped,
   };
-}
-function formatTime(hours: number, minutes: number): string {
-  const period = hours < 12 ? 'AM' : 'PM';
-  const h = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-  return `${h}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
 // "7:00 - 8:30 AM" when both ends share a meridiem, "11:30 AM - 12:15 PM" when
@@ -235,20 +165,21 @@ function applyLoadingPosition(): void {
   previewEl.style.width = `${rect.width - 4}px`;
 }
 
-function showLoading(cell: Element, clientY: number, item: DropPoolItem, recurring: boolean): void {
+// Takes the start as minutes past midnight rather than a pointer position, so
+// the schedule form, which has no pointer, can anchor a placeholder too.
+function showLoading(cell: Element, startMin: number, item: DropPoolItem, recurring: boolean): void {
   const el        = getPreview();
   // The placeholder keeps the repeat glyph but not the dashed border.
   el.classList.add('wlp-preview-loading');
   el.classList.toggle('wlp-preview-recurring', recurring);
-  const { snapped } = timeFromDrop(cell, clientY);
   const rect      = cell.getBoundingClientRect();
   const calColor  = previewColor(item);
 
   loadingCell    = cell;
-  loadingSnapped = snapped;
+  loadingSnapped = startMin;
 
   Object.assign(el.style, {
-    top: `${rect.top + snapped}px`, left: `${rect.left + 2}px`,
+    top: `${rect.top + startMin}px`, left: `${rect.left + 2}px`,
     width: `${rect.width - 4}px`,  height: `${durationOf(item)}px`,
     display: 'block', opacity: '1',
     background: calColor, border: 'none', borderRadius: '4px',
@@ -466,9 +397,151 @@ function eventBody(item: DropPoolItem, start: Date, end: Date, recurring: boolea
   return body;
 }
 
-// ── Drop listeners ────────────────────────────────────────────────────────────
+// ── Creating an event from an item ────────────────────────────────────────────
+
+// The one way an item becomes an event. A drop, a click while an item is
+// picked and the sidebar's schedule form all end here, so the event body, the
+// toast sequence ('creating', then 'created' with Undo, or 'error') and the
+// weekly wording cannot drift apart between them.
+//
+// The anchor is the day column the placeholder pulses in. The schedule form
+// can name a day that is not on screen, and then there is nothing to anchor
+// it to: the toast alone reports progress, and nothing waits for the chip,
+// because starting a wait would cancel the one a pending drop placeholder is
+// relying on, and the end of this wait would then fade that placeholder.
+function createFromItem(
+  item: DropPoolItem,
+  date: Date,
+  hours: number,
+  minutes: number,
+  recurring: boolean,
+  anchor: Element | null,
+): void {
+  const start = new Date(date); start.setHours(hours, minutes, 0, 0);
+  // Millisecond arithmetic rather than setHours(h + n): it reads the same way
+  // for any duration and rolls into the next day correctly.
+  const end   = new Date(start.getTime() + durationOf(item) * 60_000);
+
+  // Show the pulsing placeholder at the chosen slot immediately
+  if (anchor) showLoading(anchor, hours * 60 + minutes, item, recurring);
+  const fail = (error?: string) => {
+    dispatchPoolEvent('error', item.name, { error });
+    if (anchor) hideLoading(true);
+  };
+
+  dispatchPoolEvent('creating', item.name, { recurring });
+  const sent = sendToBackground(
+    { type: 'CREATE_EVENT', data: eventBody(item, start, end, recurring) },
+    (response) => {
+      if (response?.success) {
+        const { id, calendarId } = response.data ?? {};
+        dispatchPoolEvent('created', item.name, {
+          recurring,
+          event: id && calendarId ? { eventId: id, calendarId, recurring } : undefined,
+        });
+        // Watch for GCal to render the event, then fade out the placeholder
+        if (anchor) waitForEvent(id, item.name);
+      } else {
+        fail(response?.error);
+      }
+    }
+  );
+
+  if (!sent) fail('Extension reloaded - refresh the page');
+}
+
+// ── Placement hint ────────────────────────────────────────────────────────────
+
+// The tooltip and preview block shown over the time grid, both while dragging
+// and while a picked item follows the pointer, so a click places exactly what a
+// drop at the same spot would. The preview element doubles as the loading
+// placeholder, so while one is pulsing only the tooltip follows the pointer:
+// redrawing the element would move the placeholder off its event.
+function showPlacementHint(cell: Element, clientX: number, clientY: number, item: DropPoolItem, recurring: boolean): void {
+  const date = dateFromCell(cell);
+  if (!date) return;
+  const { hours, minutes } = timeFromDrop(cell, clientY);
+  const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const repeats = recurring ? '  ·  ↻ repeats weekly' : '';
+  showTooltip(clientX, clientY, `${item.name}  ·  ${day}, ${formatRange(hours, minutes, durationOf(item))}${repeats}`);
+  if (!isLoading) showPreview(cell, clientY, item, recurring);
+}
+
+// ── Picked item (click-to-place) ──────────────────────────────────────────────
+//
+// Picking an item in the sidebar is the way to schedule without dragging.
+// While one is picked, a click on the time grid places it where a drop there
+// would, and Shift-click makes it weekly as Shift-drop does. The sidebar owns
+// which item is picked and reports it with poolPickChange; this script reports
+// back with poolPickDone once a click has used the pick up.
+
+let pickedItem: DropPoolItem | null = null;
+
+// Where the pointer last was while an item is picked, so the hint can be
+// redrawn when Shift changes or the grid scrolls under a pointer that has not
+// moved, neither of which fires a mousemove.
+let lastPointer: { target: EventTarget | null; x: number; y: number; shift: boolean } | null = null;
+
+// A double-click is two clicks. The first places the item, and the second
+// would reach Google Calendar's own click-to-create and open its quick-create
+// dialog on top of the new event, so clicks on the time grid this soon after
+// a place are swallowed too.
+const PLACE_SETTLE_MS = 500;
+let settleUntil = 0;
+
+function refreshPickedHint(): void {
+  if (!pickedItem || !lastPointer) return;
+  const { target, x, y, shift } = lastPointer;
+  const cell = closestFrom(target, '[role="gridcell"]');
+  if (!cell) { hideTooltip(); hidePreview(); return; }
+  if (!isTimeGridCell(cell)) {
+    hidePreview();
+    showTooltip(x, y, 'Switch to Day or Week view to place here');
+    return;
+  }
+  showPlacementHint(cell, x, y, pickedItem, shift);
+}
+
+function clearPick(): void {
+  pickedItem  = null;
+  lastPointer = null;
+  hideTooltip();
+  hidePreview();
+}
+
+function placePicked(cell: Element, e: MouseEvent): void {
+  const item = pickedItem;
+  const date = dateFromCell(cell);
+  if (!item || !date) { console.warn('[WeeklyPool] Could not resolve a date for cell', cell); return; }
+  console.log(`[WeeklyPool] Place → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
+
+  const { hours, minutes } = timeFromDrop(cell, e.clientY);
+  clearPick();
+  settleUntil = performance.now() + PLACE_SETTLE_MS;
+  document.dispatchEvent(new CustomEvent('poolPickDone'));
+  // Shift is read from the click itself, as a drop reads it from the release.
+  createFromItem(item, date, hours, minutes, e.shiftKey, cell);
+}
+
+// What the sidebar's schedule form sends. It names a day and a time but has
+// no pointer, so the placeholder can only go in that day's column if the time
+// grid is showing it.
+interface ScheduleRequest {
+  item:      DropPoolItem;
+  date:      Date;
+  hours:     number;
+  minutes:   number;
+  recurring: boolean;
+}
+
+// ── Listeners ─────────────────────────────────────────────────────────────────
 
 let draggingItem: DropPoolItem | null = null;
+
+// Every event of a press on the time grid, not just the click: Google Calendar
+// begins its own click-to-create (and drag-to-create) on the press, so letting
+// that through would open its quick-create dialog over our event.
+const GRID_PRESS_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'dblclick'];
 
 function setupListeners(): void {
   document.addEventListener('poolDragStart', (e: Event) => {
@@ -502,19 +575,9 @@ function setupListeners(): void {
       return;
     }
     e.preventDefault();
-    if (draggingItem) {
-      const date = dateFromCell(cell);
-      if (date) {
-        const { hours, minutes } = timeFromDrop(cell, e.clientY);
-        const duration = durationOf(draggingItem);
-        const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        // dragover keeps firing while the pointer is still, so pressing or
-        // releasing Shift mid-drag updates this without a mouse move.
-        const repeats = e.shiftKey ? '  ·  ↻ repeats weekly' : '';
-        showTooltip(e.clientX, e.clientY, `${draggingItem.name}  ·  ${day}, ${formatRange(hours, minutes, duration)}${repeats}`);
-        showPreview(cell, e.clientY, draggingItem, e.shiftKey);
-      }
-    }
+    // dragover keeps firing while the pointer is still, so pressing or
+    // releasing Shift mid-drag updates this without a mouse move.
+    if (draggingItem) showPlacementHint(cell, e.clientX, e.clientY, draggingItem, e.shiftKey);
   });
 
   document.addEventListener('drop', (e: DragEvent) => {
@@ -535,40 +598,63 @@ function setupListeners(): void {
     console.log(`[WeeklyPool] Drop → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
 
     const { hours, minutes } = timeFromDrop(cell, e.clientY);
-    const start = new Date(date); start.setHours(hours, minutes, 0, 0);
-    // Millisecond arithmetic rather than setHours(h + n): it reads the same way
-    // for any duration and rolls into the next day correctly.
-    const end   = new Date(start.getTime() + durationOf(item) * 60_000);
     // Read from the drop itself rather than the last dragover, so what is
     // created is whatever the key says at the moment of release.
-    const recurring = e.shiftKey;
+    createFromItem(item, date, hours, minutes, e.shiftKey, cell);
+  });
 
-    // Show pulsing placeholder at the exact drop position immediately
-    showLoading(cell, e.clientY, item, recurring);
+  // ── Click-to-place ──
 
-    dispatchPoolEvent('creating', item.name, { recurring });
-    const sent = sendToBackground(
-      { type: 'CREATE_EVENT', data: eventBody(item, start, end, recurring) },
-      (response) => {
-        if (response?.success) {
-          const { id, calendarId } = response.data ?? {};
-          dispatchPoolEvent('created', item.name, {
-            recurring,
-            event: id && calendarId ? { eventId: id, calendarId, recurring } : undefined,
-          });
-          // Watch for GCal to render the event, then fade out the placeholder
-          waitForEvent(id, item.name);
-        } else {
-          dispatchPoolEvent('error', item.name, { error: response?.error });
-          hideLoading(true);
-        }
-      }
-    );
-
-    if (!sent) {
-      dispatchPoolEvent('error', item.name, { error: 'Extension reloaded - refresh the page' });
-      hideLoading(true);
+  document.addEventListener('poolPickChange', (e: Event) => {
+    const item = (e as CustomEvent).detail.item as DropPoolItem | null;
+    if (item) {
+      pickedItem = item;
+      refreshPickedHint();
+    } else if (pickedItem) {
+      clearPick();
     }
+  });
+
+  // On window in the capture phase, like the press handling below, so nothing
+  // Google Calendar does with mousemove on the grid can hide it from us.
+  window.addEventListener('mousemove', (e: MouseEvent) => {
+    if (!pickedItem) return;
+    lastPointer = { target: e.target, x: e.clientX, y: e.clientY, shift: e.shiftKey };
+    refreshPickedHint();
+  }, { capture: true, passive: true });
+
+  const onShift = (e: KeyboardEvent) => {
+    if (e.key !== 'Shift' || !pickedItem || !lastPointer) return;
+    lastPointer.shift = e.type === 'keydown';
+    refreshPickedHint();
+  };
+  window.addEventListener('keydown', onShift, true);
+  window.addEventListener('keyup',   onShift, true);
+  document.addEventListener('scroll', refreshPickedHint, { capture: true, passive: true });
+
+  // Capturing on window runs ahead of anything Google Calendar listens with on
+  // the document or the grid. Nothing is touched unless an item is picked (or
+  // was placed a moment ago) and the press is a primary-button one on a time
+  // grid cell, so Google Calendar's own click-to-create, its event popovers and
+  // its right-click menu all work as usual the rest of the time.
+  const onGridPress = (e: MouseEvent) => {
+    if (!pickedItem && performance.now() > settleUntil) return;
+    if (e.button !== 0) return;
+    const cell = closestFrom(e.target, '[role="gridcell"]');
+    if (!cell || !isTimeGridCell(cell)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.type === 'click' && pickedItem) placePicked(cell, e);
+  };
+  for (const type of GRID_PRESS_EVENTS) {
+    window.addEventListener(type, onGridPress as EventListener, true);
+  }
+
+  // ── Schedule form ──
+
+  document.addEventListener('poolScheduleItem', (e: Event) => {
+    const { item, date, hours, minutes, recurring } = (e as CustomEvent).detail as ScheduleRequest;
+    createFromItem(item, date, hours, minutes, recurring, timeGridCellFor(date));
   });
 }
 

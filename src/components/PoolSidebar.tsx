@@ -12,6 +12,7 @@ import {
   hasTemplate,
   newItemId,
 } from '../poolItem';
+import { formatTime, isSameDay, visibleTimeGridDays } from '../calendarGrid';
 
 interface PoolCategory {
   calendarId: string;
@@ -184,6 +185,131 @@ const ItemDetails: React.FC<{
   </div>
 );
 
+// ── Schedule form ────────────────────────────────────────────────────────────
+//
+// The way to put an item on the calendar without dragging it. It offers the
+// days the time grid is showing, so it schedules into the week the user is
+// looking at, and falls back to the coming seven days when there is no time
+// grid to read (month or schedule view). Whatever it picks goes through the
+// same create path as a drop.
+
+const QUARTER_HOURS = Array.from({ length: 24 * 4 }, (_, i) => i * 15);
+const LAST_START_MIN = QUARTER_HOURS[QUARTER_HOURS.length - 1];
+
+function scheduleDays(): Date[] {
+  const shown = visibleTimeGridDays();
+  if (shown.length > 0) return shown;
+  const now = new Date();
+  return Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
+}
+
+function defaultDay(days: Date[]): Date {
+  const today = new Date();
+  return days.find((d) => isSameDay(d, today)) ?? days[0];
+}
+
+function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+// The weekday is dropped for today so the label still fits the 280px rail.
+function dayLabel(d: Date): string {
+  return isSameDay(d, new Date())
+    ? `Today, ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// The soonest quarter hour that has not started yet. Late in the evening that
+// would be tomorrow, which the day choice says otherwise, so it stops at the
+// last slot of the day instead of wrapping.
+function nextQuarterHour(now = new Date()): number {
+  const minutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  return Math.min(Math.ceil(minutes / 15) * 15, LAST_START_MIN);
+}
+
+const ScheduleForm: React.FC<{
+  id: string;
+  item: PoolItem;
+  onSchedule: (date: Date, startMin: number, recurring: boolean) => void;
+  onCancel: () => void;
+}> = ({ id, item, onSchedule, onCancel }) => {
+  const [days, setDays] = useState(scheduleDays);
+  const [dayValue, setDayValue] = useState(() => dayKey(defaultDay(days)));
+  const [startMin, setStartMin] = useState(() => nextQuarterHour());
+  const [recurring, setRecurring] = useState(false);
+
+  // Google Calendar can move to another week while the form is open, so the
+  // days are read again each time the day choice gets focus. The chosen day
+  // survives when the new week still shows it.
+  const refreshDays = () => {
+    const next = scheduleDays();
+    setDays(next);
+    if (!next.some((d) => dayKey(d) === dayValue)) setDayValue(dayKey(defaultDay(next)));
+  };
+
+  const submit = () => {
+    const date = days.find((d) => dayKey(d) === dayValue);
+    if (date) onSchedule(date, startMin, recurring);
+  };
+
+  return (
+    <form
+      id={id}
+      aria-label={`Schedule ${item.name}`}
+      onSubmit={(e) => { e.preventDefault(); submit(); }}
+      // Browsers only submit on Enter from a text field, and this form has
+      // none, so Enter on the selects or the checkbox schedules too. A button
+      // keeps its own Enter, so Cancel still cancels. A held Enter is ignored:
+      // the press that picked the item would otherwise repeat into the day
+      // choice it focused and schedule straight away.
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' || e.repeat || (e.target as HTMLElement).tagName === 'BUTTON') return;
+        e.preventDefault();
+        submit();
+      }}
+      className="wlp-schedule"
+    >
+      <div className="wlp-schedule-row">
+        <label className="wlp-schedule-field">
+          <span className="wlp-schedule-label">Day</span>
+          <select
+            autoFocus
+            value={dayValue}
+            onFocus={refreshDays}
+            onChange={(e) => setDayValue(e.target.value)}
+            className="wlp-field"
+          >
+            {days.map((d) => (
+              <option key={dayKey(d)} value={dayKey(d)}>{dayLabel(d)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="wlp-schedule-field wlp-schedule-time">
+          <span className="wlp-schedule-label">Start</span>
+          <select
+            value={startMin}
+            onChange={(e) => setStartMin(Number(e.target.value))}
+            className="wlp-field"
+          >
+            {QUARTER_HOURS.map((min) => (
+              <option key={min} value={min}>{formatTime(Math.floor(min / 60), min % 60)}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="wlp-schedule-repeat">
+        <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
+        Repeat weekly
+      </label>
+      <p className="wlp-schedule-hint">Or click a time in Day or Week view. Shift-click repeats weekly.</p>
+      <div className="wlp-schedule-actions">
+        <button type="button" onClick={onCancel} className="wlp-schedule-btn">Cancel</button>
+        <button type="submit" className="wlp-schedule-btn wlp-schedule-btn-primary">Schedule</button>
+      </div>
+    </form>
+  );
+};
+
 const PoolSidebar: React.FC = () => {
   const [categories, setCategories] = useState<PoolCategory[]>([]);
   const [newItemName, setNewItemName] = useState('');
@@ -201,11 +327,13 @@ const PoolSidebar: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const collapsedReady = useRef(false);
   const formReady = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRename = useRef(false);
+  const scheduleButtons = useRef(new Map<string, HTMLButtonElement>());
 
   // One timer for every toast source, so a pending clear from an earlier toast
   // cannot wipe a newer one.
@@ -313,6 +441,67 @@ const PoolSidebar: React.FC = () => {
     };
   }, []);
 
+
+  // ── Picked item ──────────────────────────────────────────────────────────────
+  //
+  // Picking an item opens its schedule form and, at the same time, lets a click
+  // on the time grid place it (content.tsx does the placing). Only one item is
+  // picked at a time; picking it again, Escape, a drag or collapsing the
+  // sidebar puts it back.
+
+  // Focus returns to the item's schedule button only when it was in the form,
+  // so an Escape pressed while working in Google Calendar does not pull focus
+  // into the sidebar.
+  const closePick = (id: string) => {
+    const returnFocus = document.activeElement?.closest('.wlp-schedule') != null;
+    setPickedId(null);
+    if (returnFocus) scheduleButtons.current.get(id)?.focus();
+  };
+
+  // The content script creates the event the same way a drop does, so the
+  // toast, Undo and the weekly wording all follow without anything here.
+  const scheduleItem = (item: PoolItem, color: string, date: Date, startMin: number, recurring: boolean) => {
+    document.dispatchEvent(new CustomEvent('poolScheduleItem', {
+      detail: {
+        item: { ...item, color },
+        date,
+        hours: Math.floor(startMin / 60),
+        minutes: startMin % 60,
+        recurring,
+      },
+    }));
+    closePick(item.id);
+  };
+
+  // Tells the content script what a click on the grid would place, with the
+  // calendar colour a drag would carry. Deleting the item or hiding its
+  // calendar ends the pick rather than leaving an invisible item armed.
+  useEffect(() => {
+    let payload: (PoolItem & { color: string }) | null = null;
+    for (const cat of categories) {
+      const item = cat.hidden ? undefined : cat.items.find((i) => i.id === pickedId);
+      if (item) payload = { ...item, color: cat.color };
+    }
+    if (pickedId && !payload) { setPickedId(null); return; }
+    document.dispatchEvent(new CustomEvent('poolPickChange', { detail: { item: payload } }));
+  }, [pickedId, categories]);
+
+  // Escape is caught on window in the capture phase so it works wherever focus
+  // is, Google Calendar's own widgets included. It is not stopped, so whatever
+  // Google Calendar does with Escape still happens.
+  useEffect(() => {
+    if (!pickedId) return;
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') closePick(pickedId); };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [pickedId]);
+
+  // A click on the grid used the pick up.
+  useEffect(() => {
+    const done = () => setPickedId(null);
+    document.addEventListener('poolPickDone', done);
+    return () => document.removeEventListener('poolPickDone', done);
+  }, []);
 
   // ── Calendar fetch ───────────────────────────────────────────────────────────
 
@@ -565,6 +754,23 @@ const PoolSidebar: React.FC = () => {
     error:   'bg-[#fce8e6] text-[#d33427] border-[#f5c6c3]',
   };
 
+  const renderToast = (t: Toast) => (
+    <div
+      className={`px-4 py-[9px] text-[12px] border-b flex items-center gap-[10px] ${toastColors[t.type]} [animation:wlp-fadein_200ms_ease]`}
+    >
+      <span className="flex-1 min-w-[0]">{t.message}</span>
+      {t.undo && (
+        <button
+          onClick={() => undoDrop(t.undo!)}
+          title={t.undo.recurring ? 'Remove the whole weekly series' : 'Remove this event'}
+          className="wlp-toast-undo"
+        >
+          Undo
+        </button>
+      )}
+    </div>
+  );
+
   const visibleCategories = categories.filter((c) => !c.hidden);
   const hiddenCategories  = categories.filter((c) =>  c.hidden);
   const selectedCategory  = visibleCategories.find((c) => c.calendarId === newItemCategory);
@@ -620,7 +826,7 @@ const PoolSidebar: React.FC = () => {
               </button>
               {/* Collapse sidebar */}
               <button
-                onClick={() => setCollapsed(true)}
+                onClick={() => { setPickedId(null); setCollapsed(true); }}
                 title="Hide sidebar"
                 className={iconBtnCls}
               >
@@ -739,25 +945,24 @@ const PoolSidebar: React.FC = () => {
                     </button>
                   </div>
 
+                  {/* The two modifiers nothing else on screen mentions. */}
+                  <p className="wlp-form-hint">
+                    Hold Shift as you drop to repeat weekly · Enter on an item's calendar icon schedules it
+                  </p>
+
                 </div>
               </div>
 
-              {/* Toast */}
-              {toast && (
-                <div
-                  className={`px-4 py-[9px] text-[12px] border-b shrink-0 flex items-center gap-[10px] ${toastColors[toast.type]} [animation:wlp-fadein_200ms_ease]`}
-                >
-                  <span className="flex-1 min-w-[0]">{toast.message}</span>
-                  {toast.undo && (
-                    <button
-                      onClick={() => undoDrop(toast.undo!)}
-                      title={toast.undo.recurring ? 'Remove the whole weekly series' : 'Remove this event'}
-                      className="wlp-toast-undo"
-                    >
-                      Undo
-                    </button>
-                  )}
-                </div>
+              {/* Toast. A screen reader only announces a live region that was
+                  already in the page when its text changed, so the status
+                  region stays mounted and empty between toasts. An error goes
+                  in a role="alert" instead, which is announced on insertion and
+                  interrupts, since it means the event was not created. */}
+              <div role="status" aria-live="polite" aria-atomic="true" className="shrink-0">
+                {toast && toast.type !== 'error' && renderToast(toast)}
+              </div>
+              {toast && toast.type === 'error' && (
+                <div role="alert" className="shrink-0">{renderToast(toast)}</div>
               )}
 
               {/* Category list */}
@@ -796,6 +1001,8 @@ const PoolSidebar: React.FC = () => {
                       {category.items.map((item, index) => {
                         const editing  = editingId  === item.id;
                         const expanded = expandedId === item.id;
+                        const picked   = pickedId   === item.id;
+                        const scheduleFormId = `wlp-schedule-${item.id}`;
                         const aimedHere = dropTarget?.calendarId === category.calendarId;
                         const dropBefore = aimedHere && dropTarget!.index === index;
                         const dropAfter  = aimedHere &&
@@ -820,6 +1027,10 @@ const PoolSidebar: React.FC = () => {
                                 // the other's payload by accident.
                                 e.dataTransfer?.setData('poolReorder', JSON.stringify({ id: item.id }));
                                 setDraggingId(item.id);
+                                // A drag is its own way of scheduling, and a pick
+                                // left armed would place a second event on the
+                                // next click.
+                                setPickedId(null);
                                 document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item: payload } }));
                               }}
                               onDragEnd={() => {
@@ -829,7 +1040,7 @@ const PoolSidebar: React.FC = () => {
                               }}
                               className={`wlp-item group flex items-center justify-between bg-white border border-[#e8eaed] rounded-[6px] text-[13px] text-[#202124] cursor-grab select-none transition-all duration-150 hover:border-[#c5c9ce] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
                                 draggingId === item.id ? ' opacity-40' : ''
-                              }`}
+                              }${picked ? ' wlp-item-picked' : ''}`}
                               style={{ borderLeft: `3px solid ${eventColorHex(item.colorId, category.color)}` }}
                             >
                               {editing ? (
@@ -851,7 +1062,7 @@ const PoolSidebar: React.FC = () => {
                               ) : (
                                 <span
                                   onDoubleClick={() => startRename(item)}
-                                  title={`${item.name} — double-click to rename`}
+                                  title={`${item.name} — drag onto the calendar (hold Shift to repeat weekly), double-click to rename`}
                                   className="flex-1 truncate"
                                 >
                                   {item.name}
@@ -861,6 +1072,27 @@ const PoolSidebar: React.FC = () => {
                                 value={durationOf(item)}
                                 onChange={(min) => updateItem(item.id, { durationMin: min })}
                               />
+                              {/* The no-drag way to schedule. A real button, so
+                                  Tab reaches it and Enter or Space picks the item,
+                                  and a pointer user who cannot drag can click it
+                                  and then click a time on the grid. */}
+                              <button
+                                ref={(el) => {
+                                  if (el) scheduleButtons.current.set(item.id, el);
+                                  else    scheduleButtons.current.delete(item.id);
+                                }}
+                                type="button"
+                                onClick={() => setPickedId(picked ? null : item.id)}
+                                aria-label={`Schedule ${item.name}`}
+                                aria-expanded={picked}
+                                aria-controls={picked ? scheduleFormId : undefined}
+                                title={picked ? 'Cancel scheduling (Esc)' : 'Schedule without dragging (Enter)'}
+                                className={`wlp-item-schedule${picked ? ' wlp-item-schedule-on' : ''}`}
+                              >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
+                                </svg>
+                              </button>
                               <button
                                 onClick={() => setExpandedId(expanded ? null : item.id)}
                                 title={expanded ? 'Hide details' : 'Edit details'}
@@ -874,11 +1106,21 @@ const PoolSidebar: React.FC = () => {
                               <button
                                 onClick={() => deleteItem(item.id)}
                                 title="Remove"
-                                className="opacity-0 group-hover:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-0 ml-1 transition-all duration-150 hover:text-[#d33427] hover:scale-110"
+                                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-0 ml-1 transition-all duration-150 hover:text-[#d33427] hover:scale-110"
                               >
                                 ×
                               </button>
                             </div>
+                            {picked && (
+                              <ScheduleForm
+                                id={scheduleFormId}
+                                item={item}
+                                onSchedule={(date, startMin, recurring) =>
+                                  scheduleItem(item, category.color, date, startMin, recurring)
+                                }
+                                onCancel={() => closePick(item.id)}
+                              />
+                            )}
                             {expanded && (
                               <ItemDetails
                                 item={item}
