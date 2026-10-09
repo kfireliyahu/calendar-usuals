@@ -16,3 +16,7 @@ dist/
 .DS_Store
 Thumbs.db
 *.log
+
+# Emerald development document. Private, never committed.
+*.emd
+*.emd.*.bak
