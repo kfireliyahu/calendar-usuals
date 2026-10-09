@@ -707,7 +707,7 @@ const PoolSidebar: React.FC = () => {
                 ...cat.items,
                 {
                   id: newItemId(),
-                  name: newItemName,
+                  name: newItemName.trim(),
                   calendarId: newItemCategory,
                   durationMin: newItemDuration,
                 },
