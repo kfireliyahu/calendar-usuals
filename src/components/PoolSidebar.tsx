@@ -48,6 +48,12 @@ interface Toast {
 
 const UNDO_WINDOW_MS = 5000;
 
+// A toast does not count down while the pointer is over it or focus is inside
+// it: five seconds is short for someone tabbing to Undo or listening to a
+// screen reader. Once they leave it gets at least this long again, so it never
+// vanishes the instant the pointer moves off.
+const TOAST_RESUME_MIN_MS = 2000;
+
 // Store users never see the README, so the sidebar's footer is how they find
 // the project page. manifest.json's homepage_url repeats it, because JSON
 // cannot import a constant; change both together.
@@ -337,15 +343,55 @@ const PoolSidebar: React.FC = () => {
   const formReady = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastDeadline = useRef(0);
+  const toastRemaining = useRef<number | null>(null);
+  const toastArea = useRef<HTMLDivElement>(null);
   const cancelledRename = useRef(false);
   const scheduleButtons = useRef(new Map<string, HTMLButtonElement>());
 
+  // Hover and focus are read from the DOM when needed rather than tracked from
+  // enter and leave events: the toast's content is swapped out from under the
+  // pointer and the focus (Undo replaces itself with "Removing…"), and a
+  // missed leave would otherwise hold a toast on screen for good.
+  const toastEngaged = () => {
+    const el = toastArea.current;
+    return el !== null && (el.matches(':hover') || el.contains(document.activeElement));
+  };
+
+  const startToastTimer = (ms: number) => {
+    toastTimer.current = setTimeout(() => setToast(null), ms);
+    toastDeadline.current = Date.now() + ms;
+  };
+
   // One timer for every toast source, so a pending clear from an earlier toast
-  // cannot wipe a newer one.
+  // cannot wipe a newer one. A toast that arrives under the pointer or focus
+  // starts out paused.
   const showToast = (message: string, type: Toast['type'], holdMs = 3000, undo?: UndoTarget) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+    toastRemaining.current = null;
     setToast({ message, type, undo });
-    if (holdMs > 0) toastTimer.current = setTimeout(() => setToast(null), holdMs);
+    if (holdMs <= 0) return;
+    if (toastEngaged()) toastRemaining.current = holdMs;
+    else startToastTimer(holdMs);
+  };
+
+  const pauseToast = () => {
+    if (!toastTimer.current) return;
+    clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+    toastRemaining.current = Math.max(0, toastDeadline.current - Date.now());
+  };
+
+  // Deferred a tick because a leave or blur is often a move to another part of
+  // the toast, and by then :hover and activeElement say where it ended up.
+  const resumeToast = () => {
+    setTimeout(() => {
+      if (toastRemaining.current === null || toastEngaged()) return;
+      const ms = Math.max(toastRemaining.current, TOAST_RESUME_MIN_MS);
+      toastRemaining.current = null;
+      startToastTimer(ms);
+    }, 0);
   };
 
   // Deletes the event the last drop created. A recurring event's id is the
@@ -962,13 +1008,23 @@ const PoolSidebar: React.FC = () => {
                   already in the page when its text changed, so the status
                   region stays mounted and empty between toasts. An error goes
                   in a role="alert" instead, which is announced on insertion and
-                  interrupts, since it means the event was not created. */}
-              <div role="status" aria-live="polite" aria-atomic="true" className="shrink-0">
-                {toast && toast.type !== 'error' && renderToast(toast)}
+                  interrupts, since it means the event was not created. Both
+                  sit in one plain wrapper that pauses the toast's timer. */}
+              <div
+                ref={toastArea}
+                onMouseEnter={pauseToast}
+                onMouseLeave={resumeToast}
+                onFocus={pauseToast}
+                onBlur={resumeToast}
+                className="shrink-0"
+              >
+                <div role="status" aria-live="polite" aria-atomic="true">
+                  {toast && toast.type !== 'error' && renderToast(toast)}
+                </div>
+                {toast && toast.type === 'error' && (
+                  <div role="alert">{renderToast(toast)}</div>
+                )}
               </div>
-              {toast && toast.type === 'error' && (
-                <div role="alert" className="shrink-0">{renderToast(toast)}</div>
-              )}
 
               {/* Category list */}
               <div

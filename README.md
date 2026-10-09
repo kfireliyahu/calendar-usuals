@@ -9,7 +9,7 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 - **Activity pool** — store reusable items (tasks, routines, habits) grouped by your Google Calendars
 - **Drag-and-drop creation** — drag any item onto the calendar grid; an event is created at the exact time and date you drop it
 - **Shift-drop for weekly** — hold Shift while dropping to create a weekly series with no end date; the tooltip and a dashed, ↻-marked preview show it live as Shift goes down or up
-- **Undo** — the toast after a drop offers Undo for 5 seconds; it deletes the event, or the whole series for a Shift-drop
+- **Undo** — the toast after a drop offers Undo for 5 seconds, paused while the pointer or keyboard focus is on it; it deletes the event, or the whole series for a Shift-drop
 - **Schedule without dragging** — each item has a calendar button: Tab to it and press Enter (or click it) to pick the item, then choose a day from the week on screen and a 15-minute start time, or click a time slot in Day or Week view to place it there; Shift-click and the form's Repeat weekly box work like Shift-drop, and Escape cancels
 - **Item templates** — give an item a description, location, event colour and reminder; dropping it creates the event fully configured
 - **Rename in place** — double-click an item's name; Enter or clicking away commits, Escape cancels
