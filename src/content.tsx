@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import PoolSidebar from './components/PoolSidebar';
 import { PoolItem, durationOf, eventColorHex } from './poolItem';
 import { dateFromCell, findDatekey, formatTime, isTimeGridCell, timeGridCellFor } from './calendarGrid';
+import { Theme, watchTheme } from './theme';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
@@ -48,6 +49,21 @@ function adjustLayout(collapsed: boolean): void {
   root.style.transition = 'transform 0.2s ease-in-out, width 0.2s ease-in-out';
 }
 
+// ── Theme ─────────────────────────────────────────────────────────────────────
+
+// The sidebar's mount and the tooltip and preview below are the only elements
+// the extension adds to the page, and content.css keys every colour off this
+// attribute on them. The tooltip and preview are created lazily, so each picks
+// up the current theme when it is made.
+let currentTheme: Theme = 'light';
+
+function applyTheme(theme: Theme): void {
+  currentTheme = theme;
+  for (const el of [document.getElementById('weekly-life-pool-sidebar'), tooltipEl, previewEl]) {
+    el?.setAttribute('data-wlp-theme', theme);
+  }
+}
+
 // ── Time helper ───────────────────────────────────────────────────────────────
 
 // Only meaningful on a time-grid cell (see isTimeGridCell), where 1 px below
@@ -89,6 +105,7 @@ function getTooltip(): HTMLElement {
   if (!tooltipEl) {
     tooltipEl = document.createElement('div');
     tooltipEl.id = 'wlp-drop-tooltip';
+    tooltipEl.setAttribute('data-wlp-theme', currentTheme);
     Object.assign(tooltipEl.style, {
       position: 'fixed', zIndex: '10001', pointerEvents: 'none',
       padding: '8px 12px', borderRadius: '6px', fontSize: '13px',
@@ -115,6 +132,7 @@ function getPreview(): HTMLElement {
   if (!previewEl) {
     previewEl = document.createElement('div');
     previewEl.id = 'wlp-event-preview';
+    previewEl.setAttribute('data-wlp-theme', currentTheme);
     Object.assign(previewEl.style, {
       position: 'fixed', zIndex: '9999', pointerEvents: 'none',
       background: 'rgba(66,133,244,0.2)', border: '2px solid rgba(66,133,244,0.55)',
@@ -674,6 +692,8 @@ function injectSidebar(): void {
   const sidebarEl = document.createElement('div');
   sidebarEl.id = 'weekly-life-pool-sidebar';
   document.body.insertBefore(sidebarEl, document.body.firstChild);
+  // Before the first render, so the sidebar never flashes light on a dark page.
+  watchTheme(applyTheme);
 
   try {
     ReactDOM.createRoot(sidebarEl).render(<PoolSidebar />);

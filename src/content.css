@@ -56,6 +56,58 @@
   --wlp-tooltip-bg:      #202124;
   --wlp-tooltip-text:    #ffffff;
   --wlp-swatch-outline:  rgba(0, 0, 0, 0.12);
+  color-scheme: light;
+}
+
+/* content.tsx sets data-wlp-theme="dark" on the same three elements whenever
+   Google Calendar is showing its dark theme (see theme.ts). The palette follows
+   Google's own dark greys and its light blue accent. Every text colour here meets
+   WCAG AA on the surfaces it is drawn on, and the faint icon grey keeps 3:1
+   against the rows it sits on. color-scheme gives the
+   native controls, the checkbox, the selects' open lists and the scrollbars,
+   their dark look too. */
+:is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview)[data-wlp-theme="dark"] {
+  --wlp-surface:         #1f1f1f;
+  --wlp-surface-raised:  #28292a;
+  --wlp-panel:           #2d2e30;
+  --wlp-input:           #1f1f1f;
+  --wlp-hover:           #37393b;
+  --wlp-text:            #e3e3e3;
+  --wlp-text-secondary:  #c4c7c5;
+  --wlp-text-muted:      #9aa0a6;
+  --wlp-icon-faint:      #80868b;
+  --wlp-border:          #444746;
+  --wlp-border-subtle:   #3c4043;
+  --wlp-border-hover:    #5f6368;
+  --wlp-divider:         #3c4043;
+  --wlp-accent:          #a8c7fa;
+  --wlp-accent-soft:     #1e3150;
+  --wlp-primary:         #a8c7fa;
+  --wlp-primary-hover:   #d3e3fd;
+  --wlp-on-primary:      #062e6f;
+  --wlp-focus:           #a8c7fa;
+  --wlp-danger:          #f2b8b5;
+  --wlp-info-bg:         #1c2b41;
+  --wlp-info-text:       #a8c7fa;
+  --wlp-info-border:     #2c4466;
+  --wlp-success-bg:      #1a2e22;
+  --wlp-success-text:    #6dd58c;
+  --wlp-success-border:  #2a4a35;
+  --wlp-error-bg:        #3a1d1b;
+  --wlp-error-text:      #f2b8b5;
+  --wlp-error-border:    #5c2b29;
+  --wlp-tooltip-bg:      #e3e3e3;
+  --wlp-tooltip-text:    #1f1f1f;
+  --wlp-swatch-outline:  rgba(255, 255, 255, 0.24);
+  color-scheme: dark;
+}
+
+/* Chrome draws a select's open list from its options' own colours when they
+   have them, so they are set here rather than left to Google Calendar's
+   stylesheet or the browser default. */
+#weekly-life-pool-sidebar option {
+  background: var(--wlp-input) !important;
+  color: var(--wlp-text) !important;
 }
 
 /* ── Hover tooltip ─────────────────────────────────────────────────────────── */

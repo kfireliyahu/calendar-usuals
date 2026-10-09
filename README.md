@@ -21,6 +21,7 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 - **Hide categories** — collapse calendars you don't need to reduce sidebar noise; the choice syncs with your pool
 - **Collapsible sidebar** — collapse to a 40 px icon strip when you need the full screen
 - **Collapsible input form** — toggle the add-item form open/closed with the pencil icon; preference is saved
+- **Follows Google Calendar's theme** — the sidebar, its forms and toasts, and the tooltip, drag preview and loading placeholder it draws on the calendar turn dark whenever Google Calendar is showing its dark theme and light when it is not, going by Google Calendar's own Appearance setting rather than the operating system's; changing it switches them over without a reload
 - **Syncs across your Chrome profile** — pool items and hidden categories are saved with `chrome.storage.sync`, so every computer signed into the same Chrome profile sees the same pool, and an edit on one shows up on the others (and in other Calendar tabs) without a reload
 - **Persistent storage** — whether the sidebar and the add-item form are collapsed is saved per computer in Chrome local storage, and the pool keeps a copy there too, so an edit is never lost if it has not reached sync yet
 
@@ -104,6 +105,7 @@ src/
 ├── calendarGrid.ts        # Reads Google Calendar's grid — datekeys, day columns, visible days
 ├── poolItem.ts            # The pool item type and its helpers
 ├── poolStore.ts           # Loads, saves and live-updates the pool in chrome.storage.sync
+├── theme.ts               # Reads whether Google Calendar is showing its light or dark theme
 ├── content.css            # Sidebar styles (Tailwind utilities + wlp-* override classes)
 └── components/
     └── PoolSidebar.tsx    # React sidebar component
@@ -121,6 +123,8 @@ vite.config.ts             # Vite build config (two entry points: content + back
 **Datekey conversion** — Google Calendar encodes dates as integer "datekeys" (not simple epoch days). A datekey is bit-packed: `((year - 1970) << 9) | (month << 5) | day`, with month and day 1-based — 512 per year, 32 per month, 1 per day (e.g. Apr 30 2026 = 28830, May 1 2026 = 28833). `calendarGrid.ts` unpacks it with shifts and masks. An earlier approximation treated it as days-since-epoch plus a fudge at each month boundary, which drifted by a day or more in any week spanning two months.
 
 **Synced pool** — `poolStore.ts` owns the pool's storage. Chrome sync allows about 100 KB in all but only 8 KB per key, so each item has its own key (`item:<id>`) and each calendar keeps its order as a list of ids (`order:<calendarId>`), next to `hiddenCategories` and a `poolSchema` marker. A long description therefore only weighs on its own item. Writes wait for a pause in editing and start at least 5 s apart, to stay under sync's write limits. Every edit is also copied to `chrome.storage.local` with a note of which keys sync has not accepted yet; if sync refuses the pool for size, the sidebar says so once ("saved on this device only") and keeps working from that copy. On the first run after the update, a pool kept in local storage by an earlier version is copied up to sync once, unless sync already holds a pool from another computer, in which case sync wins and the two are not merged. The old local copy is left in place as a backup. Changes from other computers and tabs arrive through `chrome.storage.onChanged`; a key this tab has edited and not yet sent keeps its edit. Items for calendars that are not in this Google account's list (say, from a different account on another computer) are kept in storage but not shown.
+
+**Theme detection** — Google Calendar has its own Light / Dark / Device default setting, so `prefers-color-scheme` alone is wrong whenever it disagrees with the OS. `theme.ts` reads what the page is painted with instead: it walks up from Google Calendar's `[role="main"]` to the first element with an opaque `background-color` and calls the theme dark if that colour's luminance is low. It relies on no class name or attribute of Google's. It checks again when `<html>` or `<body>` change, when a stylesheet is added, when the OS switches between light and dark, and every few seconds while the tab is visible. The result is a `data-wlp-theme` attribute on the sidebar's mount, the tooltip and the preview, and `content.css` defines every colour as a `--wlp-*` variable for each theme.
 
 **Scroll-tracking overlay** — The loading placeholder uses `position: fixed` but attaches a scroll listener in capture mode that re-reads `getBoundingClientRect()` on the target cell on every scroll event, keeping the overlay pinned to the correct calendar column even as the user scrolls.
 
