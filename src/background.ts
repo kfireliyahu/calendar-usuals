@@ -15,6 +15,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'DELETE_EVENT') {
+    deleteCalendarEvent(message.data.calendarId, message.data.eventId)
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
   return false;
 });
 
@@ -52,6 +59,21 @@ async function createCalendarEvent(eventData: any) {
   // payload may have left it to default to 'primary'.
   const event = await response.json();
   return { id: event.id as string, htmlLink: event.htmlLink as string, calendarId };
+}
+
+// Undo for a drop. Deleting the id of a recurring event removes the whole
+// series, which is what Undo should do since the drop created all of it.
+async function deleteCalendarEvent(calendarId: string, eventId: string) {
+  const response = await authedFetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    { method: 'DELETE' }
+  );
+
+  // 410 means the event is already deleted, perhaps by hand in Google Calendar
+  // during the Undo window. Either way it is gone, which is what Undo asked for.
+  if (!response.ok && response.status !== 410) {
+    throw new Error(`Failed to remove event: ${await describeError(response)}`);
+  }
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────

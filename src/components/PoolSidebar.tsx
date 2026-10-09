@@ -28,10 +28,24 @@ interface CalendarListEntry {
   accessRole?: 'owner' | 'writer' | 'reader' | 'freeBusyReader';
 }
 
+// The event a drop just created, as content.tsx sends it with 'created'.
+interface UndoTarget {
+  itemName: string;
+  eventId: string;
+  calendarId: string;
+  recurring: boolean;
+}
+
+// The undo target lives on the toast itself, so any newer toast — the next
+// drop's "Adding…" included — takes the Undo button away with it, and only
+// the latest drop is ever undoable.
 interface Toast {
   message: string;
   type: 'info' | 'success' | 'error';
+  undo?: UndoTarget;
 }
+
+const UNDO_WINDOW_MS = 5000;
 
 // Where a reorder drag would land: the category the item would end up in and
 // the index it would be inserted at (items.length means "after the last one").
@@ -195,10 +209,40 @@ const PoolSidebar: React.FC = () => {
 
   // One timer for every toast source, so a pending clear from an earlier toast
   // cannot wipe a newer one.
-  const showToast = (message: string, type: Toast['type'], holdMs = 3000) => {
+  const showToast = (message: string, type: Toast['type'], holdMs = 3000, undo?: UndoTarget) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ message, type });
+    setToast({ message, type, undo });
     if (holdMs > 0) toastTimer.current = setTimeout(() => setToast(null), holdMs);
+  };
+
+  // Deletes the event the last drop created. A recurring event's id is the
+  // series, so its Undo removes every instance, and the toast says so.
+  const undoDrop = (target: UndoTarget) => {
+    const fail = (err?: string) => showToast(err ?? 'Failed to remove event', 'error', 5000);
+    if (typeof chrome === 'undefined' || !chrome.runtime?.id) {
+      fail('Extension reloaded - refresh the page');
+      return;
+    }
+
+    showToast(`Removing "${target.itemName}"…`, 'info', 0);
+    try {
+      chrome.runtime.sendMessage(
+        { type: 'DELETE_EVENT', data: { calendarId: target.calendarId, eventId: target.eventId } },
+        (response) => {
+          if (chrome.runtime.lastError) { fail(chrome.runtime.lastError.message); return; }
+          if (!response?.success)       { fail(response?.error); return; }
+          showToast(
+            target.recurring ? `Weekly series "${target.itemName}" removed` : `"${target.itemName}" removed`,
+            'success'
+          );
+          document.dispatchEvent(new CustomEvent('poolEventRemoved', { detail: { eventId: target.eventId } }));
+        }
+      );
+    } catch {
+      // sendMessage throws rather than reporting when the extension was
+      // reloaded underneath this page.
+      fail('Extension reloaded - refresh the page');
+    }
   };
 
   // ── Collapsed state ──────────────────────────────────────────────────────────
@@ -237,12 +281,15 @@ const PoolSidebar: React.FC = () => {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const { type, itemName, error: err } = (e as CustomEvent).detail;
+      const { type, itemName, error: err, recurring, event } = (e as CustomEvent).detail;
       if (type === 'creating') {
-        showToast(`Adding "${itemName}"…`, 'info', 0);
+        showToast(`Adding "${itemName}"${recurring ? ' weekly' : ''}…`, 'info', 0);
 
       } else if (type === 'created') {
-        showToast(`"${itemName}" added!`, 'success');
+        const message = recurring ? `"${itemName}" added, repeats weekly` : `"${itemName}" added!`;
+        // Without an id there is nothing to delete, so the toast is the old one.
+        if (event) showToast(message, 'success', UNDO_WINDOW_MS, { itemName, ...event });
+        else       showToast(message, 'success');
       } else if (type === 'error') {
         showToast(err ?? 'Failed to create event', 'error', 5000);
       }
@@ -698,9 +745,18 @@ const PoolSidebar: React.FC = () => {
               {/* Toast */}
               {toast && (
                 <div
-                  className={`px-4 py-[9px] text-[12px] border-b shrink-0 ${toastColors[toast.type]} [animation:wlp-fadein_200ms_ease]`}
+                  className={`px-4 py-[9px] text-[12px] border-b shrink-0 flex items-center gap-[10px] ${toastColors[toast.type]} [animation:wlp-fadein_200ms_ease]`}
                 >
-                  {toast.message}
+                  <span className="flex-1 min-w-[0]">{toast.message}</span>
+                  {toast.undo && (
+                    <button
+                      onClick={() => undoDrop(toast.undo!)}
+                      title={toast.undo.recurring ? 'Remove the whole weekly series' : 'Remove this event'}
+                      className="wlp-toast-undo"
+                    >
+                      Undo
+                    </button>
+                  )}
                 </div>
               )}
 

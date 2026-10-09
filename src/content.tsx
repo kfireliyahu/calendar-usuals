@@ -390,8 +390,20 @@ function waitForEvent(eventId: string | undefined, itemName: string): void {
 
 // ── Custom events ─────────────────────────────────────────────────────────────
 
-function dispatchPoolEvent(type: 'creating' | 'created' | 'error', itemName: string, error?: string): void {
-  document.dispatchEvent(new CustomEvent('poolEvent', { detail: { type, itemName, error } }));
+// What the sidebar needs to undo a drop. It rides on 'created' next to
+// itemName, which every event type still carries.
+interface CreatedEvent {
+  eventId:    string;
+  calendarId: string;
+  recurring:  boolean;
+}
+
+function dispatchPoolEvent(
+  type: 'creating' | 'created' | 'error',
+  itemName: string,
+  extra: { error?: string; recurring?: boolean; event?: CreatedEvent } = {},
+): void {
+  document.dispatchEvent(new CustomEvent('poolEvent', { detail: { type, itemName, ...extra } }));
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -468,6 +480,11 @@ function setupListeners(): void {
   document.addEventListener('poolSidebarToggle', (e: Event) => {
     adjustLayout((e as CustomEvent).detail.collapsed as boolean);
   });
+  // An Undo inside the window can delete the event before Google Calendar ever
+  // renders it, and then nothing would resolve the placeholder until timeout.
+  document.addEventListener('poolEventRemoved', (e: Event) => {
+    if ((e as CustomEvent).detail.eventId === waitingForEventId) resolvePlaceholder();
+  });
 
   const isPoolDrag = (e: DragEvent) =>
     e.dataTransfer?.types.some((t) => t.toLowerCase() === 'poolitem') ?? false;
@@ -529,23 +546,27 @@ function setupListeners(): void {
     // Show pulsing placeholder at the exact drop position immediately
     showLoading(cell, e.clientY, item, recurring);
 
-    dispatchPoolEvent('creating', item.name);
+    dispatchPoolEvent('creating', item.name, { recurring });
     const sent = sendToBackground(
       { type: 'CREATE_EVENT', data: eventBody(item, start, end, recurring) },
       (response) => {
         if (response?.success) {
-          dispatchPoolEvent('created', item.name);
+          const { id, calendarId } = response.data ?? {};
+          dispatchPoolEvent('created', item.name, {
+            recurring,
+            event: id && calendarId ? { eventId: id, calendarId, recurring } : undefined,
+          });
           // Watch for GCal to render the event, then fade out the placeholder
-          waitForEvent(response.data?.id, item.name);
+          waitForEvent(id, item.name);
         } else {
-          dispatchPoolEvent('error', item.name, response?.error);
+          dispatchPoolEvent('error', item.name, { error: response?.error });
           hideLoading(true);
         }
       }
     );
 
     if (!sent) {
-      dispatchPoolEvent('error', item.name, 'Extension reloaded - refresh the page');
+      dispatchPoolEvent('error', item.name, { error: 'Extension reloaded - refresh the page' });
       hideLoading(true);
     }
   });

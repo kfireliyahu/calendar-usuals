@@ -24,7 +24,7 @@
 }
 
 #wlp-event-preview.wlp-preview-recurring::after {
-  content: '\21BB'; /* ↻, escaped so the glyph survives any charset guess */
+  content: '\21BB'; /* ↻ */
   position: absolute;
   top: 2px;
   right: 6px;
@@ -443,4 +443,27 @@
    the colour it is marking. */
 .wlp-swatch-on {
   box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #202124 !important;
+}
+
+/* ── Toast ─────────────────────────────────────────────────────────────────── */
+
+/* A text button in the toast's own colour, as Google's snackbars do it. Reset
+   with !important because Google Calendar styles bare buttons globally. */
+.wlp-toast-undo {
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+  padding: 2px 6px !important;
+  border: none !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: inherit !important;
+  cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+
+.wlp-toast-undo:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
 }
