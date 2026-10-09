@@ -396,10 +396,19 @@ function closestFrom(target: EventTarget | null, selector: string): Element | nu
 // Reloading the extension orphans any content script already on the page:
 // chrome.runtime.id becomes undefined and sendMessage throws "Extension context
 // invalidated". Surface that as a failed send rather than an uncaught error.
+//
+// A send that does reach Chrome can still go unanswered, for instance when the
+// service worker is stopped mid-request. The callback then gets no response
+// and the reason only in lastError, which Chrome also reports as an error on
+// the extensions page when nothing reads it, so it is turned into a failed
+// response carrying that reason.
 function sendToBackground(message: unknown, onResponse: (response: any) => void): boolean {
   if (typeof chrome === 'undefined' || !chrome.runtime?.id) return false;
   try {
-    chrome.runtime.sendMessage(message, onResponse);
+    chrome.runtime.sendMessage(message, (response) => {
+      const lastError = chrome.runtime.lastError;
+      onResponse(lastError ? { success: false, error: lastError.message } : response);
+    });
     return true;
   } catch {
     return false;
