@@ -53,11 +53,18 @@ function adjustLayout(collapsed: boolean): void {
 // Only meaningful on a time-grid cell (see isTimeGridCell), where 1 px below
 // the cell's top is one minute past midnight. A drop and a click-to-place both
 // read their time through here, so they snap identically.
+//
+// Rounding to the nearest slot sends the bottom 7.5 minutes of a column to
+// 24:00, which is the next day. They belong to the day's last slot, so the
+// start is clamped to 23:45 here, once, and the preview, the tooltip and the
+// created event all read the same clamped value.
+const LAST_SLOT_MIN = 24 * 60 - 15;
+
 function timeFromDrop(cell: Element, clientY: number): { hours: number; minutes: number; snapped: number } {
   const pixelY = clientY - cell.getBoundingClientRect().top;
-  const snapped = Math.round(pixelY / 15) * 15;
+  const snapped = Math.max(0, Math.min(LAST_SLOT_MIN, Math.round(pixelY / 15) * 15));
   return {
-    hours:   Math.max(0, Math.min(23, Math.floor(snapped / 60))),
+    hours:   Math.floor(snapped / 60),
     minutes: snapped % 60,
     snapped,
   };
