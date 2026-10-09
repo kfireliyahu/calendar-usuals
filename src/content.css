@@ -15,6 +15,58 @@
   50%       { opacity: 0.9; }
 }
 
+/* ── Colours ───────────────────────────────────────────────────────────────── */
+
+/* Every colour the extension draws with, apart from the calendar and event
+   colours that come from the user's data. They are set on the three elements
+   the extension adds to the page, the sidebar's mount and the tooltip and
+   preview that content.tsx appends to <body>, so none of them reaches Google
+   Calendar's own elements. The sidebar's Tailwind classes read them as
+   bracket values, bg-[var(--wlp-surface)] and so on. */
+:is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview) {
+  --wlp-surface:         #ffffff;  /* the sidebar and its collapsed strip */
+  --wlp-surface-raised:  #ffffff;  /* item rows */
+  --wlp-panel:           #f8f9fa;  /* schedule form and details panel */
+  --wlp-input:           #ffffff;  /* text fields, selects and the buttons beside them */
+  --wlp-hover:           #f1f3f4;
+  --wlp-text:            #202124;
+  --wlp-text-secondary:  #5f6368;
+  --wlp-text-muted:      #9aa0a6;  /* hints, empty states, the footer */
+  --wlp-icon-faint:      #bdc1c6;  /* row icons at rest, a disabled Add */
+  --wlp-border:          #dadce0;  /* outlines of fields and buttons */
+  --wlp-border-subtle:   #e8eaed;  /* item rows, panels, chips */
+  --wlp-border-hover:    #c5c9ce;
+  --wlp-divider:         rgba(218, 220, 224, 0.6);
+  --wlp-accent:          #4285f4;
+  --wlp-accent-soft:     #e8f0fe;  /* a picked row, the Add button's hover */
+  --wlp-primary:         #1a73e8;
+  --wlp-primary-hover:   #1765cc;
+  --wlp-on-primary:      #ffffff;
+  --wlp-focus:           #1a73e8;
+  --wlp-danger:          #d33427;
+  --wlp-info-bg:         #e8f0fe;
+  --wlp-info-text:       #1a73e8;
+  --wlp-info-border:     #c5d8fc;
+  --wlp-success-bg:      #e6f4ea;
+  --wlp-success-text:    #188038;
+  --wlp-success-border:  #b6dfc2;
+  --wlp-error-bg:        #fce8e6;
+  --wlp-error-text:      #d33427;
+  --wlp-error-border:    #f5c6c3;
+  --wlp-tooltip-bg:      #202124;
+  --wlp-tooltip-text:    #ffffff;
+  --wlp-swatch-outline:  rgba(0, 0, 0, 0.12);
+}
+
+/* ── Hover tooltip ─────────────────────────────────────────────────────────── */
+
+/* content.tsx positions the tooltip inline; its colours come from here so they
+   follow the theme. */
+#wlp-drop-tooltip {
+  background: var(--wlp-tooltip-bg) !important;
+  color: var(--wlp-tooltip-text) !important;
+}
+
 /* ── Drag preview: weekly recurrence ───────────────────────────────────────── */
 
 /* content.tsx positions and colours the preview with inline styles, so these
@@ -38,14 +90,18 @@
   line-height: 1;
 }
 
-/* Google Sans → Roboto fallback to match Google Calendar's typeface */
+/* Google Sans → Roboto fallback to match Google Calendar's typeface.
+   The sidebar paints its own surface and text colour rather than letting
+   Google Calendar's page show through: what is behind it is whatever Google
+   gives <body>, which only matches the sidebar's colours by accident. */
 .wlp-sidebar {
   font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   position: fixed !important;
   left: 0 !important;
   top: 0 !important;
   height: 100vh !important;
-  background: transparent !important;
+  background: var(--wlp-surface) !important;
+  color: var(--wlp-text) !important;
   z-index: 1000 !important;
 }
 
@@ -91,13 +147,13 @@
   gap: 5px !important;
   padding: 4px 9px !important;
   border-radius: 100px !important;
-  border: 1px solid var(--chip-border, #e8eaed) !important;
+  border: 1px solid var(--chip-border, var(--wlp-border-subtle)) !important;
   font-size: 11px !important;
   font-weight: 500 !important;
   font-family: inherit !important;
   cursor: pointer !important;
   background: var(--chip-bg, transparent) !important;
-  color: var(--chip-color, #5f6368) !important;
+  color: var(--chip-color, var(--wlp-text-secondary)) !important;
   max-width: 130px !important;
   transition: opacity 0.15s !important;
   white-space: nowrap !important;
@@ -120,16 +176,16 @@
 .wlp-input-row {
   display: flex !important;
   align-items: center !important;
-  border: 1px solid #dadce0 !important;
+  border: 1px solid var(--wlp-border) !important;
   border-radius: 8px !important;
   overflow: hidden !important;
-  background: #ffffff !important;
+  background: var(--wlp-input) !important;
   transition: border-color 0.15s, box-shadow 0.15s !important;
 }
 
 .wlp-input-row:focus-within {
-  border-color: #4285f4 !important;
-  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.12) !important;
+  border-color: var(--wlp-accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wlp-accent) 12%, transparent) !important;
 }
 
 .wlp-input-row input {
@@ -140,7 +196,7 @@
   outline: none !important;
   background: transparent !important;
   font-size: 13px !important;
-  color: #202124 !important;
+  color: var(--wlp-text) !important;
   box-shadow: none !important;
 }
 
@@ -160,14 +216,14 @@
   padding: 6px !important;
   border: none !important;
   background: transparent !important;
-  color: #bdc1c6 !important;
+  color: var(--wlp-icon-faint) !important;
   cursor: pointer !important;
   flex-shrink: 0 !important;
   transition: color 0.15s !important;
 }
 
 .wlp-input-clear:hover {
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
 }
 
 .wlp-input-add {
@@ -176,20 +232,20 @@
   justify-content: center !important;
   padding: 9px 12px !important;
   border: none !important;
-  border-left: 1px solid #e8eaed !important;
+  border-left: 1px solid var(--wlp-border-subtle) !important;
   background: transparent !important;
-  color: #4285f4 !important;
+  color: var(--wlp-accent) !important;
   cursor: pointer !important;
   flex-shrink: 0 !important;
   transition: background 0.15s !important;
 }
 
 .wlp-input-add:hover:not(:disabled) {
-  background: #f0f4ff !important;
+  background: var(--wlp-accent-soft) !important;
 }
 
 .wlp-input-add:disabled {
-  color: #bdc1c6 !important;
+  color: var(--wlp-icon-faint) !important;
   cursor: not-allowed !important;
 }
 
@@ -203,7 +259,7 @@
   font-family: inherit !important;
   font-size: 11px !important;
   font-weight: 500 !important;
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
   cursor: pointer !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -213,28 +269,28 @@
 }
 
 .wlp-duration:hover {
-  color: #202124 !important;
+  color: var(--wlp-text) !important;
 }
 
 .wlp-duration:focus-visible {
-  outline: 1px solid #4285f4 !important;
+  outline: 1px solid var(--wlp-focus) !important;
   border-radius: 3px !important;
 }
 
 /* In the add row it divides the text field from the add button. */
 .wlp-input-row .wlp-duration {
   padding: 9px 8px 9px 6px !important;
-  border-left: 1px solid #e8eaed !important;
+  border-left: 1px solid var(--wlp-border-subtle) !important;
 }
 
 /* On an item row it reads as a label until the row is hovered. */
 .wlp-item .wlp-duration {
-  color: #9aa0a6 !important;
+  color: var(--wlp-text-muted) !important;
   margin-left: 8px !important;
 }
 
 .wlp-item:hover .wlp-duration {
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
 }
 
 /* ── Category list ─────────────────────────────────────────────────────────── */
@@ -274,26 +330,26 @@
   flex-shrink: 0 !important;
   margin-top: auto !important;
   padding: 10px 20px 12px !important;
-  border-top: 1px solid rgba(218, 220, 224, 0.6) !important;
+  border-top: 1px solid var(--wlp-divider) !important;
 }
 
 .wlp-footer-link {
   font-size: 11px !important;
-  color: #9aa0a6 !important;
+  color: var(--wlp-text-muted) !important;
   text-decoration: none !important;
   border-radius: 3px !important;
   transition: color 0.15s !important;
 }
 
 .wlp-footer-link:hover {
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
   text-decoration: underline !important;
 }
 
 .wlp-footer-link:focus-visible {
-  outline: 2px solid #1a73e8 !important;
+  outline: 2px solid var(--wlp-focus) !important;
   outline-offset: 2px !important;
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
 }
 
 .wlp-sidebar::-webkit-scrollbar {
@@ -305,12 +361,12 @@
 }
 
 .wlp-sidebar::-webkit-scrollbar-thumb {
-  background: #dadce0;
+  background: var(--wlp-border);
   border-radius: 3px;
 }
 
 .wlp-sidebar::-webkit-scrollbar-thumb:hover {
-  background: #bdc1c6;
+  background: var(--wlp-icon-faint);
 }
 
 /* ── Item row: rename, details toggle ──────────────────────────────────────── */
@@ -329,7 +385,7 @@
   right: 0 !important;
   height: 2px !important;
   border-radius: 1px !important;
-  background: #4285f4 !important;
+  background: var(--wlp-accent) !important;
 }
 
 .wlp-drop-before::before { top: -4px !important; }
@@ -337,7 +393,7 @@
 
 /* An empty category has no row to draw a line against. */
 .wlp-drop-empty {
-  color: #4285f4 !important;
+  color: var(--wlp-accent) !important;
   font-style: normal !important;
 }
 
@@ -353,9 +409,9 @@
   background: transparent !important;
   font-family: inherit !important;
   font-size: 13px !important;
-  color: #202124 !important;
+  color: var(--wlp-text) !important;
   box-shadow: none !important;
-  border-bottom: 1px solid #4285f4 !important;
+  border-bottom: 1px solid var(--wlp-accent) !important;
 }
 
 .wlp-item-expand {
@@ -367,19 +423,19 @@
   padding: 0 !important;
   border: none !important;
   background: transparent !important;
-  color: #bdc1c6 !important;
+  color: var(--wlp-icon-faint) !important;
   cursor: pointer !important;
   transition: color 0.15s, transform 0.15s !important;
 }
 
 .wlp-item:hover .wlp-item-expand {
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
 }
 
 /* A configured item keeps the affordance visible while collapsed, so its
    settings are not invisible. */
 .wlp-item-expand-on {
-  color: #4285f4 !important;
+  color: var(--wlp-accent) !important;
 }
 
 /* The no-drag schedule control. Muted like the details chevron so the row
@@ -393,26 +449,26 @@
   padding: 0 !important;
   border: none !important;
   background: transparent !important;
-  color: #bdc1c6 !important;
+  color: var(--wlp-icon-faint) !important;
   cursor: pointer !important;
   transition: color 0.15s !important;
 }
 
 .wlp-item:hover .wlp-item-schedule {
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
 }
 
 .wlp-item-schedule-on,
 .wlp-item:hover .wlp-item-schedule-on {
-  color: #1a73e8 !important;
+  color: var(--wlp-primary) !important;
 }
 
 /* A picked item waits for a day and time, from the form or a click on the
    grid, so it has to stand out from every other row until then. A ring rather
    than a border, so the calendar-colour left border stays as it is. */
 .wlp-item-picked {
-  background: #e8f0fe !important;
-  box-shadow: 0 0 0 2px #1a73e8 !important;
+  background: var(--wlp-accent-soft) !important;
+  box-shadow: 0 0 0 2px var(--wlp-primary) !important;
 }
 
 /* These controls strip the browser's own button look with !important, so
@@ -426,7 +482,7 @@
 .wlp-toast-undo:focus-visible,
 .wlp-schedule-btn:focus-visible,
 .wlp-schedule-repeat input:focus-visible {
-  outline: 2px solid #1a73e8 !important;
+  outline: 2px solid var(--wlp-focus) !important;
   outline-offset: 2px !important;
 }
 
@@ -461,9 +517,9 @@
   gap: 8px !important;
   padding: 10px !important;
   margin: 4px 0 0 !important;
-  border: 1px solid #e8eaed !important;
+  border: 1px solid var(--wlp-border-subtle) !important;
   border-radius: 6px !important;
-  background: #f8f9fa !important;
+  background: var(--wlp-panel) !important;
 }
 
 .wlp-schedule-row {
@@ -486,7 +542,7 @@
 .wlp-schedule-label {
   font-size: 11px !important;
   font-weight: 500 !important;
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
 }
 
 .wlp-schedule .wlp-field {
@@ -494,7 +550,7 @@
 }
 
 .wlp-schedule .wlp-field:focus-visible {
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.35) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wlp-focus) 35%, transparent) !important;
 }
 
 .wlp-schedule-repeat {
@@ -502,13 +558,13 @@
   align-items: center !important;
   gap: 6px !important;
   font-size: 12px !important;
-  color: #202124 !important;
+  color: var(--wlp-text) !important;
   cursor: pointer !important;
 }
 
 .wlp-schedule-repeat input {
   margin: 0 !important;
-  accent-color: #1a73e8 !important;
+  accent-color: var(--wlp-primary) !important;
   cursor: pointer !important;
 }
 
@@ -517,7 +573,7 @@
   margin: 0 !important;
   font-size: 11px !important;
   line-height: 1.4 !important;
-  color: #9aa0a6 !important;
+  color: var(--wlp-text-muted) !important;
 }
 
 .wlp-schedule-actions {
@@ -529,31 +585,31 @@
 .wlp-schedule-btn {
   margin: 0 !important;
   padding: 6px 12px !important;
-  border: 1px solid #dadce0 !important;
+  border: 1px solid var(--wlp-border) !important;
   border-radius: 4px !important;
-  background: #ffffff !important;
+  background: var(--wlp-input) !important;
   font-family: inherit !important;
   font-size: 12px !important;
   font-weight: 500 !important;
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
   cursor: pointer !important;
   transition: background 0.15s, color 0.15s !important;
 }
 
 .wlp-schedule-btn:hover {
-  background: #f1f3f4 !important;
-  color: #202124 !important;
+  background: var(--wlp-hover) !important;
+  color: var(--wlp-text) !important;
 }
 
 .wlp-schedule-btn-primary {
-  border-color: #1a73e8 !important;
-  background: #1a73e8 !important;
-  color: #ffffff !important;
+  border-color: var(--wlp-primary) !important;
+  background: var(--wlp-primary) !important;
+  color: var(--wlp-on-primary) !important;
 }
 
 .wlp-schedule-btn-primary:hover {
-  background: #1765cc !important;
-  color: #ffffff !important;
+  background: var(--wlp-primary-hover) !important;
+  color: var(--wlp-on-primary) !important;
 }
 
 /* ── Item template panel ───────────────────────────────────────────────────── */
@@ -564,32 +620,32 @@
   gap: 7px !important;
   padding: 10px !important;
   margin-top: 4px !important;
-  border: 1px solid #e8eaed !important;
+  border: 1px solid var(--wlp-border-subtle) !important;
   border-radius: 6px !important;
-  background: #f8f9fa !important;
+  background: var(--wlp-panel) !important;
 }
 
 .wlp-field {
   width: 100% !important;
   box-sizing: border-box !important;
   padding: 6px 8px !important;
-  border: 1px solid #dadce0 !important;
+  border: 1px solid var(--wlp-border) !important;
   border-radius: 4px !important;
   outline: none !important;
-  background: #ffffff !important;
+  background: var(--wlp-input) !important;
   font-family: inherit !important;
   font-size: 12px !important;
-  color: #202124 !important;
+  color: var(--wlp-text) !important;
   box-shadow: none !important;
   resize: none !important;
 }
 
 .wlp-field:focus {
-  border-color: #4285f4 !important;
+  border-color: var(--wlp-accent) !important;
 }
 
 .wlp-field::placeholder {
-  color: #9aa0a6 !important;
+  color: var(--wlp-text-muted) !important;
 }
 
 .wlp-details-row {
@@ -610,20 +666,20 @@
   gap: 4px !important;
   flex-shrink: 0 !important;
   padding: 6px 8px !important;
-  border: 1px solid #dadce0 !important;
+  border: 1px solid var(--wlp-border) !important;
   border-radius: 4px !important;
-  background: #ffffff !important;
+  background: var(--wlp-input) !important;
   font-family: inherit !important;
   font-size: 11px !important;
   font-weight: 500 !important;
-  color: #5f6368 !important;
+  color: var(--wlp-text-secondary) !important;
   cursor: pointer !important;
   transition: background 0.15s, color 0.15s !important;
 }
 
 .wlp-dup-btn:hover {
-  background: #f1f3f4 !important;
-  color: #202124 !important;
+  background: var(--wlp-hover) !important;
+  color: var(--wlp-text) !important;
 }
 
 /* Twelve swatches: the calendar's own colour first, then Google's eleven. */
@@ -640,7 +696,7 @@
   border: none !important;
   border-radius: 50% !important;
   cursor: pointer !important;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 0 0 1px var(--wlp-swatch-outline) !important;
   transition: transform 0.12s !important;
 }
 
@@ -651,7 +707,7 @@
 /* A ring rather than a checkmark: the swatch is 15px and a tick would hide
    the colour it is marking. */
 .wlp-swatch-on {
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #202124 !important;
+  box-shadow: 0 0 0 2px var(--wlp-panel), 0 0 0 3px var(--wlp-text) !important;
 }
 
 /* ── Toast ─────────────────────────────────────────────────────────────────── */
@@ -674,5 +730,5 @@
 }
 
 .wlp-toast-undo:hover {
-  background: rgba(0, 0, 0, 0.06) !important;
+  background: color-mix(in srgb, currentColor 10%, transparent) !important;
 }

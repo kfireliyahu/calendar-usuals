@@ -91,8 +91,7 @@ function getTooltip(): HTMLElement {
     tooltipEl.id = 'wlp-drop-tooltip';
     Object.assign(tooltipEl.style, {
       position: 'fixed', zIndex: '10001', pointerEvents: 'none',
-      background: '#202124', color: '#fff', padding: '8px 12px',
-      borderRadius: '6px', fontSize: '13px',
+      padding: '8px 12px', borderRadius: '6px', fontSize: '13px',
       fontFamily: "'Roboto', -apple-system, sans-serif",
       whiteSpace: 'nowrap', boxShadow: '0 4px 6px rgba(0,0,0,0.15)', display: 'none',
     });

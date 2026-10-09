@@ -829,17 +829,17 @@ const PoolSidebar: React.FC = () => {
 
   // ── Shared styles ────────────────────────────────────────────────────────────
 
-  const sidebarCls = `wlp-sidebar fixed left-0 top-0 h-screen border-r border-[#dadce0]/60 flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+  const sidebarCls = `wlp-sidebar fixed left-0 top-0 h-screen border-r border-[var(--wlp-divider)] flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${
     collapsed ? 'w-[40px]' : 'w-[280px]'
   }`;
 
   const iconBtnCls =
-    'w-[28px] h-[28px] flex items-center justify-center rounded-full text-[#5f6368] cursor-pointer border-none bg-transparent hover:bg-[#f1f3f4] transition-colors duration-150 shrink-0';
+    'w-[28px] h-[28px] flex items-center justify-center rounded-full text-[var(--wlp-text-secondary)] cursor-pointer border-none bg-transparent hover:bg-[var(--wlp-hover)] transition-colors duration-150 shrink-0';
 
   const toastColors: Record<Toast['type'], string> = {
-    info:    'bg-[#e8f0fe] text-[#1a73e8] border-[#c5d8fc]',
-    success: 'bg-[#e6f4ea] text-[#188038] border-[#b6dfc2]',
-    error:   'bg-[#fce8e6] text-[#d33427] border-[#f5c6c3]',
+    info:    'bg-[var(--wlp-info-bg)] text-[var(--wlp-info-text)] border-[var(--wlp-info-border)]',
+    success: 'bg-[var(--wlp-success-bg)] text-[var(--wlp-success-text)] border-[var(--wlp-success-border)]',
+    error:   'bg-[var(--wlp-error-bg)] text-[var(--wlp-error-text)] border-[var(--wlp-error-border)]',
   };
 
   const renderToast = (t: Toast) => (
@@ -887,17 +887,17 @@ const PoolSidebar: React.FC = () => {
         <div className="flex flex-col h-full w-[280px]">
 
           {/* Header */}
-          <div className="wlp-header flex items-center justify-between border-b border-[#dadce0] shrink-0">
+          <div className="wlp-header flex items-center justify-between border-b border-[var(--wlp-border)] shrink-0">
             <div className="flex items-center gap-[9px]">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-                <rect x="3" y="6" width="18" height="15" rx="2" stroke="#4285f4" strokeWidth="1.8" fill="none"/>
-                <path d="M3 10h18" stroke="#4285f4" strokeWidth="1.8"/>
-                <path d="M8 3v4M16 3v4" stroke="#4285f4" strokeWidth="1.8" strokeLinecap="round"/>
-                <circle cx="8" cy="15" r="1.1" fill="#4285f4"/>
-                <circle cx="12" cy="15" r="1.1" fill="#4285f4"/>
-                <circle cx="16" cy="15" r="1.1" fill="#4285f4"/>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 text-[var(--wlp-accent)]">
+                <rect x="3" y="6" width="18" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+                <path d="M3 10h18" stroke="currentColor" strokeWidth="1.8"/>
+                <path d="M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                <circle cx="8" cy="15" r="1.1" fill="currentColor"/>
+                <circle cx="12" cy="15" r="1.1" fill="currentColor"/>
+                <circle cx="16" cy="15" r="1.1" fill="currentColor"/>
               </svg>
-              <h2 className="m-[0] text-[14px] font-[500] text-[#202124] tracking-[0.1px]">
+              <h2 className="m-[0] text-[14px] font-[500] text-[var(--wlp-text)] tracking-[0.1px]">
                 Weekly Pool
               </h2>
             </div>
@@ -909,7 +909,7 @@ const PoolSidebar: React.FC = () => {
                 aria-label="Add items"
                 aria-expanded={formOpen}
                 className={iconBtnCls}
-                style={{ color: formOpen ? '#4285f4' : undefined }}
+                style={{ color: formOpen ? 'var(--wlp-accent)' : undefined }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -932,17 +932,17 @@ const PoolSidebar: React.FC = () => {
           {/* Loading */}
           {loading && (
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-[13px] text-[#5f6368]">Loading…</p>
+              <p className="text-[13px] text-[var(--wlp-text-secondary)]">Loading…</p>
             </div>
           )}
 
           {/* Error */}
           {!loading && fetchError && (
             <div className="p-[16px] flex flex-col gap-[12px]">
-              <p className="text-[13px] text-[#d33427]">{fetchError}</p>
+              <p className="text-[13px] text-[var(--wlp-danger)]">{fetchError}</p>
               <button
                 onClick={fetchCalendars}
-                className="px-[12px] py-[8px] bg-[#4285f4] text-[#fff] border-none rounded-[6px] text-[13px] font-[500] cursor-pointer hover:bg-[#3367d6] transition-colors duration-150"
+                className="px-[12px] py-[8px] bg-[var(--wlp-primary)] text-[var(--wlp-on-primary)] border-none rounded-[6px] text-[13px] font-[500] cursor-pointer hover:bg-[var(--wlp-primary-hover)] transition-colors duration-150"
               >
                 Retry
               </button>
@@ -960,7 +960,7 @@ const PoolSidebar: React.FC = () => {
                   overflow: 'hidden',
                   pointerEvents: formOpen ? undefined : 'none',
                   transition: 'max-height 0.22s ease, opacity 0.15s ease',
-                  borderBottom: '1px solid rgba(218,220,224,0.6)',
+                  borderBottom: '1px solid var(--wlp-divider)',
                   flexShrink: 0,
                 }}
               >
@@ -979,8 +979,8 @@ const PoolSidebar: React.FC = () => {
                             className="wlp-cat-chip"
                             style={{
                               '--chip-bg':     sel ? cat.color : 'transparent',
-                              '--chip-border': sel ? cat.color : '#e8eaed',
-                              '--chip-color':  sel ? '#fff'    : '#5f6368',
+                              '--chip-border': sel ? cat.color : 'var(--wlp-border-subtle)',
+                              '--chip-color':  sel ? '#fff'    : 'var(--wlp-text-secondary)',
                             } as React.CSSProperties}
                           >
                             <span
@@ -1010,7 +1010,7 @@ const PoolSidebar: React.FC = () => {
                       value={newItemName}
                       onChange={(e) => setNewItemName(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && addItem()}
-                      className="[font-family:inherit] placeholder-[#9aa0a6]"
+                      className="[font-family:inherit] placeholder-[var(--wlp-text-muted)]"
                     />
                     {newItemName && (
                       <button
@@ -1085,14 +1085,14 @@ const PoolSidebar: React.FC = () => {
                         className="w-[10px] h-[10px] rounded-full shrink-0"
                         style={{ backgroundColor: category.color }}
                       />
-                      <h3 className="flex-1 m-[0] text-[11px] font-[600] text-[#5f6368] uppercase tracking-[0.6px]">
+                      <h3 className="flex-1 m-[0] text-[11px] font-[600] text-[var(--wlp-text-secondary)] uppercase tracking-[0.6px]">
                         {category.name}
                       </h3>
                       <button
                         onClick={() => toggleCategoryHidden(category.calendarId)}
                         title="Hide category"
                         aria-label={`Hide ${category.name}`}
-                        className="wlp-cat-hide shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[#9aa0a6] transition-all duration-150 hover:text-[#5f6368]"
+                        className="wlp-cat-hide shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[var(--wlp-text-muted)] transition-all duration-150 hover:text-[var(--wlp-text-secondary)]"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
@@ -1140,7 +1140,7 @@ const PoolSidebar: React.FC = () => {
                                 setDropTarget(null);
                                 document.dispatchEvent(new CustomEvent('poolDragEnd'));
                               }}
-                              className={`wlp-item group flex items-center justify-between bg-[#fff] border border-[#e8eaed] rounded-[6px] text-[13px] text-[#202124] cursor-grab select-none transition-all duration-150 hover:border-[#c5c9ce] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
+                              className={`wlp-item group flex items-center justify-between bg-[var(--wlp-surface-raised)] border border-[var(--wlp-border-subtle)] rounded-[6px] text-[13px] text-[var(--wlp-text)] cursor-grab select-none transition-all duration-150 hover:border-[var(--wlp-border-hover)] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
                                 draggingId === item.id ? ' opacity-40' : ''
                               }${picked ? ' wlp-item-picked' : ''}`}
                               style={{ borderLeft: `3px solid ${eventColorHex(item.colorId, category.color)}` }}
@@ -1211,7 +1211,7 @@ const PoolSidebar: React.FC = () => {
                                 onClick={() => deleteItem(item.id)}
                                 title="Delete"
                                 aria-label={`Delete ${item.name}`}
-                                className="wlp-item-delete opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-[0] ml-[4px] transition-all duration-150 hover:text-[#d33427] hover:scale-110"
+                                className="wlp-item-delete opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[var(--wlp-icon-faint)] cursor-pointer p-[0] ml-[4px] transition-all duration-150 hover:text-[var(--wlp-danger)] hover:scale-110"
                               >
                                 ×
                               </button>
@@ -1240,7 +1240,7 @@ const PoolSidebar: React.FC = () => {
                       {category.items.length === 0 && (
                         <p
                           onDragOver={(e) => handleCategoryDragOver(e, category.calendarId)}
-                          className={`wlp-empty px-[16px] py-[4px] text-[12px] text-[#9aa0a6] italic${
+                          className={`wlp-empty px-[16px] py-[4px] text-[12px] text-[var(--wlp-text-muted)] italic${
                             dropTarget?.calendarId === category.calendarId ? ' wlp-drop-empty' : ''
                           }`}
                         >
@@ -1251,24 +1251,24 @@ const PoolSidebar: React.FC = () => {
                   </div>
                 ))}
                 {visibleCategories.length === 0 && hiddenCategories.length === 0 && (
-                  <p className="px-[20px] pt-[20px] text-[13px] text-[#5f6368]">No calendars found.</p>
+                  <p className="px-[20px] pt-[20px] text-[13px] text-[var(--wlp-text-secondary)]">No calendars found.</p>
                 )}
 
                 {/* Hidden categories restore strip */}
                 {hiddenCategories.length > 0 && (
-                  <div className="wlp-hidden-strip border-t border-[#dadce0]/60">
-                    <p className="text-[11px] font-[600] uppercase tracking-[0.6px] text-[#9aa0a6] mb-[8px]">
+                  <div className="wlp-hidden-strip border-t border-[var(--wlp-divider)]">
+                    <p className="text-[11px] font-[600] uppercase tracking-[0.6px] text-[var(--wlp-text-muted)] mb-[8px]">
                       Hidden ({hiddenCategories.length})
                     </p>
                     {hiddenCategories.map((cat) => (
                       <div key={cat.calendarId} className="wlp-hidden-row flex items-center gap-[8px]">
                         <span className="w-[8px] h-[8px] rounded-full shrink-0 opacity-40" style={{ backgroundColor: cat.color }} />
-                        <span className="flex-1 text-[12px] text-[#9aa0a6] truncate">{cat.name}</span>
+                        <span className="flex-1 text-[12px] text-[var(--wlp-text-muted)] truncate">{cat.name}</span>
                         <button
                           onClick={() => toggleCategoryHidden(cat.calendarId)}
                           title="Show category"
                           aria-label={`Show ${cat.name}`}
-                          className="wlp-cat-show shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[#9aa0a6] hover:text-[#5f6368] transition-colors duration-150"
+                          className="wlp-cat-show shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[var(--wlp-text-muted)] hover:text-[var(--wlp-text-secondary)] transition-colors duration-150"
                         >
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
