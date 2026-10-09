@@ -119,6 +119,25 @@
   color: var(--wlp-tooltip-text) !important;
 }
 
+/* ── Drag preview: the name ────────────────────────────────────────────────── */
+
+/* The preview is a 20% tint of the event's colour, which content.tsx sets as
+   --wlp-event-color. The name drawn in that colour unchanged falls below 3:1
+   for most of Google's colours: the light ones (Banana, Sage, the pastel
+   calendar colours) on their tint over the white grid, the dark ones
+   (Blueberry, Graphite, Grape) on their tint over the dark grid. So it is
+   mixed halfway to black in the light theme and 60% of the way to white in the
+   dark one, which keeps it recognisably the event's colour and gives every one
+   of Google's eleven, and its default blue, at least 4.5:1. The loading
+   placeholder is a solid block with its own text colour and is left out. */
+#wlp-event-preview:not(.wlp-preview-loading) {
+  color: color-mix(in srgb, var(--wlp-event-color) 50%, #000000) !important;
+}
+
+#wlp-event-preview[data-wlp-theme="dark"]:not(.wlp-preview-loading) {
+  color: color-mix(in srgb, var(--wlp-event-color) 40%, #ffffff) !important;
+}
+
 /* ── Drag preview: weekly recurrence ───────────────────────────────────────── */
 
 /* content.tsx positions and colours the preview with inline styles, so these

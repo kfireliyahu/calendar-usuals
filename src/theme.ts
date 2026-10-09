@@ -34,14 +34,20 @@ const OPAQUE_ENOUGH = 0.5;
 // ── Reading colours ───────────────────────────────────────────────────────────
 
 // Chrome reports a computed background-color as rgb() or rgba() for any colour
-// written in sRGB, which is what Google uses today. The canvas fallback covers
-// a colour Google might one day write as oklch() or color(), which Chrome
-// reports in that form instead.
+// written in sRGB, which is what Google uses today. Calendar and event colours
+// arrive as #rrggbb. The canvas fallback covers a colour Google might one day
+// write as oklch() or color(), which Chrome reports in that form instead.
+const HEX_PATTERN = /^#([0-9a-f]{6})$/i;
 const RGB_PATTERN = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,/]\s*([\d.]+)(%?))?\s*\)$/i;
 
 let probe: CanvasRenderingContext2D | null | undefined;
 
 export function parseColor(css: string): Rgba | null {
+  const hex = css.trim().match(HEX_PATTERN);
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    return [n >> 16, (n >> 8) & 0xff, n & 0xff, 1];
+  }
   const m = css.trim().match(RGB_PATTERN);
   if (m) {
     const alpha = m[4] === undefined ? 1 : Number(m[4]) / (m[5] ? 100 : 1);
@@ -66,6 +72,25 @@ export function relativeLuminance([r, g, b]: Rgba): number {
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
   };
   return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+// ── Text on a data colour ─────────────────────────────────────────────────────
+
+const LIGHT_TEXT = '#ffffff';
+const DARK_TEXT  = '#202124';
+
+// White text on a calendar or event colour, as Google Calendar draws its own
+// event chips, unless the colour is so light that white falls below 3:1
+// (Banana, Sage, Flamingo, the pastel calendar colours); then near-black, which
+// beats white by far on all of those. The colour is the same in both themes,
+// so the choice is too.
+const MIN_LIGHT_TEXT_CONTRAST = 3;
+
+export function readableTextOn(color: string): string {
+  const parsed = parseColor(color);
+  if (!parsed) return LIGHT_TEXT;
+  const contrastWithWhite = 1.05 / (relativeLuminance(parsed) + 0.05);
+  return contrastWithWhite >= MIN_LIGHT_TEXT_CONTRAST ? LIGHT_TEXT : DARK_TEXT;
 }
 
 // ── Detecting the theme ───────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ import {
 } from '../poolItem';
 import { formatTime, isSameDay, visibleTimeGridDays } from '../calendarGrid';
 import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
+import { readableTextOn } from '../theme';
 
 interface PoolCategory {
   calendarId: string;
@@ -980,12 +981,14 @@ const PoolSidebar: React.FC = () => {
                             style={{
                               '--chip-bg':     sel ? cat.color : 'transparent',
                               '--chip-border': sel ? cat.color : 'var(--wlp-border-subtle)',
-                              '--chip-color':  sel ? '#fff'    : 'var(--wlp-text-secondary)',
+                              '--chip-color':  sel ? readableTextOn(cat.color) : 'var(--wlp-text-secondary)',
                             } as React.CSSProperties}
                           >
                             <span
                               className="wlp-cat-chip-dot"
-                              style={{ backgroundColor: sel ? 'rgba(255,255,255,0.75)' : cat.color }}
+                              // On a selected chip the dot takes the text colour,
+                              // which readableTextOn picked for this calendar.
+                              style={sel ? { backgroundColor: 'currentColor', opacity: 0.75 } : { backgroundColor: cat.color }}
                             />
                             <span className="truncate">{cat.name}</span>
                           </button>

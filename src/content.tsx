@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import PoolSidebar from './components/PoolSidebar';
 import { PoolItem, durationOf, eventColorHex } from './poolItem';
 import { dateFromCell, findDatekey, formatTime, isTimeGridCell, timeGridCellFor } from './calendarGrid';
-import { Theme, watchTheme } from './theme';
+import { Theme, readableTextOn, watchTheme } from './theme';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
@@ -148,7 +148,8 @@ function getPreview(): HTMLElement {
 }
 // A recurring drop commits a series that repeats forever, so the preview has
 // to look different the moment Shift goes down: content.css dashes its border
-// and adds a repeat glyph while the class is on.
+// and adds a repeat glyph while the class is on. The name's colour also comes
+// from content.css, which shades the event colour for the theme.
 function showPreview(cell: Element, clientY: number, item: DropPoolItem, recurring: boolean): void {
   const el = getPreview();
   el.classList.remove('wlp-preview-loading');
@@ -163,8 +164,9 @@ function showPreview(cell: Element, clientY: number, item: DropPoolItem, recurri
     display: 'block', opacity: '1', animation: 'none',
     background: color + '33',
     border: `2px solid ${color}`,
-    borderRadius: '2px', color, padding: '2px 6px',
+    borderRadius: '2px', color: '', padding: '2px 6px',
   });
+  el.style.setProperty('--wlp-event-color', color);
   el.textContent = item.name;
 }
 function hidePreview(): void {
@@ -208,7 +210,7 @@ function showLoading(cell: Element, startMin: number, item: DropPoolItem, recurr
     display: 'block', opacity: '1',
     background: calColor, border: 'none', borderRadius: '4px',
     padding: '4px 8px', fontSize: '12px', fontWeight: '500',
-    color: '#fff', boxSizing: 'border-box',
+    color: readableTextOn(calColor), boxSizing: 'border-box',
     overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
     animation: 'wlp-event-loading 1.1s ease-in-out infinite',
     transition: 'opacity 0.35s ease',
