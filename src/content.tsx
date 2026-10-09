@@ -192,8 +192,13 @@ function getPreview(): HTMLElement {
   }
   return previewEl;
 }
-function showPreview(cell: Element, clientY: number, item: DropPoolItem): void {
+// A recurring drop commits a series that repeats forever, so the preview has
+// to look different the moment Shift goes down: content.css dashes its border
+// and adds a repeat glyph while the class is on.
+function showPreview(cell: Element, clientY: number, item: DropPoolItem, recurring: boolean): void {
   const el = getPreview();
+  el.classList.remove('wlp-preview-loading');
+  el.classList.toggle('wlp-preview-recurring', recurring);
   const { snapped } = timeFromDrop(cell, clientY);
   const rect = cell.getBoundingClientRect();
   const color = previewColor(item);
@@ -230,8 +235,11 @@ function applyLoadingPosition(): void {
   previewEl.style.width = `${rect.width - 4}px`;
 }
 
-function showLoading(cell: Element, clientY: number, item: DropPoolItem): void {
+function showLoading(cell: Element, clientY: number, item: DropPoolItem, recurring: boolean): void {
   const el        = getPreview();
+  // The placeholder keeps the repeat glyph but not the dashed border.
+  el.classList.add('wlp-preview-loading');
+  el.classList.toggle('wlp-preview-recurring', recurring);
   const { snapped } = timeFromDrop(cell, clientY);
   const rect      = cell.getBoundingClientRect();
   const calColor  = previewColor(item);
@@ -417,7 +425,12 @@ function sendToBackground(message: unknown, onResponse: (response: any) => void)
 // produces the event the user would otherwise have typed by hand. Every field
 // is omitted when the item does not set it: an empty `location` is a real value
 // to the API, and sending `reminders` at all turns off the calendar's defaults.
-function eventBody(item: DropPoolItem, start: Date, end: Date): Record<string, unknown> {
+//
+// A Shift-drop adds a weekly RRULE with no UNTIL or COUNT, so the series runs
+// until the user ends it. The API rejects a recurring event whose start and end
+// carry no timeZone, and it is also the zone the weekly instances are expanded
+// in, so they stay at the same wall-clock time across a DST change.
+function eventBody(item: DropPoolItem, start: Date, end: Date, recurring: boolean): Record<string, unknown> {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const body: Record<string, unknown> = {
     summary:    item.name,
@@ -429,6 +442,7 @@ function eventBody(item: DropPoolItem, start: Date, end: Date): Record<string, u
   if (item.description?.trim()) body.description = item.description.trim();
   if (item.location?.trim())    body.location    = item.location.trim();
   if (item.colorId)             body.colorId     = item.colorId;
+  if (recurring)                body.recurrence  = ['RRULE:FREQ=WEEKLY'];
   // 0 is a valid reminder ("at start"), so this checks for undefined, not falsy.
   if (item.reminderMin !== undefined) {
     body.reminders = {
@@ -477,8 +491,11 @@ function setupListeners(): void {
         const { hours, minutes } = timeFromDrop(cell, e.clientY);
         const duration = durationOf(draggingItem);
         const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        showTooltip(e.clientX, e.clientY, `${draggingItem.name}  ·  ${day}, ${formatRange(hours, minutes, duration)}`);
-        showPreview(cell, e.clientY, draggingItem);
+        // dragover keeps firing while the pointer is still, so pressing or
+        // releasing Shift mid-drag updates this without a mouse move.
+        const repeats = e.shiftKey ? '  ·  ↻ repeats weekly' : '';
+        showTooltip(e.clientX, e.clientY, `${draggingItem.name}  ·  ${day}, ${formatRange(hours, minutes, duration)}${repeats}`);
+        showPreview(cell, e.clientY, draggingItem, e.shiftKey);
       }
     }
   });
@@ -505,13 +522,16 @@ function setupListeners(): void {
     // Millisecond arithmetic rather than setHours(h + n): it reads the same way
     // for any duration and rolls into the next day correctly.
     const end   = new Date(start.getTime() + durationOf(item) * 60_000);
+    // Read from the drop itself rather than the last dragover, so what is
+    // created is whatever the key says at the moment of release.
+    const recurring = e.shiftKey;
 
     // Show pulsing placeholder at the exact drop position immediately
-    showLoading(cell, e.clientY, item);
+    showLoading(cell, e.clientY, item, recurring);
 
     dispatchPoolEvent('creating', item.name);
     const sent = sendToBackground(
-      { type: 'CREATE_EVENT', data: eventBody(item, start, end) },
+      { type: 'CREATE_EVENT', data: eventBody(item, start, end, recurring) },
       (response) => {
         if (response?.success) {
           dispatchPoolEvent('created', item.name);
