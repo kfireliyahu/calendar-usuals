@@ -1,25 +1,23 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import PoolSidebar from './components/PoolSidebar';
+import { PoolItem, durationOf, eventColorHex } from './poolItem';
 import './content.css';
 
-interface DropPoolItem {
-  id: string;
-  name: string;
-  calendarId: string;
-  color?: string;
-  durationMin?: number;
-}
+// What crosses the drag: the stored item plus the colour of the calendar it
+// lives in, which the sidebar knows and storage does not.
+type DropPoolItem = PoolItem & { color?: string };
 
 const SIDEBAR_WIDTH   = 280;
 const COLLAPSED_WIDTH = 40;
 const PIXELS_PER_HOUR = 60; // 1 px = 1 minute
 
-// Items saved before durations existed have no durationMin, so every read goes
-// through here rather than reading the field directly.
-const DEFAULT_DURATION_MIN = 60;
-function durationOf(item: { durationMin?: number }): number {
-  return item.durationMin ?? DEFAULT_DURATION_MIN;
+const FALLBACK_COLOR = '#4285f4';
+
+// An item with its own colorId will render in that colour once Google Calendar
+// draws it, so the preview and the loading placeholder use it too.
+function previewColor(item: DropPoolItem): string {
+  return eventColorHex(item.colorId, item.color ?? FALLBACK_COLOR);
 }
 
 // ── Datekey → Date ────────────────────────────────────────────────────────────
@@ -194,20 +192,21 @@ function getPreview(): HTMLElement {
   }
   return previewEl;
 }
-function showPreview(cell: Element, clientY: number, itemName: string, color = '#4285f4', durationMin = DEFAULT_DURATION_MIN): void {
+function showPreview(cell: Element, clientY: number, item: DropPoolItem): void {
   const el = getPreview();
   const { snapped } = timeFromDrop(cell, clientY);
   const rect = cell.getBoundingClientRect();
+  const color = previewColor(item);
   // 1 px = 1 min in the time grid, so the block's pixel height is its duration.
   Object.assign(el.style, {
     top: `${rect.top + snapped}px`, left: `${rect.left + 2}px`,
-    width: `${rect.width - 4}px`,  height: `${durationMin}px`,
+    width: `${rect.width - 4}px`,  height: `${durationOf(item)}px`,
     display: 'block', opacity: '1', animation: 'none',
     background: color + '33',
     border: `2px solid ${color}`,
     borderRadius: '2px', color, padding: '2px 6px',
   });
-  el.textContent = itemName;
+  el.textContent = item.name;
 }
 function hidePreview(): void {
   if (isLoading) return; // don't clobber the loading overlay
@@ -235,7 +234,7 @@ function showLoading(cell: Element, clientY: number, item: DropPoolItem): void {
   const el        = getPreview();
   const { snapped } = timeFromDrop(cell, clientY);
   const rect      = cell.getBoundingClientRect();
-  const calColor  = item.color ?? '#4285f4';
+  const calColor  = previewColor(item);
 
   loadingCell    = cell;
   loadingSnapped = snapped;
@@ -348,6 +347,35 @@ function sendToBackground(message: unknown, onResponse: (response: any) => void)
   }
 }
 
+// ── Event body ────────────────────────────────────────────────────────────────
+
+// An item's template fields map one-to-one onto events.insert, so a drop
+// produces the event the user would otherwise have typed by hand. Every field
+// is omitted when the item does not set it: an empty `location` is a real value
+// to the API, and sending `reminders` at all turns off the calendar's defaults.
+function eventBody(item: DropPoolItem, start: Date, end: Date): Record<string, unknown> {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const body: Record<string, unknown> = {
+    summary:    item.name,
+    calendarId: item.calendarId,
+    start: { dateTime: start.toISOString(), timeZone },
+    end:   { dateTime: end.toISOString(),   timeZone },
+  };
+
+  if (item.description?.trim()) body.description = item.description.trim();
+  if (item.location?.trim())    body.location    = item.location.trim();
+  if (item.colorId)             body.colorId     = item.colorId;
+  // 0 is a valid reminder ("at start"), so this checks for undefined, not falsy.
+  if (item.reminderMin !== undefined) {
+    body.reminders = {
+      useDefault: false,
+      overrides: [{ method: 'popup', minutes: item.reminderMin }],
+    };
+  }
+
+  return body;
+}
+
 // ── Drop listeners ────────────────────────────────────────────────────────────
 
 let draggingItem: DropPoolItem | null = null;
@@ -386,7 +414,7 @@ function setupListeners(): void {
         const duration = durationOf(draggingItem);
         const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         showTooltip(e.clientX, e.clientY, `${draggingItem.name}  ·  ${day}, ${formatRange(hours, minutes, duration)}`);
-        showPreview(cell, e.clientY, draggingItem.name, draggingItem.color, duration);
+        showPreview(cell, e.clientY, draggingItem);
       }
     }
   });
@@ -419,15 +447,7 @@ function setupListeners(): void {
 
     dispatchPoolEvent('creating', item.name);
     const sent = sendToBackground(
-      {
-        type: 'CREATE_EVENT',
-        data: {
-          summary:    item.name,
-          calendarId: item.calendarId,
-          start: { dateTime: start.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-          end:   { dateTime: end.toISOString(),   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        },
-      },
+      { type: 'CREATE_EVENT', data: eventBody(item, start, end) },
       (response) => {
         if (response?.success) {
           dispatchPoolEvent('created', item.name);

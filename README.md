@@ -8,6 +8,10 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 
 - **Activity pool** — store reusable items (tasks, routines, habits) grouped by your Google Calendars
 - **Drag-and-drop creation** — drag any item onto the calendar grid; an event is created at the exact time and date you drop it
+- **Item templates** — give an item a description, location, event colour and reminder; dropping it creates the event fully configured
+- **Rename in place** — double-click an item's name; Enter or clicking away commits, Escape cancels
+- **Reorder and re-file** — drag an item within its list to reorder it, or onto another calendar's heading to move it there
+- **Duplicate** — clone a configured item and tweak the copy
 - **Time snapping** — drops snap to the nearest 15-minute slot with a live tooltip showing day + time while hovering
 - **Loading overlay** — a pulsing placeholder in the calendar's color appears at the drop location and fades out once Google Calendar renders the real event; tracks the column as you scroll
 - **Category chips** — quickly switch which calendar an item belongs to before adding it

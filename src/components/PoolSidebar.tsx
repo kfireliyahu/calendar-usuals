@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-
-interface PoolItem {
-  id: string;
-  name: string;
-  calendarId: string;
-  durationMin?: number;
-}
+import {
+  PoolItem,
+  DEFAULT_DURATION_MIN,
+  DURATION_PRESETS,
+  EVENT_COLORS,
+  REMINDER_PRESETS,
+  durationOf,
+  eventColorHex,
+  formatDuration,
+  formatReminder,
+  hasTemplate,
+  newItemId,
+} from '../poolItem';
 
 interface PoolCategory {
   calendarId: string;
@@ -26,20 +32,11 @@ interface Toast {
   type: 'info' | 'success' | 'error';
 }
 
-// Items saved before durations existed have no durationMin, so it is read through
-// durationOf() everywhere rather than off the field directly.
-const DEFAULT_DURATION_MIN = 60;
-const DURATION_PRESETS = [15, 30, 45, 60, 90, 120];
-
-function durationOf(item: PoolItem): number {
-  return item.durationMin ?? DEFAULT_DURATION_MIN;
-}
-
-function formatDuration(min: number): string {
-  if (min < 60) return `${min}m`;
-  const hours = Math.floor(min / 60);
-  const mins  = min % 60;
-  return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+// Where a reorder drag would land: the category the item would end up in and
+// the index it would be inserted at (items.length means "after the last one").
+interface DropTarget {
+  calendarId: string;
+  index: number;
 }
 
 // Shape of what we keep in chrome.storage.local. Every key is optional because
@@ -49,6 +46,24 @@ interface StoredState {
   hiddenCategories?: string[];
   sidebarCollapsed?: boolean;
   formOpen?: boolean;
+}
+
+// Reorder rides on its own dataTransfer type. A pool drag sets both types, so
+// one drag creates an event over the calendar grid and reorders over the
+// sidebar, and neither drop handler can be fooled by the other's payload.
+const REORDER_TYPE = 'poolreorder';
+
+function isReorderDrag(e: React.DragEvent): boolean {
+  return Array.from(e.dataTransfer.types).some((t) => t.toLowerCase() === REORDER_TYPE);
+}
+
+// A dragover handled by an item or a header must not then be cleared by the
+// container's own handler, which fires afterwards on the way up.
+function markHandled(e: React.DragEvent): void {
+  (e.nativeEvent as DragEvent & { wlpHandled?: boolean }).wlpHandled = true;
+}
+function wasHandled(e: React.DragEvent): boolean {
+  return (e.nativeEvent as DragEvent & { wlpHandled?: boolean }).wlpHandled === true;
 }
 
 // Compact duration control. A native <select> so it stays keyboard accessible
@@ -80,6 +95,80 @@ const DurationSelect: React.FC<{
   );
 };
 
+// ── Item template panel ──────────────────────────────────────────────────────
+//
+// Everything an item carries beyond its name and duration. Collapsed by
+// default: the pool is meant to be scannable at 280px, so these fields never
+// sit on the always-visible row.
+
+const ItemDetails: React.FC<{
+  item: PoolItem;
+  categoryColor: string;
+  onChange: (patch: Partial<PoolItem>) => void;
+  onDuplicate: () => void;
+}> = ({ item, categoryColor, onChange, onDuplicate }) => (
+  <div className="wlp-item-details">
+    <textarea
+      rows={2}
+      placeholder="Description"
+      value={item.description ?? ''}
+      onChange={(e) => onChange({ description: e.target.value })}
+      className="wlp-field"
+    />
+    <input
+      type="text"
+      placeholder="Location"
+      value={item.location ?? ''}
+      onChange={(e) => onChange({ location: e.target.value })}
+      className="wlp-field"
+    />
+
+    <div className="wlp-swatches">
+      {/* No colorId means "whatever colour the calendar uses", which is what
+          every item did before this panel existed. */}
+      <button
+        type="button"
+        title="Calendar colour"
+        onClick={() => onChange({ colorId: undefined })}
+        className={`wlp-swatch${item.colorId ? '' : ' wlp-swatch-on'}`}
+        style={{ backgroundColor: categoryColor }}
+      />
+      {EVENT_COLORS.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          title={c.name}
+          onClick={() => onChange({ colorId: c.id })}
+          className={`wlp-swatch${item.colorId === c.id ? ' wlp-swatch-on' : ''}`}
+          style={{ backgroundColor: c.hex }}
+        />
+      ))}
+    </div>
+
+    <div className="wlp-details-row">
+      <select
+        title="Reminder"
+        value={item.reminderMin === undefined ? '' : String(item.reminderMin)}
+        onChange={(e) =>
+          onChange({ reminderMin: e.target.value === '' ? undefined : Number(e.target.value) })
+        }
+        className="wlp-field wlp-details-select"
+      >
+        <option value="">Default reminder</option>
+        {REMINDER_PRESETS.map((min) => (
+          <option key={min} value={min}>{formatReminder(min)}</option>
+        ))}
+      </select>
+      <button type="button" onClick={onDuplicate} title="Duplicate item" className="wlp-dup-btn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+        Duplicate
+      </button>
+    </div>
+  </div>
+);
+
 const PoolSidebar: React.FC = () => {
   const [categories, setCategories] = useState<PoolCategory[]>([]);
   const [newItemName, setNewItemName] = useState('');
@@ -92,10 +181,16 @@ const PoolSidebar: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [formOpen, setFormOpen] = useState(true);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const collapsedReady = useRef(false);
   const formReady = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelledRename = useRef(false);
 
   // One timer for every toast source, so a pending clear from an earlier toast
   // cannot wipe a newer one.
@@ -155,6 +250,18 @@ const PoolSidebar: React.FC = () => {
     return () => {
       document.removeEventListener('poolEvent', handler);
       if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
+  // Any end to a drag clears the insertion marker. dragend alone is not enough:
+  // it does not fire on the source row when the drop lands outside the sidebar.
+  useEffect(() => {
+    const clear = () => { setDropTarget(null); setDraggingId(null); };
+    document.addEventListener('poolDragEnd', clear);
+    document.addEventListener('drop', clear);
+    return () => {
+      document.removeEventListener('poolDragEnd', clear);
+      document.removeEventListener('drop', clear);
     };
   }, []);
 
@@ -231,7 +338,7 @@ const PoolSidebar: React.FC = () => {
               items: [
                 ...cat.items,
                 {
-                  id: Date.now().toString(),
+                  id: newItemId(),
                   name: newItemName,
                   calendarId: newItemCategory,
                   durationMin: newItemDuration,
@@ -245,11 +352,13 @@ const PoolSidebar: React.FC = () => {
     inputRef.current?.focus();
   };
 
-  const setItemDuration = (id: string, durationMin: number) => {
+  // One updater for every per-item field, so duration, rename and the template
+  // panel do not each need their own walk over the category array.
+  const updateItem = (id: string, patch: Partial<PoolItem>) => {
     setCategories((prev) =>
       prev.map((cat) => ({
         ...cat,
-        items: cat.items.map((item) => (item.id === id ? { ...item, durationMin } : item)),
+        items: cat.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
       }))
     );
   };
@@ -258,6 +367,52 @@ const PoolSidebar: React.FC = () => {
     setCategories((prev) =>
       prev.map((cat) => ({ ...cat, items: cat.items.filter((item) => item.id !== id) }))
     );
+    if (expandedId === id) setExpandedId(null);
+    if (editingId  === id) setEditingId(null);
+  };
+
+  // The copy lands directly under the original and keeps every template field —
+  // configure one item well, then clone it. The name gets a suffix because two
+  // identically named items resolve each other's drop placeholder.
+  const duplicateItem = (id: string) => {
+    setCategories((prev) =>
+      prev.map((cat) => {
+        const index = cat.items.findIndex((item) => item.id === id);
+        if (index === -1) return cat;
+        const copy = { ...cat.items[index], id: newItemId(), name: `${cat.items[index].name} copy` };
+        const items = [...cat.items];
+        items.splice(index + 1, 0, copy);
+        return { ...cat, items };
+      })
+    );
+  };
+
+  // Array order is the persisted order, so a move is just a splice — no schema
+  // change. Dropping an item into its own gap is a no-op rather than a move
+  // into the slot that opens up once it is removed.
+  const moveItem = (id: string, toCalendarId: string, toIndex: number) => {
+    setCategories((prev) => {
+      const source = prev.find((cat) => cat.items.some((item) => item.id === id));
+      if (!source) return prev;
+      const fromIndex = source.items.findIndex((item) => item.id === id);
+      const moved = source.items[fromIndex];
+
+      const sameCategory = source.calendarId === toCalendarId;
+      if (sameCategory && (toIndex === fromIndex || toIndex === fromIndex + 1)) return prev;
+      const insertAt = sameCategory && fromIndex < toIndex ? toIndex - 1 : toIndex;
+
+      return prev.map((cat) => {
+        const items = cat.items.filter((item) => item.id !== id);
+        if (cat.calendarId !== toCalendarId) {
+          return items.length === cat.items.length ? cat : { ...cat, items };
+        }
+        const at = Math.max(0, Math.min(insertAt, items.length));
+        return {
+          ...cat,
+          items: [...items.slice(0, at), { ...moved, calendarId: toCalendarId }, ...items.slice(at)],
+        };
+      });
+    });
   };
 
   const toggleCategoryHidden = (calendarId: string) => {
@@ -266,6 +421,70 @@ const PoolSidebar: React.FC = () => {
         cat.calendarId === calendarId ? { ...cat, hidden: !cat.hidden } : cat
       )
     );
+  };
+
+  // ── Rename ───────────────────────────────────────────────────────────────────
+
+  const startRename = (item: PoolItem) => {
+    cancelledRename.current = false;
+    setEditingId(item.id);
+    setEditingName(item.name);
+  };
+
+  // Enter and blur both commit, Escape does not. The flag is a ref rather than
+  // state because unmounting the focused input can fire blur with the closure
+  // from the render before Escape, which would otherwise commit the edit anyway.
+  const cancelRename = () => {
+    cancelledRename.current = true;
+    setEditingId(null);
+  };
+
+  const commitRename = () => {
+    if (!editingId || cancelledRename.current) return;
+    const name = editingName.trim();
+    if (name) updateItem(editingId, { name });
+    setEditingId(null);
+  };
+
+  // ── Reorder drag ─────────────────────────────────────────────────────────────
+
+  // Which half of the row the pointer is in decides whether the item lands
+  // before or after it.
+  const handleRowDragOver = (e: React.DragEvent, calendarId: string, index: number) => {
+    if (!isReorderDrag(e)) return;
+    e.preventDefault();
+    markHandled(e);
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDropTarget({
+      calendarId,
+      index: e.clientY > rect.top + rect.height / 2 ? index + 1 : index,
+    });
+  };
+
+  // Aiming at a category itself — its header or its empty space — means "put it
+  // in this calendar", which reassigns calendarId when it came from another one.
+  const handleCategoryDragOver = (e: React.DragEvent, calendarId: string) => {
+    if (!isReorderDrag(e)) return;
+    e.preventDefault();
+    markHandled(e);
+    setDropTarget({ calendarId, index: 0 });
+  };
+
+  const handleListDrop = (e: React.DragEvent) => {
+    const raw = e.dataTransfer.getData('poolReorder');
+    if (!raw || !dropTarget) return;
+    // The document-level drop listener creates calendar events. It already
+    // ignores anything outside a gridcell, and stopping here keeps that true
+    // however the sidebar's own drop zones grow.
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const { id } = JSON.parse(raw) as { id: string };
+      moveItem(id, dropTarget.calendarId, dropTarget.index);
+    } catch {
+      // Malformed payload — drop nothing rather than move the wrong item.
+    }
+    setDropTarget(null);
   };
 
   // If selected dropdown category gets hidden, reset to first visible
@@ -479,13 +698,18 @@ const PoolSidebar: React.FC = () => {
               )}
 
               {/* Category list */}
-              <div className="flex-1 overflow-y-auto py-3">
+              <div
+                className="flex-1 overflow-y-auto py-3"
+                onDragOver={(e) => { if (isReorderDrag(e) && !wasHandled(e)) setDropTarget(null); }}
+                onDrop={handleListDrop}
+              >
                 {visibleCategories.map((category) => (
                   <div key={category.calendarId} className="wlp-cat-group">
                     <div
                       className="wlp-cat-header flex items-center gap-[7px]"
                       onMouseEnter={() => setHoveredCategory(category.calendarId)}
                       onMouseLeave={() => setHoveredCategory(null)}
+                      onDragOver={(e) => handleCategoryDragOver(e, category.calendarId)}
                     >
                       <span
                         className="w-[10px] h-[10px] rounded-full shrink-0"
@@ -506,37 +730,110 @@ const PoolSidebar: React.FC = () => {
                       </button>
                     </div>
                     <div className="wlp-items-list flex flex-col">
-                      {category.items.map((item) => (
-                        <div
-                          key={item.id}
-                          draggable
-                          onDragStart={(e) => {
-                            const payload = { ...item, color: category.color };
-                            e.dataTransfer?.setData('poolItem', JSON.stringify(payload));
-                            document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item: payload } }));
-                          }}
-                          onDragEnd={() =>
-                            document.dispatchEvent(new CustomEvent('poolDragEnd'))
-                          }
-                          className="wlp-item group flex items-center justify-between bg-white border border-[#e8eaed] rounded-[6px] text-[13px] text-[#202124] cursor-grab select-none transition-all duration-150 hover:border-[#c5c9ce] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing active:opacity-70"
-                          style={{ borderLeft: `3px solid ${category.color}` }}
-                        >
-                          <span className="flex-1 truncate">{item.name}</span>
-                          <DurationSelect
-                            value={durationOf(item)}
-                            onChange={(min) => setItemDuration(item.id, min)}
-                          />
-                          <button
-                            onClick={() => deleteItem(item.id)}
-                            title="Remove"
-                            className="opacity-0 group-hover:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-0 ml-2 transition-all duration-150 hover:text-[#d33427] hover:scale-110"
+                      {category.items.map((item, index) => {
+                        const editing  = editingId  === item.id;
+                        const expanded = expandedId === item.id;
+                        const aimedHere = dropTarget?.calendarId === category.calendarId;
+                        const dropBefore = aimedHere && dropTarget!.index === index;
+                        const dropAfter  = aimedHere &&
+                          dropTarget!.index === index + 1 &&
+                          index === category.items.length - 1;
+                        return (
+                          <div
+                            key={item.id}
+                            className={`wlp-item-wrap${dropBefore ? ' wlp-drop-before' : ''}${dropAfter ? ' wlp-drop-after' : ''}`}
+                            onDragOver={(e) => handleRowDragOver(e, category.calendarId, index)}
                           >
-                            ×
-                          </button>
-                        </div>
-                      ))}
+                            <div
+                              // A draggable ancestor swallows the caret and text
+                              // selection, so the row stops being draggable while
+                              // its name is being edited.
+                              draggable={!editing}
+                              onDragStart={(e) => {
+                                const payload = { ...item, color: category.color };
+                                e.dataTransfer?.setData('poolItem', JSON.stringify(payload));
+                                // Its own type: a calendar drop reads poolItem, a
+                                // sidebar drop reads this, and neither can pick up
+                                // the other's payload by accident.
+                                e.dataTransfer?.setData('poolReorder', JSON.stringify({ id: item.id }));
+                                setDraggingId(item.id);
+                                document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item: payload } }));
+                              }}
+                              onDragEnd={() => {
+                                setDraggingId(null);
+                                setDropTarget(null);
+                                document.dispatchEvent(new CustomEvent('poolDragEnd'));
+                              }}
+                              className={`wlp-item group flex items-center justify-between bg-white border border-[#e8eaed] rounded-[6px] text-[13px] text-[#202124] cursor-grab select-none transition-all duration-150 hover:border-[#c5c9ce] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
+                                draggingId === item.id ? ' opacity-40' : ''
+                              }`}
+                              style={{ borderLeft: `3px solid ${eventColorHex(item.colorId, category.color)}` }}
+                            >
+                              {editing ? (
+                                <input
+                                  autoFocus
+                                  // Rename usually means replace, not append:
+                                  // without this the caret lands at the end and
+                                  // typing extends the old name.
+                                  onFocus={(e) => e.currentTarget.select()}
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  onBlur={commitRename}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter')  commitRename();
+                                    if (e.key === 'Escape') cancelRename();
+                                  }}
+                                  className="wlp-item-rename"
+                                />
+                              ) : (
+                                <span
+                                  onDoubleClick={() => startRename(item)}
+                                  title={`${item.name} — double-click to rename`}
+                                  className="flex-1 truncate"
+                                >
+                                  {item.name}
+                                </span>
+                              )}
+                              <DurationSelect
+                                value={durationOf(item)}
+                                onChange={(min) => updateItem(item.id, { durationMin: min })}
+                              />
+                              <button
+                                onClick={() => setExpandedId(expanded ? null : item.id)}
+                                title={expanded ? 'Hide details' : 'Edit details'}
+                                className={`wlp-item-expand${hasTemplate(item) ? ' wlp-item-expand-on' : ''}`}
+                                style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
+                              >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => deleteItem(item.id)}
+                                title="Remove"
+                                className="opacity-0 group-hover:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[#bdc1c6] cursor-pointer p-0 ml-1 transition-all duration-150 hover:text-[#d33427] hover:scale-110"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            {expanded && (
+                              <ItemDetails
+                                item={item}
+                                categoryColor={category.color}
+                                onChange={(patch) => updateItem(item.id, patch)}
+                                onDuplicate={() => duplicateItem(item.id)}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                       {category.items.length === 0 && (
-                        <p className="px-4 py-1 text-[12px] text-[#9aa0a6] italic">
+                        <p
+                          onDragOver={(e) => handleCategoryDragOver(e, category.calendarId)}
+                          className={`wlp-empty px-4 py-1 text-[12px] text-[#9aa0a6] italic${
+                            dropTarget?.calendarId === category.calendarId ? ' wlp-drop-empty' : ''
+                          }`}
+                        >
                           No items yet
                         </p>
                       )}

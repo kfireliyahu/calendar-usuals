@@ -254,3 +254,170 @@
 .wlp-sidebar::-webkit-scrollbar-thumb:hover {
   background: #bdc1c6;
 }
+
+/* ── Item row: rename, details toggle ──────────────────────────────────────── */
+
+/* Wraps the draggable row plus its template panel, and hosts the reorder
+   insertion line so the line never changes the list's layout. */
+.wlp-item-wrap {
+  position: relative !important;
+}
+
+.wlp-drop-before::before,
+.wlp-drop-after::after {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 2px !important;
+  border-radius: 1px !important;
+  background: #4285f4 !important;
+}
+
+.wlp-drop-before::before { top: -4px !important; }
+.wlp-drop-after::after   { bottom: -4px !important; }
+
+/* An empty category has no row to draw a line against. */
+.wlp-drop-empty {
+  color: #4285f4 !important;
+  font-style: normal !important;
+}
+
+/* Sits exactly where the name span was, so committing a rename does not
+   reflow the row. */
+.wlp-item-rename {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  color: #202124 !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid #4285f4 !important;
+}
+
+.wlp-item-expand {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin-left: 4px !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: #bdc1c6 !important;
+  cursor: pointer !important;
+  transition: color 0.15s, transform 0.15s !important;
+}
+
+.wlp-item:hover .wlp-item-expand {
+  color: #5f6368 !important;
+}
+
+/* A configured item keeps the affordance visible while collapsed, so its
+   settings are not invisible. */
+.wlp-item-expand-on {
+  color: #4285f4 !important;
+}
+
+/* ── Item template panel ───────────────────────────────────────────────────── */
+
+.wlp-item-details {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+  padding: 10px !important;
+  margin-top: 4px !important;
+  border: 1px solid #e8eaed !important;
+  border-radius: 6px !important;
+  background: #f8f9fa !important;
+}
+
+.wlp-field {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 6px 8px !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 4px !important;
+  outline: none !important;
+  background: #ffffff !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  color: #202124 !important;
+  box-shadow: none !important;
+  resize: none !important;
+}
+
+.wlp-field:focus {
+  border-color: #4285f4 !important;
+}
+
+.wlp-field::placeholder {
+  color: #9aa0a6 !important;
+}
+
+.wlp-details-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.wlp-details-select {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  cursor: pointer !important;
+}
+
+.wlp-dup-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex-shrink: 0 !important;
+  padding: 6px 8px !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #5f6368 !important;
+  cursor: pointer !important;
+  transition: background 0.15s, color 0.15s !important;
+}
+
+.wlp-dup-btn:hover {
+  background: #f1f3f4 !important;
+  color: #202124 !important;
+}
+
+/* Twelve swatches: the calendar's own colour first, then Google's eleven. */
+.wlp-swatches {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 5px !important;
+}
+
+.wlp-swatch {
+  width: 15px !important;
+  height: 15px !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12) !important;
+  transition: transform 0.12s !important;
+}
+
+.wlp-swatch:hover {
+  transform: scale(1.15) !important;
+}
+
+/* A ring rather than a checkmark: the swatch is 15px and a tick would hide
+   the colour it is marking. */
+.wlp-swatch-on {
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #202124 !important;
+}
