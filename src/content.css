@@ -176,22 +176,6 @@
   z-index: 1000 !important;
 }
 
-.wlp-dropdown-menu {
-  background-color: #ffffff !important;
-}
-
-.wlp-dropdown-trigger {
-  background-color: #ffffff !important;
-}
-
-.wlp-dropdown-item {
-  background-color: transparent !important;
-}
-
-.wlp-dropdown-item:hover {
-  background-color: #f1f3f4 !important;
-}
-
 /* Force spacing to win over Google Calendar's global stylesheet */
 .wlp-header {
   padding: 16px 20px !important;
@@ -421,23 +405,6 @@
   outline: 2px solid var(--wlp-focus) !important;
   outline-offset: 2px !important;
   color: var(--wlp-text-secondary) !important;
-}
-
-.wlp-sidebar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.wlp-sidebar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.wlp-sidebar::-webkit-scrollbar-thumb {
-  background: var(--wlp-border);
-  border-radius: 3px;
-}
-
-.wlp-sidebar::-webkit-scrollbar-thumb:hover {
-  background: var(--wlp-icon-faint);
 }
 
 /* ── Item row: rename, details toggle ──────────────────────────────────────── */
