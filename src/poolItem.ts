@@ -4,8 +4,9 @@
 // own durationOf().
 //
 // Every field past `calendarId` is optional and every reader treats `undefined`
-// as the behaviour that existed before the field did, so items already in
-// chrome.storage.local keep working without a migration step.
+// as the behaviour that existed before the field did, so items saved by any
+// earlier version, whether still in chrome.storage.local or carried into
+// chrome.storage.sync by poolStore.ts, keep working without a migration step.
 
 export interface PoolItem {
   id: string;

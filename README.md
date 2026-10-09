@@ -18,10 +18,11 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 - **Time snapping** — drops snap to the nearest 15-minute slot with a live tooltip showing day + time while hovering
 - **Loading overlay** — a pulsing placeholder in the calendar's color appears at the drop location and fades out once Google Calendar renders the real event; tracks the column as you scroll
 - **Category chips** — quickly switch which calendar an item belongs to before adding it
-- **Hide categories** — collapse calendars you don't need to reduce sidebar noise; state survives page refresh
+- **Hide categories** — collapse calendars you don't need to reduce sidebar noise; the choice syncs with your pool
 - **Collapsible sidebar** — collapse to a 40 px icon strip when you need the full screen
 - **Collapsible input form** — toggle the add-item form open/closed with the pencil icon; preference is saved
-- **Persistent storage** — pool items, hidden categories, and all UI state are saved to Chrome local storage
+- **Syncs across your Chrome profile** — pool items and hidden categories are saved with `chrome.storage.sync`, so every computer signed into the same Chrome profile sees the same pool, and an edit on one shows up on the others (and in other Calendar tabs) without a reload
+- **Persistent storage** — whether the sidebar and the add-item form are collapsed is saved per computer in Chrome local storage, and the pool keeps a copy there too, so an edit is never lost if it has not reached sync yet
 
 ---
 
@@ -101,6 +102,8 @@ src/
 ├── background.ts          # Service worker — OAuth + Google Calendar API calls
 ├── content.tsx            # Content script — sidebar injection, drag/drop, loading overlay
 ├── calendarGrid.ts        # Reads Google Calendar's grid — datekeys, day columns, visible days
+├── poolItem.ts            # The pool item type and its helpers
+├── poolStore.ts           # Loads, saves and live-updates the pool in chrome.storage.sync
 ├── content.css            # Sidebar styles (Tailwind utilities + wlp-* override classes)
 └── components/
     └── PoolSidebar.tsx    # React sidebar component
@@ -117,6 +120,8 @@ vite.config.ts             # Vite build config (two entry points: content + back
 
 **Datekey conversion** — Google Calendar encodes dates as integer "datekeys" (not simple epoch days). A datekey is bit-packed: `((year - 1970) << 9) | (month << 5) | day`, with month and day 1-based — 512 per year, 32 per month, 1 per day (e.g. Apr 30 2026 = 28830, May 1 2026 = 28833). `calendarGrid.ts` unpacks it with shifts and masks. An earlier approximation treated it as days-since-epoch plus a fudge at each month boundary, which drifted by a day or more in any week spanning two months.
 
+**Synced pool** — `poolStore.ts` owns the pool's storage. Chrome sync allows about 100 KB in all but only 8 KB per key, so each item has its own key (`item:<id>`) and each calendar keeps its order as a list of ids (`order:<calendarId>`), next to `hiddenCategories` and a `poolSchema` marker. A long description therefore only weighs on its own item. Writes wait for a pause in editing and start at least 5 s apart, to stay under sync's write limits. Every edit is also copied to `chrome.storage.local` with a note of which keys sync has not accepted yet; if sync refuses the pool for size, the sidebar says so once ("saved on this device only") and keeps working from that copy. On the first run after the update, a pool kept in local storage by an earlier version is copied up to sync once, unless sync already holds a pool from another computer, in which case sync wins and the two are not merged. The old local copy is left in place as a backup. Changes from other computers and tabs arrive through `chrome.storage.onChanged`; a key this tab has edited and not yet sent keeps its edit. Items for calendars that are not in this Google account's list (say, from a different account on another computer) are kept in storage but not shown.
+
 **Scroll-tracking overlay** — The loading placeholder uses `position: fixed` but attaches a scroll listener in capture mode that re-reads `getBoundingClientRect()` on the target cell on every scroll event, keeping the overlay pinned to the correct calendar column even as the user scrolls.
 
 ---
@@ -125,7 +130,7 @@ vite.config.ts             # Vite build config (two entry points: content + back
 
 | Permission | Reason |
 |---|---|
-| `storage` | Persist pool items, hidden categories, and UI state |
+| `storage` | Sync pool items and hidden categories across the user's Chrome profile (`chrome.storage.sync`); keep per-device UI state and a local copy of the pool (`chrome.storage.local`) |
 | `identity` | OAuth 2.0 token for Google Calendar API |
 | `https://calendar.google.com/*` | Inject the sidebar into Google Calendar |
 | `.../auth/calendar.events.owned` | Create events on calendars the user owns |
@@ -138,6 +143,10 @@ shared with the user. Calendars whose `accessRole` is not `owner` cannot be writ
 to under `calendar.events.owned`.
 
 ---
+
+## Privacy
+
+The extension has no server of its own and collects nothing. Pool items (names, descriptions, locations, colours, reminders, durations) and the list of hidden calendars are stored with `chrome.storage.sync`, so when Chrome sync is turned on they travel through **Chrome Sync, which is operated by Google**, to the other computers signed into the same Chrome profile; with Chrome sync off they stay on the computer. Per-device settings and a local copy of the pool stay in `chrome.storage.local`. Events are created and deleted directly with the Google Calendar API.
 
 ## Support
 

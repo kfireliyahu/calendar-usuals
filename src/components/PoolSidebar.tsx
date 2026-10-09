@@ -13,6 +13,7 @@ import {
   newItemId,
 } from '../poolItem';
 import { formatTime, isSameDay, visibleTimeGridDays } from '../calendarGrid';
+import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
 
 interface PoolCategory {
   calendarId: string;
@@ -66,14 +67,19 @@ interface DropTarget {
   index: number;
 }
 
-// Shape of what we keep in chrome.storage.local. Every key is optional because
-// storage is empty on a fresh install, so each read needs a fallback.
+// Shape of what this device keeps in chrome.storage.local: how this screen has
+// the sidebar laid out. The pool itself syncs between machines and belongs to
+// poolStore.ts. Every key is optional because storage is empty on a fresh
+// install, so each read needs a fallback.
 interface StoredState {
-  poolItems?: Record<string, PoolItem[]>;
-  hiddenCategories?: string[];
   sidebarCollapsed?: boolean;
   formOpen?: boolean;
 }
+
+// Said once per page, the first time Chrome Sync refuses the pool for size.
+// Nothing is lost: the pool keeps saving on this device.
+const SYNC_FULL_MESSAGE = 'Pool too large to sync — saved on this device only';
+const SYNC_FULL_HOLD_MS = 8000;
 
 // Reorder rides on its own dataTransfer type. A pool drag sets both types, so
 // one drag creates an event over the calendar grid and reorders over the
@@ -589,39 +595,67 @@ const PoolSidebar: React.FC = () => {
         (cal: CalendarListEntry) => cal.accessRole === 'owner'
       );
 
-      chrome.storage.local.get<StoredState>(['poolItems', 'hiddenCategories'], (result) => {
-        const stored: Record<string, PoolItem[]> = result.poolItems ?? {};
-        const hiddenIds: string[] = result.hiddenCategories ?? [];
-        const newCategories: PoolCategory[] = entries.map((cal) => ({
-          calendarId: cal.id,
-          name: cal.summary,
-          color: cal.backgroundColor ?? '#4285f4',
-          items: stored[cal.id] ?? [],
-          hidden: hiddenIds.includes(cal.id),
-        }));
-        setCategories(newCategories);
-        const firstVisible = newCategories.find((c) => !c.hidden);
-        setNewItemCategory((firstVisible ?? newCategories[0])?.calendarId ?? '');
-        setLoaded(true);
-        setLoading(false);
-      });
+      // Items stored under a calendar that is not in this list, say one from
+      // the Google account another machine is signed into, are not shown but
+      // stay in storage: poolStore only replaces the calendars passed to it.
+      loadPool().then(
+        (pool) => {
+          const newCategories: PoolCategory[] = entries.map((cal) => ({
+            calendarId: cal.id,
+            name: cal.summary,
+            color: cal.backgroundColor ?? '#4285f4',
+            items: pool.items[cal.id] ?? [],
+            hidden: pool.hidden.includes(cal.id),
+          }));
+          setCategories(newCategories);
+          const firstVisible = newCategories.find((c) => !c.hidden);
+          setNewItemCategory((firstVisible ?? newCategories[0])?.calendarId ?? '');
+          setLoaded(true);
+          setLoading(false);
+        },
+        (err) => {
+          setFetchError(`Could not read the pool: ${err instanceof Error ? err.message : String(err)}`);
+          setLoading(false);
+        }
+      );
     });
   };
 
   useEffect(() => { fetchCalendars(); }, []);
 
   // Only persist when loaded and non-empty to avoid wiping items on auth hiccups.
+  // poolStore compares against what it holds, so a render that changed nothing
+  // in the pool, including one that applied another machine's edit, writes
+  // nothing.
   useEffect(() => {
     if (!loaded || categories.length === 0) return;
-    if (typeof chrome === 'undefined' || !chrome.storage) return;
-    const poolItems: Record<string, PoolItem[]> = {};
-    const hiddenCategories: string[] = [];
+    const items: Record<string, PoolItem[]> = {};
+    const hidden: string[] = [];
     categories.forEach((cat) => {
-      poolItems[cat.calendarId] = cat.items;
-      if (cat.hidden) hiddenCategories.push(cat.calendarId);
+      items[cat.calendarId] = cat.items;
+      if (cat.hidden) hidden.push(cat.calendarId);
     });
-    chrome.storage.local.set({ poolItems, hiddenCategories });
+    savePool({ items, hidden });
   }, [categories, loaded]);
+
+  // An edit on another machine or in another Calendar tab. Only items and the
+  // hidden flags are replaced; rows are keyed by item id, so an open rename,
+  // details panel or schedule form stays open through a change to some other
+  // item. An item deleted elsewhere takes its own open form with it, and a
+  // pick on it ends as it would for a local delete.
+  useEffect(() => {
+    const stopChanges = subscribePool((pool) => {
+      setCategories((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          items: pool.items[cat.calendarId] ?? [],
+          hidden: pool.hidden.includes(cat.calendarId),
+        }))
+      );
+    });
+    const stopSyncFull = onSyncFull(() => showToast(SYNC_FULL_MESSAGE, 'info', SYNC_FULL_HOLD_MS));
+    return () => { stopChanges(); stopSyncFull(); };
+  }, []);
 
   // ── Item management ──────────────────────────────────────────────────────────
 
