@@ -120,4 +120,11 @@ vite.config.ts             # Vite build config (two entry points: content + back
 | `storage` | Persist pool items, hidden categories, and UI state |
 | `identity` | OAuth 2.0 token for Google Calendar API |
 | `https://calendar.google.com/*` | Inject the sidebar into Google Calendar |
-| `https://www.googleapis.com/auth/calendar` | Create events and list calendars |
+| `.../auth/calendar.events.owned` | Create events on calendars the user owns |
+| `.../auth/calendar.calendarlist.readonly` | Read the calendar list to group pool items |
+
+The two Calendar scopes are deliberately narrower than the blanket `auth/calendar`
+scope. The extension only writes events and reads the calendar list, so it never
+asks to read existing events, and never asks to write to a calendar that is merely
+shared with the user. Calendars whose `accessRole` is not `owner` cannot be written
+to under `calendar.events.owned`.

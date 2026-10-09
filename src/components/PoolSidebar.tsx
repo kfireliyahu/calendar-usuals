@@ -25,6 +25,7 @@ interface CalendarListEntry {
   id: string;
   summary: string;
   backgroundColor?: string;
+  accessRole?: 'owner' | 'writer' | 'reader' | 'freeBusyReader';
 }
 
 interface Toast {
@@ -290,7 +291,13 @@ const PoolSidebar: React.FC = () => {
         return;
       }
 
-      const entries: CalendarListEntry[] = response.data.items ?? [];
+      // The calendar.events.owned scope can only write to calendars the user
+      // owns. A merely subscribed calendar — shared, team, holidays — would
+      // render as a drop target and then 403 on drop, so it never becomes a
+      // category.
+      const entries: CalendarListEntry[] = (response.data.items ?? []).filter(
+        (cal: CalendarListEntry) => cal.accessRole === 'owner'
+      );
 
       chrome.storage.local.get<StoredState>(['poolItems', 'hiddenCategories'], (result) => {
         const stored: Record<string, PoolItem[]> = result.poolItems ?? {};
