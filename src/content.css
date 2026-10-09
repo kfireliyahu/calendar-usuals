@@ -261,6 +261,36 @@
   padding-bottom: 5px !important;
 }
 
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+
+/* One quiet link, in the muted grey of the empty-state and hint text, so it
+   never competes with the pool above it. */
+.wlp-footer {
+  flex-shrink: 0 !important;
+  margin-top: auto !important;
+  padding: 10px 20px 12px !important;
+  border-top: 1px solid rgba(218, 220, 224, 0.6) !important;
+}
+
+.wlp-footer-link {
+  font-size: 11px !important;
+  color: #9aa0a6 !important;
+  text-decoration: none !important;
+  border-radius: 3px !important;
+  transition: color 0.15s !important;
+}
+
+.wlp-footer-link:hover {
+  color: #5f6368 !important;
+  text-decoration: underline !important;
+}
+
+.wlp-footer-link:focus-visible {
+  outline: 2px solid #1a73e8 !important;
+  outline-offset: 2px !important;
+  color: #5f6368 !important;
+}
+
 .wlp-sidebar::-webkit-scrollbar {
   width: 6px;
 }

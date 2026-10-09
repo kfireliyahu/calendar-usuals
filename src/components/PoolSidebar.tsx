@@ -48,6 +48,11 @@ interface Toast {
 
 const UNDO_WINDOW_MS = 5000;
 
+// Store users never see the README, so the sidebar's footer is how they find
+// the project page. manifest.json's homepage_url repeats it, because JSON
+// cannot import a constant; change both together.
+const HOMEPAGE_URL = 'https://kfireliyahu.com/weekly-life-pool';
+
 // Where a reorder drag would land: the category the item would end up in and
 // the index it would be inserted at (items.length means "after the last one").
 interface DropTarget {
@@ -1175,6 +1180,22 @@ const PoolSidebar: React.FC = () => {
               </div>
             </>
           )}
+
+          {/* Footer. Last in the column, so it sits at the bottom under the
+              scrolling list; its auto top margin keeps it there while the
+              list is replaced by the loading or error state. The collapsed
+              strip has no room for it and does not get one. */}
+          <footer className="wlp-footer">
+            <a
+              href={HOMEPAGE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="wlp-footer-link"
+            >
+              About · Support<span aria-hidden="true"> ↗</span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </footer>
         </div>
       )}
     </div>
