@@ -31,21 +31,25 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 Google Calendar page
 └── Content script (content.tsx)
     ├── Injects the React sidebar into the page
+    │   └── Sends DELETE_EVENT when the toast's Undo is pressed
     ├── Shifts Google Calendar's layout right to make room
-    ├── Listens for drag events over calendar cells
-    └── Sends CREATE_EVENT to the background worker on drop
+    ├── Listens for drops, and for clicks while an item is picked, over calendar cells
+    └── Sends CREATE_EVENT for a drop, a click-to-place or the schedule form
 
 Background service worker (background.ts)
 ├── Authenticates with Google via chrome.identity (OAuth 2.0)
 ├── Fetches the user's calendar list  →  LIST_CALENDARS
-└── Creates events via Google Calendar API v3  →  CREATE_EVENT
+├── Creates events via Google Calendar API v3 and returns the id  →  CREATE_EVENT
+└── Deletes an event (the whole series if recurring)  →  DELETE_EVENT
 ```
 
-When you drop an item the content script:
-1. Shows a pulsing event-shaped placeholder at the drop position
-2. Asks the background worker to create the event via the Calendar API
-3. Watches the calendar DOM with a `MutationObserver` for the new event element
+Dropping an item, clicking a time slot while it is picked, and its schedule form all take the same path. The content script:
+1. Shows a pulsing event-shaped placeholder at the chosen slot (when that day is on screen)
+2. Asks the background worker to create the event via the Calendar API, which answers with the new event's id
+3. Watches the calendar DOM with a `MutationObserver` for a chip whose `data-eventid` resolves to that id, falling back to a name match after a short grace period
 4. Fades the placeholder out once the real event appears (12 s fallback timeout)
+
+Undo in the toast sends `DELETE_EVENT` with that id, and clears the placeholder if the event never rendered.
 
 ---
 
