@@ -45,10 +45,10 @@
   --wlp-focus:           #1a73e8;
   --wlp-danger:          #d33427;
   --wlp-info-bg:         #e8f0fe;
-  --wlp-info-text:       #1a73e8;
+  --wlp-info-text:       #1967d2;  /* 4.7:1 on --wlp-info-bg; #1a73e8 was 3.9:1 */
   --wlp-info-border:     #c5d8fc;
   --wlp-success-bg:      #e6f4ea;
-  --wlp-success-text:    #188038;
+  --wlp-success-text:    #137333;  /* 5.2:1 on --wlp-success-bg; #188038 was 4.4:1 */
   --wlp-success-border:  #b6dfc2;
   --wlp-error-bg:        #fce8e6;
   --wlp-error-text:      #c5221f;  /* 4.9:1 on --wlp-error-bg, so the toast meets AA */
