@@ -118,7 +118,9 @@ vite.config.ts             # Vite build config (two entry points: content + back
 
 ## Design notes
 
-**CSS `!important` overrides** — All spacing and layout classes on sidebar elements use named `wlp-*` CSS classes defined in `content.css` with `!important`. This is intentional: Google Calendar's own global stylesheet overrides Tailwind utility classes injected by a content script, so the only reliable way to guarantee padding and margin values is explicit `!important` declarations.
+**CSS `!important` overrides** — Most spacing and layout on sidebar elements comes from named `wlp-*` CSS classes defined in `content.css` with `!important`. This is intentional: Google Calendar's own global stylesheet overrides Tailwind utility classes injected by a content script, so the only reliable way to guarantee padding and margin values is explicit `!important` declarations.
+
+**Tailwind without its theme** — `content.css` imports only Tailwind's utilities, because the theme layer would put its variables and preflight into Google Calendar's page. A utility that reads a theme value (`px-4`, `font-medium`, `text-white`, `rounded-md`) therefore emits no CSS at all, so the sidebar writes those as bracket values instead (`px-[16px]`, `font-[500]`), and every colour as a theme variable (`text-[var(--wlp-text)]`).
 
 **Datekey conversion** — Google Calendar encodes dates as integer "datekeys" (not simple epoch days). A datekey is bit-packed: `((year - 1970) << 9) | (month << 5) | day`, with month and day 1-based — 512 per year, 32 per month, 1 per day (e.g. Apr 30 2026 = 28830, May 1 2026 = 28833). `calendarGrid.ts` unpacks it with shifts and masks. An earlier approximation treated it as days-since-epoch plus a fudge at each month boundary, which drifted by a day or more in any week spanning two months.
 
