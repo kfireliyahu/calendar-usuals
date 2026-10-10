@@ -6,14 +6,12 @@ import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, 
 import { EventDateTime, eventTimes } from './calendarZone';
 import { PageLook, Theme, chipTextOn, watchTheme } from './theme';
 import { isolate } from './names';
+import { adjustLayout } from './layout';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
 // lives in, which the sidebar knows and storage does not.
 type DropPoolItem = PoolItem & { color?: string };
-
-const SIDEBAR_WIDTH   = 280;
-const COLLAPSED_WIDTH = 40;
 
 const FALLBACK_COLOR = '#4285f4';
 
@@ -21,34 +19,6 @@ const FALLBACK_COLOR = '#4285f4';
 // draws it, so the preview and the loading placeholder use it too.
 function previewColor(item: DropPoolItem): string {
   return eventColorHex(item.colorId, item.color ?? FALLBACK_COLOR);
-}
-
-// ── Layout ────────────────────────────────────────────────────────────────────
-
-// transform: translateX() shifts Google Calendar's root including its own fixed
-// children (FAB, top bar) because transform creates a new containing block for
-// position:fixed descendants — they shift right along with the container.
-function getGcalRoot(): HTMLElement | null {
-  // Walk up from [role="main"] to the direct child of <body>.
-  // This is reliable regardless of how many wrapper divs Google Calendar uses.
-  const mainEl = document.querySelector<HTMLElement>('[role="main"]');
-  if (!mainEl) return null;
-  let el: HTMLElement = mainEl;
-  while (el.parentElement && el.parentElement.tagName !== 'BODY') {
-    el = el.parentElement as HTMLElement;
-  }
-  if (el.id === 'weekly-life-pool-sidebar') return null;
-  return el;
-}
-
-function adjustLayout(collapsed: boolean): void {
-  const px = collapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH;
-  const root = getGcalRoot();
-  if (!root) { console.warn('[WeeklyPool] adjustLayout: no root found'); return; }
-  console.log('[WeeklyPool] adjustLayout: shifting', root.tagName, root.id || root.className.slice(0, 60), 'by', px, 'px');
-  root.style.transform  = `translateX(${px}px)`;
-  root.style.width      = `calc(100% - ${px}px)`;
-  root.style.transition = 'transform 0.2s ease-in-out, width 0.2s ease-in-out';
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
@@ -117,6 +87,9 @@ function getTooltip(): HTMLElement {
     tooltipEl = document.createElement('div');
     tooltipEl.id = 'wlp-drop-tooltip';
     tooltipEl.setAttribute('data-wlp-theme', currentTheme);
+    // An English line with the name isolated in it, so it reads left to right
+    // on a right-to-left page too, as the sidebar does.
+    tooltipEl.dir = 'ltr';
     Object.assign(tooltipEl.style, {
       position: 'fixed', zIndex: '10001', pointerEvents: 'none',
       padding: '8px 12px', borderRadius: '6px', fontSize: '13px',
@@ -742,6 +715,10 @@ function injectSidebar(): void {
 
   const sidebarEl = document.createElement('div');
   sidebarEl.id = 'weekly-life-pool-sidebar';
+  // Its words are English, so it keeps its own left-to-right order when Google
+  // Calendar is in a right-to-left language; names in it still take their own
+  // direction (names.ts). layout.ts says where it sits on such a page.
+  sidebarEl.dir = 'ltr';
   document.body.insertBefore(sidebarEl, document.body.firstChild);
   // Before the first render, so the sidebar never flashes light on a dark page.
   watchTheme(applyTheme);
@@ -749,11 +726,11 @@ function injectSidebar(): void {
   try {
     ReactDOM.createRoot(sidebarEl).render(<PoolSidebar />);
     setupListeners();
-    if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.local.get('sidebarCollapsed', (r) => adjustLayout(r.sidebarCollapsed === true));
-    } else {
-      adjustLayout(false);
-    }
+    // The sidebar says how wide it is once it has read the stored choice and
+    // whether Google's main menu is open (poolSidebarToggle), so the page is
+    // shifted once, to the right width, rather than to the stored one first.
+    // Without storage it never reads one, so it is laid out open here.
+    if (typeof chrome === 'undefined' || !chrome.storage) adjustLayout(false);
     console.log('[WeeklyPool] Sidebar injected.');
   } catch (err) {
     console.error('[WeeklyPool] Failed to render sidebar:', err);

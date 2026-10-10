@@ -20,6 +20,7 @@ import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
 import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
 import { chipTextOn } from '../theme';
 import { CalendarListEntry, displayName, isolate, needsPageName, textDirection, watchPrimaryName } from '../names';
+import { watchGoogleNav } from '../layout';
 
 // hidden is the stored name, kept so every synced pool reads as before: it
 // now means the calendar's section is folded to its title row, which is what
@@ -605,7 +606,11 @@ const PoolSidebar: React.FC = () => {
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [besideNav, setBesideNav] = useState(false);
   const [formOpen, setFormOpen] = useState(true);
+  const [formSettled, setFormSettled] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -616,6 +621,11 @@ const PoolSidebar: React.FC = () => {
   const primaryName = useRef<PrimaryName | null>(null);
   const collapsedReady = useRef(false);
   const formReady = useRef(false);
+  const formMounted = useRef(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const showButton = useRef<HTMLButtonElement>(null);
+  const hideButton = useRef<HTMLButtonElement>(null);
+  const focusToggle = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastDeadline = useRef(0);
@@ -716,6 +726,17 @@ const PoolSidebar: React.FC = () => {
   };
 
   // ── Collapsed state ──────────────────────────────────────────────────────────
+  //
+  // collapsed is the user's choice, kept on this device. What shows can differ
+  // from it while Google's own main menu is open: the pool then steps aside to
+  // its strip, so the week is not squeezed between two sidebars, and Google's
+  // nav takes nearly the room the pool gives up, so the grid barely moves
+  // while the two swap. One sidebar at a time, as Google's own side panels
+  // are. Opening the pool from the strip while the menu is open keeps it open
+  // beside the menu until the menu closes. None of that is saved: when the
+  // menu closes, the user's own choice shows again.
+
+  const shownCollapsed = collapsed || (navOpen && !besideNav);
 
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage) return;
@@ -723,6 +744,7 @@ const PoolSidebar: React.FC = () => {
       collapsedReady.current = true;
       formReady.current = true;
       setCollapsed(result.sidebarCollapsed === true);
+      setLayoutReady(true);
       if (result.formOpen === false) setFormOpen(false);
     });
   }, []);
@@ -732,8 +754,53 @@ const PoolSidebar: React.FC = () => {
     if (extensionAlive()) {
       chrome.storage.local.set({ sidebarCollapsed: collapsed });
     }
-    document.dispatchEvent(new CustomEvent('poolSidebarToggle', { detail: { collapsed } }));
   }, [collapsed]);
+
+  // content.tsx makes room on the page for what shows. The menu can be read
+  // as open before the stored choice arrives, so this also runs once that
+  // arrives, even when what shows has not changed.
+  useEffect(() => {
+    if (!layoutReady) return;
+    document.dispatchEvent(new CustomEvent('poolSidebarToggle', { detail: { collapsed: shownCollapsed } }));
+  }, [shownCollapsed, layoutReady]);
+
+  // A change of the menu, either way, ends an opening of the pool beside it.
+  // If focus was in the sidebar, it is about to lose the control it was on,
+  // so it is given the toggle that takes that control's place.
+  useEffect(() => watchGoogleNav((open) => {
+    if (sidebarRef.current?.contains(document.activeElement)) focusToggle.current = true;
+    setNavOpen(open);
+    setBesideNav(false);
+  }), []);
+
+  // Showing the strip ends a pick, as the schedule form it was in is gone.
+  useEffect(() => {
+    if (shownCollapsed) setPickedId(null);
+  }, [shownCollapsed]);
+
+  // Hiding or showing the sidebar removes the button that did it, and focus
+  // with it, so focus goes to the button now in its place: the strip's
+  // chevron, or the header's. Only when focus was in fact lost, so a change of
+  // the menu that leaves the sidebar as it was never pulls focus out of the
+  // field being typed in.
+  useEffect(() => {
+    if (!focusToggle.current) return;
+    focusToggle.current = false;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    (shownCollapsed ? showButton : hideButton).current?.focus();
+  });
+
+  const showSidebar = () => {
+    focusToggle.current = true;
+    setCollapsed(false);
+    if (navOpen) setBesideNav(true);
+  };
+
+  const hideSidebar = () => {
+    focusToggle.current = true;
+    setCollapsed(true);
+  };
 
   useEffect(() => {
     if (!formReady.current) return;
@@ -745,6 +812,15 @@ const PoolSidebar: React.FC = () => {
   // Focus input when form opens
   useEffect(() => {
     if (formOpen) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [formOpen]);
+
+  // The composer only scrolls once it has finished opening, for a window too
+  // short to show all of it; while it opens or closes its content is meant to
+  // be cut off, and a scrollbar would flash in and narrow its fields. It
+  // starts settled, as it mounts open with nothing to animate.
+  useEffect(() => {
+    if (!formMounted.current) { formMounted.current = true; return; }
+    setFormSettled(false);
   }, [formOpen]);
 
   // ── Drop toast listener ──────────────────────────────────────────────────────
@@ -1172,8 +1248,8 @@ const PoolSidebar: React.FC = () => {
 
   // ── Shared styles ────────────────────────────────────────────────────────────
 
-  const sidebarCls = `wlp-sidebar fixed left-0 top-0 h-screen flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-    collapsed ? 'w-[40px]' : 'w-[280px]'
+  const sidebarCls = `wlp-sidebar flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+    shownCollapsed ? 'w-[40px]' : 'w-[280px]'
   }`;
 
   const iconBtnCls =
@@ -1213,13 +1289,14 @@ const PoolSidebar: React.FC = () => {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className={sidebarCls}>
+    <div ref={sidebarRef} className={sidebarCls}>
 
       {/* ── Collapsed strip ─────────────────────────────────────────────────── */}
-      {collapsed ? (
+      {shownCollapsed ? (
         <div className="flex flex-col items-center pt-[8px]">
           <button
-            onClick={() => setCollapsed(false)}
+            ref={showButton}
+            onClick={showSidebar}
             title="Show Weekly Pool"
             aria-label="Show Weekly Pool"
             className={iconBtnCls}
@@ -1231,7 +1308,7 @@ const PoolSidebar: React.FC = () => {
         </div>
       ) : (
         /* ── Expanded view ────────────────────────────────────────────────── */
-        <div className="flex flex-col h-full w-[280px]">
+        <div className="wlp-column w-[280px]">
 
           {/* Header. No title: the sidebar sits beside Google Calendar's own
               top bar and reads as part of it, so it opens with the add action
@@ -1258,7 +1335,8 @@ const PoolSidebar: React.FC = () => {
             </button>
             {/* Collapse sidebar */}
             <button
-              onClick={() => { setPickedId(null); setCollapsed(true); }}
+              ref={hideButton}
+              onClick={hideSidebar}
               title="Hide sidebar"
               aria-label="Hide sidebar"
               className={iconBtnCls}
@@ -1292,16 +1370,24 @@ const PoolSidebar: React.FC = () => {
           {/* Content (loaded) */}
           {!loading && !fetchError && (
             <>
-              {/* Add item form — always in DOM, animated via max-height/opacity */}
+              {/* Add item form — always in DOM, animated via max-height/opacity.
+                  In a window too short for it and the list it gives way
+                  (.wlp-column), and once open it scrolls rather than cut off. */}
               <div
+                onTransitionEnd={(e) => {
+                  if (e.target === e.currentTarget && e.propertyName === 'max-height' && formOpen) setFormSettled(true);
+                }}
+                className="wlp-scroll"
                 style={{
                   maxHeight: formOpen ? '300px' : '0',
                   opacity: formOpen ? 1 : 0,
-                  overflow: 'hidden',
+                  overflowX: 'hidden',
+                  overflowY: formOpen && formSettled ? 'auto' : 'hidden',
                   pointerEvents: formOpen ? undefined : 'none',
                   transition: 'max-height 0.22s ease, opacity 0.15s ease',
                   borderBottom: '1px solid var(--wlp-divider)',
-                  flexShrink: 0,
+                  flexShrink: 1,
+                  minHeight: 0,
                 }}
               >
                 {/* The composer, in the words of Google's event editor: a
@@ -1417,7 +1503,7 @@ const PoolSidebar: React.FC = () => {
 
               {/* Category list */}
               <div
-                className="wlp-scroll flex-1 overflow-y-auto py-[12px]"
+                className="wlp-scroll wlp-list py-[12px]"
                 onDragOver={(e) => { if (isReorderDrag(e) && !wasHandled(e)) setDropTarget(null); }}
                 onDrop={handleListDrop}
               >

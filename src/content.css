@@ -185,17 +185,47 @@
    Google Calendar's page show through: what is behind it is whatever Google
    gives <body>, which only matches the sidebar's colours by accident. The
    surface is Google's own page colour (see --wlp-surface), and there is no
-   border at its edge, as there is none between Google's nav and its grid. */
+   border at its edge, as there is none between Google's nav and its grid.
+
+   It is as tall as the window's visible area, held between its top and bottom
+   edges rather than set to 100vh. 100vh counts the height of a horizontal
+   scrollbar along the bottom of the window as if it were page, so whenever
+   the page has one the column runs that far below what can be seen, and its
+   footer is cut off; a fixed box's top and bottom are the edges of what can
+   be seen. */
 .wlp-sidebar {
   font-family: var(--wlp-font) !important;
   font-size: var(--wlp-type-name) !important;
   position: fixed !important;
   left: 0 !important;
   top: 0 !important;
-  height: 100vh !important;
+  bottom: 0 !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
   background: var(--wlp-surface) !important;
   color: var(--wlp-text) !important;
   z-index: 1000 !important;
+}
+
+/* The expanded sidebar is a column of the header, the composer, the toast,
+   the list and the footer, and it must never be taller than the sidebar: the
+   column fills the sidebar and no more (min-height 0, which a flex child does
+   not have by default), the header and footer keep their height, and the
+   list takes whatever is left and scrolls. In a window too short for the
+   composer as well, the list is down to nothing and the composer gives way
+   next, scrolling inside itself (PoolSidebar); the header and footer stay. */
+.wlp-column {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+}
+
+.wlp-list {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
 }
 
 /* A thin scrollbar like the one on Google's nav, in place of the browser's
@@ -216,6 +246,7 @@
    and below a 48 px pill makes the header 64 px, the height of Google
    Calendar's own top bar beside it, so the two read as one band. */
 .wlp-header {
+  flex-shrink: 0 !important;
   padding: 8px 12px 8px 16px !important;
 }
 
