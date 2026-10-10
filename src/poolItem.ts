@@ -39,8 +39,8 @@ export function formatDuration(min: number): string {
 // ── Event colors ─────────────────────────────────────────────────────────────
 //
 // Google Calendar's eleven event colors. The API takes the id; the hex is what
-// the sidebar swatches and the drag preview draw with, so the preview matches
-// the event that is about to appear.
+// the sidebar swatches, an item's chip and the drag preview draw with, so the
+// item and its preview match the event that is about to appear.
 
 export const EVENT_COLORS: { id: string; name: string; hex: string }[] = [
   { id: '1',  name: 'Lavender',  hex: '#7986cb' },
@@ -75,17 +75,6 @@ export function formatReminder(min: number): string {
   if (min === 1440) return '1 day before';
   const hours = min / 60;
   return `${hours} hour${hours === 1 ? '' : 's'} before`;
-}
-
-// Whether an item carries any template configuration — drives the row's
-// "configured" affordance so a collapsed item still shows it has settings.
-export function hasTemplate(item: PoolItem): boolean {
-  return Boolean(
-    item.description?.trim() ||
-    item.location?.trim() ||
-    item.colorId ||
-    item.reminderMin !== undefined
-  );
 }
 
 // Date.now() alone collides when two items are created inside the same

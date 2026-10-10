@@ -29,7 +29,6 @@
      page (theme.ts, detectSurface) and sets as --wlp-page. The constant is
      Google's light page colour, for when it cannot be read. */
   --wlp-surface:         var(--wlp-page, #f8fafd);
-  --wlp-surface-raised:  #ffffff;  /* item rows */
   --wlp-panel:           #f8f9fa;  /* schedule form and details panel */
   --wlp-input:           #ffffff;  /* text fields, selects and the buttons beside them */
   /* Google's hover state layer: the text colour at 8% over whatever is
@@ -38,7 +37,7 @@
   --wlp-text:            #202124;
   --wlp-text-secondary:  #5f6368;
   --wlp-text-muted:      #9aa0a6;  /* hints, empty states, the footer */
-  --wlp-icon-faint:      #bdc1c6;  /* row icons at rest, a disabled Add */
+  --wlp-icon-faint:      #bdc1c6;  /* the form's clear button, a disabled Add */
   --wlp-border:          #dadce0;  /* outlines of fields and buttons */
   --wlp-border-subtle:   #e8eaed;  /* item rows, panels, chips */
   --wlp-border-hover:    #c5c9ce;
@@ -81,7 +80,6 @@
    their dark look too. */
 :is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview)[data-wlp-theme="dark"] {
   --wlp-surface:         var(--wlp-page, #1f1f1f);
-  --wlp-surface-raised:  #28292a;
   --wlp-panel:           #2d2e30;
   --wlp-input:           #1f1f1f;
   --wlp-hover:           color-mix(in srgb, var(--wlp-text) 8%, transparent);
@@ -140,36 +138,20 @@
   color: var(--wlp-tooltip-text) !important;
 }
 
-/* ── Drag preview: the name ────────────────────────────────────────────────── */
-
-/* The preview is a 20% tint of the event's colour, which content.tsx sets as
-   --wlp-event-color. The name drawn in that colour unchanged falls below 3:1
-   for most of Google's colours: the light ones (Banana, Sage, the pastel
-   calendar colours) on their tint over the white grid, the dark ones
-   (Blueberry, Graphite, Grape) on their tint over the dark grid. So it is
-   mixed halfway to black in the light theme and 60% of the way to white in the
-   dark one, which keeps it recognisably the event's colour and gives every one
-   of Google's eleven, and its default blue, at least 4.5:1. The loading
-   placeholder is a solid block with its own text colour and is left out. */
-#wlp-event-preview:not(.wlp-preview-loading) {
-  color: color-mix(in srgb, var(--wlp-event-color) 50%, #000000) !important;
-}
-
-#wlp-event-preview[data-wlp-theme="dark"]:not(.wlp-preview-loading) {
-  color: color-mix(in srgb, var(--wlp-event-color) 40%, #ffffff) !important;
-}
-
 /* ── Drag preview: weekly recurrence ───────────────────────────────────────── */
 
 /* content.tsx positions and colours the preview with inline styles, so these
    rules need !important to win over them. A Shift-drop creates a series with
-   no end, so the preview must never look like an ordinary one-off drop. */
+   no end, so the preview must never look like an ordinary one-off drop. The
+   preview is a solid chip whose border is its own colour, so the dash is drawn
+   in its text colour, which chipTextOn picked to stand out on it. */
 #wlp-event-preview.wlp-preview-recurring {
   padding-right: 22px !important;
 }
 
 #wlp-event-preview.wlp-preview-recurring:not(.wlp-preview-loading) {
   border-style: dashed !important;
+  border-color: currentColor !important;
 }
 
 #wlp-event-preview.wlp-preview-recurring::after {
@@ -446,16 +428,6 @@
   border-left: 1px solid var(--wlp-border-subtle) !important;
 }
 
-/* On an item row it reads as a label until the row is hovered. */
-.wlp-item .wlp-duration {
-  color: var(--wlp-text-muted) !important;
-  margin-left: 8px !important;
-}
-
-.wlp-item:hover .wlp-duration {
-  color: var(--wlp-text-secondary) !important;
-}
-
 /* ── Category list ─────────────────────────────────────────────────────────── */
 
 /* Spaced like Google's "My calendars": a section title on a row of its own
@@ -568,12 +540,122 @@
   gap: 4px !important;
 }
 
+/* ── Item chips ────────────────────────────────────────────────────────────── */
+
+/* An item is drawn as the event it becomes, after Google's chips in the week
+   view: filled with the event's colour (PoolSidebar sets it as --wlp-chip, the
+   item's own colorId else its calendar's), 4 px corners, the name at 12 px
+   medium and the duration after it in regular weight, as "workout, 10:30am"
+   reads on the grid. The text colour, --wlp-chip-text, is picked per colour
+   for 4.5:1 (theme.ts, chipTextOn), and since the chip colour is the same in
+   both themes, so is everything drawn on it: the controls, the focus rings and
+   the rename field all take currentColor rather than the theme's greys, which
+   would vanish on some of Google's colours. 28 px is about the height of a
+   half-hour event in the week view. */
 .wlp-item {
-  min-height: var(--wlp-row-height) !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: 28px !important;
   box-sizing: border-box !important;
-  padding: 0 12px !important;
   margin: 0 !important;
-  font-size: var(--wlp-type-name) !important;
+  padding: 0 4px 0 8px !important;
+  border-radius: 4px !important;
+  background: var(--wlp-chip) !important;
+  color: var(--wlp-chip-text) !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  cursor: grab !important;
+  user-select: none !important;
+  transition: box-shadow 0.15s, opacity 0.15s !important;
+}
+
+/* Google lifts a chip under the pointer with its elevation shadow. */
+.wlp-item:hover {
+  box-shadow: var(--wlp-pill-shadow) !important;
+}
+
+.wlp-item:active {
+  cursor: grabbing !important;
+}
+
+/* The row left behind while it is being dragged. */
+.wlp-item-dragging {
+  opacity: 0.4 !important;
+}
+
+/* The copy the drag image is taken from (PoolSidebar, setChipDragImage): off
+   screen, out of the list's flow, and never under the pointer, so it is the
+   chip at rest. */
+.wlp-item-ghost {
+  position: fixed !important;
+  top: -1000px !important;
+  left: 0 !important;
+  pointer-events: none !important;
+}
+
+/* The name gives way first: it shrinks and ends in an ellipsis, so the
+   duration after it is always whole. */
+.wlp-item-name {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  font-weight: 500 !important;
+}
+
+.wlp-item-sep {
+  flex-shrink: 0 !important;
+  margin-right: 4px !important;
+}
+
+/* The duration as Google writes an event's time: the chip's own text colour
+   in regular weight, a select only when it is used. */
+.wlp-item .wlp-duration {
+  color: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+  text-align: start !important;
+  /* As wide as the duration it shows, not as its longest option, so the
+     space after "1h" is not a dead part of the chip. */
+  field-sizing: content !important;
+}
+
+.wlp-item .wlp-duration:hover {
+  color: inherit !important;
+  text-decoration: underline !important;
+}
+
+.wlp-item .wlp-duration:focus-visible {
+  outline: 2px solid currentColor !important;
+  outline-offset: 1px !important;
+  border-radius: 2px !important;
+}
+
+/* The schedule icon, the details chevron and delete, folded to no width at
+   rest. Not display: none, which would take them out of the tab order:
+   keyboard focus anywhere in the row unfolds them, so the one Tab lands on is
+   on screen when it does. An open schedule form or details panel keeps them
+   showing too (wlp-item-active). */
+.wlp-item-actions {
+  display: flex !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  gap: 2px !important;
+  margin-left: auto !important;
+  max-width: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  transition: max-width 0.15s, opacity 0.15s !important;
+}
+
+.wlp-item:hover .wlp-item-actions,
+.wlp-item:focus-within .wlp-item-actions,
+.wlp-item-active .wlp-item-actions {
+  max-width: 72px !important;
+  padding-left: 4px !important;
+  opacity: 1 !important;
 }
 
 /* ── Empty calendars ───────────────────────────────────────────────────────── */
@@ -699,8 +781,8 @@
 .wlp-drop-before::before { top: -4px !important; }
 .wlp-drop-after::after   { bottom: -4px !important; }
 
-/* Sits exactly where the name span was, so committing a rename does not
-   reflow the row. */
+/* Sits exactly where the name span was, in the chip's own type and colour, so
+   committing a rename does not reflow the row. */
 .wlp-item-rename {
   flex: 1 1 0 !important;
   min-width: 0 !important;
@@ -710,67 +792,64 @@
   outline: none !important;
   background: transparent !important;
   font-family: inherit !important;
-  font-size: var(--wlp-type-name) !important;
-  color: var(--wlp-text) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  color: inherit !important;
   box-shadow: none !important;
-  border-bottom: 1px solid var(--wlp-accent) !important;
+  border-bottom: 1px solid currentColor !important;
 }
 
-.wlp-item-expand {
+.wlp-item-rename::selection {
+  background: color-mix(in srgb, currentColor 30%, transparent) !important;
+}
+
+/* The row's three controls: 20 px round targets in the chip's text colour,
+   with Google's state layer of that colour on hover. */
+.wlp-item-btn {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
-  margin-left: 4px !important;
+  width: 20px !important;
+  height: 20px !important;
+  margin: 0 !important;
   padding: 0 !important;
   border: none !important;
+  border-radius: 50% !important;
   background: transparent !important;
-  color: var(--wlp-icon-faint) !important;
+  color: inherit !important;
   cursor: pointer !important;
-  transition: color 0.15s, transform 0.15s !important;
+  transition: background 0.15s !important;
 }
 
-.wlp-item:hover .wlp-item-expand {
-  color: var(--wlp-text-secondary) !important;
+.wlp-item-btn:hover,
+.wlp-item-btn-on {
+  background: color-mix(in srgb, currentColor 16%, transparent) !important;
 }
 
-/* A configured item keeps the affordance visible while collapsed, so its
-   settings are not invisible. */
-.wlp-item-expand-on {
-  color: var(--wlp-accent) !important;
+/* Inside the ring rather than around it, since the folding container clips
+   anything outside the buttons. */
+.wlp-item-btn:focus-visible {
+  outline: 2px solid currentColor !important;
+  outline-offset: -2px !important;
 }
 
-/* The no-drag schedule control. Muted like the details chevron so the row
-   still reads as a name and a duration first. */
-.wlp-item-schedule {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex-shrink: 0 !important;
-  margin: 0 0 0 6px !important;
-  padding: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  color: var(--wlp-icon-faint) !important;
-  cursor: pointer !important;
-  transition: color 0.15s !important;
+.wlp-item-expand svg {
+  transition: transform 0.15s !important;
 }
 
-.wlp-item:hover .wlp-item-schedule {
-  color: var(--wlp-text-secondary) !important;
-}
-
-.wlp-item-schedule-on,
-.wlp-item:hover .wlp-item-schedule-on {
-  color: var(--wlp-primary) !important;
+.wlp-item-expand.wlp-item-btn-on svg {
+  transform: rotate(180deg) !important;
 }
 
 /* A picked item waits for a day and time, from the form or a click on the
    grid, so it has to stand out from every other row until then. A ring rather
-   than a border, so the calendar-colour left border stays as it is. */
-.wlp-item-picked {
-  background: var(--wlp-accent-soft) !important;
-  box-shadow: 0 0 0 2px var(--wlp-primary) !important;
+   than a change of fill, so the chip keeps the colour its event will have,
+   with a gap of the page between, so the ring reads on a blue chip too. */
+.wlp-item-picked,
+.wlp-item-picked:hover {
+  box-shadow: 0 0 0 1px var(--wlp-surface), 0 0 0 3px var(--wlp-primary) !important;
 }
 
 /* These controls strip the browser's own button look with !important, so
@@ -780,9 +859,6 @@
    the collapsed strip leaves about 5 px either side of its button, room
    enough for the ring. */
 .wlp-icon-btn:focus-visible,
-.wlp-item-schedule:focus-visible,
-.wlp-item-expand:focus-visible,
-.wlp-item-delete:focus-visible,
 .wlp-toast-undo:focus-visible,
 .wlp-schedule-btn:focus-visible,
 .wlp-schedule-repeat input:focus-visible,
@@ -803,12 +879,6 @@
 
 .wlp-toast-area:focus:not(:focus-visible) {
   outline: none !important;
-}
-
-.wlp-item-schedule:focus-visible,
-.wlp-item-expand:focus-visible,
-.wlp-item-delete:focus-visible {
-  border-radius: 3px !important;
 }
 
 /* ── Schedule form ─────────────────────────────────────────────────────────── */

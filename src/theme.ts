@@ -94,6 +94,33 @@ export function readableTextOn(color: string): string {
   return contrastWithWhite >= MIN_LIGHT_TEXT_CONTRAST ? LIGHT_TEXT : DARK_TEXT;
 }
 
+// The text on a pool item's chip, and on the preview and placeholder that
+// stand for it on the grid, where an item's name is 12 px and so needs 4.5:1
+// to meet AA. readableTextOn's 3:1 leaves white on Peacock, Tangerine and
+// Lavender, which Google does too and which falls short of that, so this takes
+// whichever of white and Google's near-black reads better. On a mid-tone where
+// neither reaches 4.5:1 (luminance about 0.18 to 0.24) it uses pure black,
+// which gets at least 4.6:1 on any colour white does not. The colour is the
+// same in both themes, so the choice is too.
+const AA_TEXT_CONTRAST = 4.5;
+const BLACK_TEXT = '#000000';
+
+function contrast(a: number, b: number): number {
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+export function chipTextOn(color: string): string {
+  const parsed = parseColor(color);
+  if (!parsed) return LIGHT_TEXT;
+  const l = relativeLuminance(parsed);
+  const withWhite = contrast(l, 1);
+  const withDark  = contrast(l, relativeLuminance(parseColor(DARK_TEXT)!));
+  if (Math.max(withWhite, withDark) >= AA_TEXT_CONTRAST) {
+    return withWhite >= withDark ? LIGHT_TEXT : DARK_TEXT;
+  }
+  return withWhite >= contrast(l, 0) ? LIGHT_TEXT : BLACK_TEXT;
+}
+
 // ── Detecting the theme ───────────────────────────────────────────────────────
 
 const darkQuery = () => window.matchMedia('(prefers-color-scheme: dark)');

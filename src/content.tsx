@@ -4,7 +4,7 @@ import PoolSidebar from './components/PoolSidebar';
 import { PoolItem, durationOf, eventColorHex } from './poolItem';
 import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, timeGridCellFor } from './calendarGrid';
 import { EventDateTime, eventTimes } from './calendarZone';
-import { PageLook, Theme, readableTextOn, watchTheme } from './theme';
+import { PageLook, Theme, chipTextOn, watchTheme } from './theme';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
@@ -145,10 +145,10 @@ function getPreview(): HTMLElement {
     previewEl.setAttribute('data-wlp-theme', currentTheme);
     Object.assign(previewEl.style, {
       position: 'fixed', zIndex: '9999', pointerEvents: 'none',
-      background: 'rgba(66,133,244,0.2)', border: '2px solid rgba(66,133,244,0.55)',
-      borderRadius: '2px', fontSize: '12px',
-      fontFamily: "'Roboto', -apple-system, sans-serif",
-      color: '#1a73e8', fontWeight: '500', padding: '2px 6px',
+      borderRadius: '4px', fontSize: '12px', lineHeight: '16px',
+      // The sidebar's typeface, so the preview reads as the chip it came from.
+      fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+      fontWeight: '500',
       overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
       boxSizing: 'border-box', display: 'none',
     });
@@ -156,10 +156,17 @@ function getPreview(): HTMLElement {
   }
   return previewEl;
 }
+// The preview is the item's chip in the sidebar laid on the grid: the same
+// colour, text colour, type and corners, so what is dragged, what is about to
+// land and the event Google then draws all look alike. It is lifted off the
+// grid with Google's elevation shadow, which also tells it from the loading
+// placeholder, a flat block that pulses.
+//
 // A recurring drop commits a series that repeats forever, so the preview has
 // to look different the moment Shift goes down: content.css dashes its border
-// and adds a repeat glyph while the class is on. The name's colour also comes
-// from content.css, which shades the event colour for the theme.
+// in the text colour and adds a repeat glyph while the class is on. The solid
+// border in the chip's own colour is there so that dashing it does not change
+// the block's size.
 function showPreview(cell: Element, clientY: number, item: DropPoolItem, recurring: boolean): void {
   const el = getPreview();
   cancelFade();
@@ -173,11 +180,11 @@ function showPreview(cell: Element, clientY: number, item: DropPoolItem, recurri
     top: `${rect.top + snapped}px`, left: `${rect.left + 2}px`,
     width: `${rect.width - 4}px`,  height: `${durationOf(item)}px`,
     display: 'block', opacity: '1', animation: 'none',
-    background: color + '33',
-    border: `2px solid ${color}`,
-    borderRadius: '2px', color: '', padding: '2px 6px',
+    background: color,
+    border: `1px solid ${color}`,
+    borderRadius: '4px', color: chipTextOn(color), padding: '2px 8px',
+    boxShadow: '0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15)',
   });
-  el.style.setProperty('--wlp-event-color', color);
   el.textContent = item.name;
 }
 function hidePreview(): void {
@@ -220,9 +227,9 @@ function showLoading(cell: Element, startMin: number, item: DropPoolItem, recurr
     top: `${rect.top + startMin}px`, left: `${rect.left + 2}px`,
     width: `${rect.width - 4}px`,  height: `${durationOf(item)}px`,
     display: 'block', opacity: '1',
-    background: calColor, border: 'none', borderRadius: '4px',
+    background: calColor, border: 'none', borderRadius: '4px', boxShadow: 'none',
     padding: '4px 8px', fontSize: '12px', fontWeight: '500',
-    color: readableTextOn(calColor), boxSizing: 'border-box',
+    color: chipTextOn(calColor), boxSizing: 'border-box',
     overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
     animation: 'wlp-event-loading 1.1s ease-in-out infinite',
     transition: 'opacity 0.35s ease',

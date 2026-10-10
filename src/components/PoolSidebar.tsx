@@ -9,13 +9,12 @@ import {
   eventColorHex,
   formatDuration,
   formatReminder,
-  hasTemplate,
   newItemId,
 } from '../poolItem';
 import { formatTime, gridZoneLabels, isSameDay, visibleTimeGridDays } from '../calendarGrid';
 import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
 import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
-import { readableTextOn } from '../theme';
+import { chipTextOn, readableTextOn } from '../theme';
 
 // hidden is the stored name, kept so every synced pool reads as before: it
 // now means the calendar's section is folded to its title row, which is what
@@ -113,6 +112,25 @@ function markHandled(e: React.DragEvent): void {
 }
 function wasHandled(e: React.DragEvent): boolean {
   return (e.nativeEvent as DragEvent & { wlpHandled?: boolean }).wlpHandled === true;
+}
+
+// What the pointer carries in a drag is a picture of the chip as it rests,
+// the event-to-be, rather than of the row as it is at that moment: under the
+// pointer, so with its controls showing, and faded by then as the row left
+// behind. The picture is taken of a copy, held off screen for the moment the
+// browser needs it, at the size of the row and from the point it was grabbed.
+// A select's choice is a property the copy does not carry, so it is set again.
+function setChipDragImage(e: React.DragEvent<HTMLElement>): void {
+  const row = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const copy = row.cloneNode(true) as HTMLElement;
+  copy.className = 'wlp-item wlp-item-ghost';
+  copy.style.width = `${rect.width}px`;
+  const selects = row.querySelectorAll('select');
+  copy.querySelectorAll('select').forEach((s, i) => { s.value = selects[i].value; });
+  row.parentElement?.appendChild(copy);
+  e.dataTransfer.setDragImage(copy, e.clientX - rect.left, e.clientY - rect.top);
+  setTimeout(() => copy.remove(), 0);
 }
 
 // Compact duration control. A native <select> so it stays keyboard accessible
@@ -1188,6 +1206,9 @@ const PoolSidebar: React.FC = () => {
                             const expanded = expandedId === item.id;
                             const picked   = pickedId   === item.id;
                             const scheduleFormId = `wlp-schedule-${item.id}`;
+                            // The chip is drawn in the colour the event will
+                            // have, its own colorId else the calendar's.
+                            const chipColor = eventColorHex(item.colorId, category.color);
                             const aimedHere = dropTarget?.calendarId === category.calendarId;
                             const dropBefore = aimedHere && dropTarget!.index === index;
                             const dropAfter  = aimedHere &&
@@ -1212,6 +1233,7 @@ const PoolSidebar: React.FC = () => {
                                     // the other's payload by accident.
                                     e.dataTransfer?.setData('poolReorder', JSON.stringify({ id: item.id }));
                                     setDraggingId(item.id);
+                                    setChipDragImage(e);
                                     // A drag is its own way of scheduling, and a pick
                                     // left armed would place a second event on the
                                     // next click.
@@ -1223,10 +1245,16 @@ const PoolSidebar: React.FC = () => {
                                     setDropTarget(null);
                                     document.dispatchEvent(new CustomEvent('poolDragEnd'));
                                   }}
-                                  className={`wlp-item group flex items-center justify-between bg-[var(--wlp-surface-raised)] border border-[var(--wlp-border-subtle)] rounded-[6px] text-[var(--wlp-text)] cursor-grab select-none transition-all duration-150 hover:border-[var(--wlp-border-hover)] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
-                                    draggingId === item.id ? ' opacity-40' : ''
-                                  }${picked ? ' wlp-item-picked' : ''}`}
-                                  style={{ borderLeft: `3px solid ${eventColorHex(item.colorId, category.color)}` }}
+                                  // An open schedule form or details panel keeps
+                                  // the row's controls showing, so the one that
+                                  // opened it stays where the pointer left it.
+                                  className={`wlp-item${draggingId === item.id ? ' wlp-item-dragging' : ''}${
+                                    picked ? ' wlp-item-picked' : ''
+                                  }${picked || expanded ? ' wlp-item-active' : ''}`}
+                                  style={{
+                                    '--wlp-chip':      chipColor,
+                                    '--wlp-chip-text': chipTextOn(chipColor),
+                                  } as React.CSSProperties}
                                 >
                                   {editing ? (
                                     <input
@@ -1249,57 +1277,71 @@ const PoolSidebar: React.FC = () => {
                                     <span
                                       onDoubleClick={() => startRename(item)}
                                       title={`${item.name} — drag onto the calendar (hold Shift to repeat weekly), double-click to rename`}
-                                      className="flex-1 truncate"
+                                      className="wlp-item-name"
                                     >
                                       {item.name}
                                     </span>
                                   )}
+                                  {/* "workout, 1h", the way Google's chip reads
+                                      "workout, 10:30am": the duration follows the
+                                      name as secondary text, and is still the
+                                      select that changes it. */}
+                                  <span aria-hidden="true" className="wlp-item-sep">,</span>
                                   <DurationSelect
                                     value={durationOf(item)}
                                     label={`Duration of ${item.name}`}
                                     onChange={(min) => updateItem(item.id, { durationMin: min })}
                                   />
-                                  {/* The no-drag way to schedule. A real button, so
-                                      Tab reaches it and Enter or Space picks the item,
-                                      and a pointer user who cannot drag can click it
-                                      and then click a time on the grid. */}
-                                  <button
-                                    ref={(el) => {
-                                      if (el) scheduleButtons.current.set(item.id, el);
-                                      else    scheduleButtons.current.delete(item.id);
-                                    }}
-                                    type="button"
-                                    onClick={() => setPickedId(picked ? null : item.id)}
-                                    aria-label={`Schedule ${item.name}`}
-                                    aria-expanded={picked}
-                                    aria-controls={picked ? scheduleFormId : undefined}
-                                    title={picked ? 'Cancel scheduling (Esc)' : 'Schedule without dragging (Enter)'}
-                                    className={`wlp-item-schedule${picked ? ' wlp-item-schedule-on' : ''}`}
-                                  >
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                                      <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => setExpandedId(expanded ? null : item.id)}
-                                    title={expanded ? 'Hide details' : 'Edit details'}
-                                    aria-label={`Details for ${item.name}`}
-                                    aria-expanded={expanded}
-                                    className={`wlp-item-expand${hasTemplate(item) ? ' wlp-item-expand-on' : ''}`}
-                                    style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
-                                  >
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                                      <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => deleteItem(item.id)}
-                                    title="Delete"
-                                    aria-label={`Delete ${item.name}`}
-                                    className="wlp-item-delete opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[var(--wlp-icon-faint)] cursor-pointer p-[0] ml-[4px] transition-all duration-150 hover:text-[var(--wlp-danger)] hover:scale-110"
-                                  >
-                                    ×
-                                  </button>
+                                  {/* The row's controls show on hover and whenever
+                                      focus is in the row, as Google's nav shows its
+                                      row actions, so at rest the chip is just the
+                                      event. They are folded to no width rather than
+                                      removed, so Tab still stops on each of them,
+                                      and focus anywhere in the row unfolds them. */}
+                                  <div className="wlp-item-actions">
+                                    {/* The no-drag way to schedule. A real button, so
+                                        Tab reaches it and Enter or Space picks the item,
+                                        and a pointer user who cannot drag can click it
+                                        and then click a time on the grid. */}
+                                    <button
+                                      ref={(el) => {
+                                        if (el) scheduleButtons.current.set(item.id, el);
+                                        else    scheduleButtons.current.delete(item.id);
+                                      }}
+                                      type="button"
+                                      onClick={() => setPickedId(picked ? null : item.id)}
+                                      aria-label={`Schedule ${item.name}`}
+                                      aria-expanded={picked}
+                                      aria-controls={picked ? scheduleFormId : undefined}
+                                      title={picked ? 'Cancel scheduling (Esc)' : 'Schedule without dragging (Enter)'}
+                                      className={`wlp-item-btn wlp-item-schedule${picked ? ' wlp-item-btn-on' : ''}`}
+                                    >
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
+                                      </svg>
+                                    </button>
+                                    <button
+                                      onClick={() => setExpandedId(expanded ? null : item.id)}
+                                      title={expanded ? 'Hide details' : 'Edit details'}
+                                      aria-label={`Details for ${item.name}`}
+                                      aria-expanded={expanded}
+                                      className={`wlp-item-btn wlp-item-expand${expanded ? ' wlp-item-btn-on' : ''}`}
+                                    >
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                      </svg>
+                                    </button>
+                                    <button
+                                      onClick={() => deleteItem(item.id)}
+                                      title="Delete"
+                                      aria-label={`Delete ${item.name}`}
+                                      className="wlp-item-btn wlp-item-delete"
+                                    >
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                      </svg>
+                                    </button>
+                                  </div>
                                 </div>
                                 {picked && (
                                   <ScheduleForm
