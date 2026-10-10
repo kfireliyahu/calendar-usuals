@@ -2,7 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import PoolSidebar from './components/PoolSidebar';
 import { PoolItem, durationOf, eventColorHex } from './poolItem';
-import { dateFromCell, findDatekey, formatTime, isTimeGridCell, timeGridCellFor } from './calendarGrid';
+import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, timeGridCellFor } from './calendarGrid';
+import { EventDateTime, eventTimes } from './calendarZone';
 import { Theme, readableTextOn, watchTheme } from './theme';
 import './content.css';
 
@@ -68,7 +69,9 @@ function applyTheme(theme: Theme): void {
 
 // Only meaningful on a time-grid cell (see isTimeGridCell), where 1 px below
 // the cell's top is one minute past midnight. A drop and a click-to-place both
-// read their time through here, so they snap identically.
+// read their time through here, so they snap identically. The time is the
+// grid's wall clock, in Google Calendar's time zone, and the tooltip shows it
+// as read; eventTimes() is what turns it into an instant.
 //
 // Rounding to the nearest slot sends the bottom 7.5 minutes of a column to
 // 24:00, which is the next day. They belong to the day's last slot, so the
@@ -425,14 +428,14 @@ function sendToBackground(message: unknown, onResponse: (response: any) => void)
 // A Shift-drop adds a weekly RRULE with no UNTIL or COUNT, so the series runs
 // until the user ends it. The API rejects a recurring event whose start and end
 // carry no timeZone, and it is also the zone the weekly instances are expanded
-// in, so they stay at the same wall-clock time across a DST change.
-function eventBody(item: DropPoolItem, start: Date, end: Date, recurring: boolean): Record<string, unknown> {
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+// in, so they stay at the same wall-clock time across a DST change. That zone
+// is the one the grid is drawn in, which eventTimes() works out.
+function eventBody(item: DropPoolItem, start: EventDateTime, end: EventDateTime, recurring: boolean): Record<string, unknown> {
   const body: Record<string, unknown> = {
     summary:    item.name,
     calendarId: item.calendarId,
-    start: { dateTime: start.toISOString(), timeZone },
-    end:   { dateTime: end.toISOString(),   timeZone },
+    start,
+    end,
   };
 
   if (item.description?.trim()) body.description = item.description.trim();
@@ -470,10 +473,10 @@ function createFromItem(
   recurring: boolean,
   anchor: Element | null,
 ): void {
-  const start = new Date(date); start.setHours(hours, minutes, 0, 0);
-  // Millisecond arithmetic rather than setHours(h + n): it reads the same way
-  // for any duration and rolls into the next day correctly.
-  const end   = new Date(start.getTime() + durationOf(item) * 60_000);
+  // The grid's date and time are wall-clock time in Google Calendar's zone,
+  // not the browser's, so the zone is worked out before they become instants.
+  const { start, end, zone } = eventTimes(date, hours, minutes, durationOf(item), gridZoneLabels());
+  console.log('[WeeklyPool] Calendar time zone →', zone, start.dateTime);
 
   // Show the pulsing placeholder at the chosen slot immediately
   if (anchor) showLoading(anchor, hours * 60 + minutes, item, recurring);

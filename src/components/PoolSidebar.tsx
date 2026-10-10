@@ -12,7 +12,8 @@ import {
   hasTemplate,
   newItemId,
 } from '../poolItem';
-import { formatTime, isSameDay, visibleTimeGridDays } from '../calendarGrid';
+import { formatTime, gridZoneLabels, isSameDay, visibleTimeGridDays } from '../calendarGrid';
+import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
 import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
 import { readableTextOn } from '../theme';
 
@@ -29,6 +30,8 @@ interface CalendarListEntry {
   summary: string;
   backgroundColor?: string;
   accessRole?: 'owner' | 'writer' | 'reader' | 'freeBusyReader';
+  primary?: boolean;
+  timeZone?: string;
 }
 
 // The event a drop just created, as content.tsx sends it with 'created'.
@@ -230,19 +233,21 @@ const ItemDetails: React.FC<{
 // looking at, and falls back to the coming seven days when there is no time
 // grid to read (month or schedule view). Whatever it picks goes through the
 // same create path as a drop.
+//
+// "Today" and "now" are Google Calendar's, read in the zone its grid is drawn
+// in, so the form agrees with the grid when that is not the computer's zone.
+// They are read once per render, as new Date() was, and handed down.
 
 const QUARTER_HOURS = Array.from({ length: 24 * 4 }, (_, i) => i * 15);
 const LAST_START_MIN = QUARTER_HOURS[QUARTER_HOURS.length - 1];
 
-function scheduleDays(): Date[] {
+function scheduleDays(today: Date): Date[] {
   const shown = visibleTimeGridDays();
   if (shown.length > 0) return shown;
-  const now = new Date();
-  return Array.from({ length: 7 }, (_, i) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
+  return Array.from({ length: 7 }, (_, i) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + i));
 }
 
-function defaultDay(days: Date[]): Date {
-  const today = new Date();
+function defaultDay(days: Date[], today: Date): Date {
   return days.find((d) => isSameDay(d, today)) ?? days[0];
 }
 
@@ -251,8 +256,8 @@ function dayKey(d: Date): string {
 }
 
 // The weekday is dropped for today so the label still fits the 280px rail.
-function dayLabel(d: Date): string {
-  return isSameDay(d, new Date())
+function dayLabel(d: Date, today: Date): string {
+  return isSameDay(d, today)
     ? `Today, ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
     : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
@@ -260,9 +265,8 @@ function dayLabel(d: Date): string {
 // The soonest quarter hour that has not started yet. Late in the evening that
 // would be tomorrow, which the day choice says otherwise, so it stops at the
 // last slot of the day instead of wrapping.
-function nextQuarterHour(now = new Date()): number {
-  const minutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
-  return Math.min(Math.ceil(minutes / 15) * 15, LAST_START_MIN);
+function nextQuarterHour(nowMin: number): number {
+  return Math.min(Math.ceil(nowMin / 15) * 15, LAST_START_MIN);
 }
 
 const ScheduleForm: React.FC<{
@@ -271,18 +275,20 @@ const ScheduleForm: React.FC<{
   onSchedule: (date: Date, startMin: number, recurring: boolean) => void;
   onCancel: () => void;
 }> = ({ id, item, onSchedule, onCancel }) => {
-  const [days, setDays] = useState(scheduleDays);
-  const [dayValue, setDayValue] = useState(() => dayKey(defaultDay(days)));
-  const [startMin, setStartMin] = useState(() => nextQuarterHour());
+  const now = calendarNow(gridZoneLabels());
+  const [days, setDays] = useState(() => scheduleDays(now.date));
+  const [dayValue, setDayValue] = useState(() => dayKey(defaultDay(days, now.date)));
+  const [startMin, setStartMin] = useState(() => nextQuarterHour(now.minutes));
   const [recurring, setRecurring] = useState(false);
 
   // Google Calendar can move to another week while the form is open, so the
   // days are read again each time the day choice gets focus. The chosen day
   // survives when the new week still shows it.
   const refreshDays = () => {
-    const next = scheduleDays();
+    const today = calendarNow(gridZoneLabels()).date;
+    const next = scheduleDays(today);
     setDays(next);
-    if (!next.some((d) => dayKey(d) === dayValue)) setDayValue(dayKey(defaultDay(next)));
+    if (!next.some((d) => dayKey(d) === dayValue)) setDayValue(dayKey(defaultDay(next, today)));
   };
 
   const submit = () => {
@@ -318,7 +324,7 @@ const ScheduleForm: React.FC<{
             className="wlp-field"
           >
             {days.map((d) => (
-              <option key={dayKey(d)} value={dayKey(d)}>{dayLabel(d)}</option>
+              <option key={dayKey(d)} value={dayKey(d)}>{dayLabel(d, now.date)}</option>
             ))}
           </select>
         </label>
@@ -624,13 +630,16 @@ const PoolSidebar: React.FC = () => {
         return;
       }
 
+      // The primary calendar's zone is the user's Calendar time zone, which
+      // the grid is drawn in and every event is created in (calendarZone.ts).
+      const items: CalendarListEntry[] = response.data.items ?? [];
+      setPrimaryTimeZone(items.find((cal) => cal.primary)?.timeZone);
+
       // The calendar.events.owned scope can only write to calendars the user
       // owns. A merely subscribed calendar — shared, team, holidays — would
       // render as a drop target and then 403 on drop, so it never becomes a
       // category.
-      const entries: CalendarListEntry[] = (response.data.items ?? []).filter(
-        (cal: CalendarListEntry) => cal.accessRole === 'owner'
-      );
+      const entries = items.filter((cal) => cal.accessRole === 'owner');
 
       // Items stored under a calendar that is not in this list, say one from
       // the Google account another machine is signed into, are not shown but

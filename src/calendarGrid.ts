@@ -4,6 +4,8 @@
 // schedule form needs it to offer the days that are on screen, so it lives
 // here rather than in either of them.
 
+import { parseZoneLabel } from './calendarZone';
+
 // ── Datekey → Date ────────────────────────────────────────────────────────────
 //
 // Google Calendar's data-datekey is a bit-packed date, NOT a day counter:
@@ -19,6 +21,12 @@
 // The old "days since epoch + 2 per month boundary" approximation drifted by a
 // day or more inside any week that crossed a month, and could land in the wrong
 // month/year entirely.
+//
+// The Date returned is a day, not an instant: local midnight of that date, so
+// its getFullYear(), getMonth() and getDate() read the date back. The date is
+// the grid's, in Google Calendar's time zone, which need not be the browser's,
+// so nothing should treat it as a moment in time; calendarZone.ts turns a day
+// and a time on the grid into one.
 
 const DATEKEY_EPOCH_YEAR = 1970;
 
@@ -109,6 +117,44 @@ export function visibleTimeGridDays(): Date[] {
 // get its loading placeholder when that day is on screen.
 export function timeGridCellFor(date: Date): Element | null {
   return timeGridCells().find((c) => isSameDay(c.date, date))?.cell ?? null;
+}
+
+// ── The grid's time zone label ────────────────────────────────────────────────
+//
+// Week and Day view print the zone the grid is drawn in at the top of the
+// column of hour labels, as "GMT+03", and a second one beside it when a
+// secondary zone is shown. It is found by what it says and where it sits, not
+// by Google's class names: a short text that parses as an offset, lying in the
+// gutter beside the first day column, within the width two hour columns take.
+// Text on the far side of the gutter (Google's own side panel) or in a day
+// column (an event called "UTC") is out of reach. Right-to-left pages put the
+// gutter on the right.
+const GUTTER_MAX_PX = 150;
+
+// Minutes east of UTC, nearest the grid first, or an empty list when the time
+// grid is not showing or no label could be read.
+export function gridZoneLabels(): number[] {
+  const grid = timeGridCells();
+  if (grid.length === 0) return [];
+  const rects = grid.map(({ cell }) => cell.getBoundingClientRect());
+  const rtl = getComputedStyle(grid[0].cell).direction === 'rtl';
+  const edge = rtl ? Math.max(...rects.map((r) => r.right)) : Math.min(...rects.map((r) => r.left));
+
+  const found: { minutes: number; distance: number }[] = [];
+  const root = document.querySelector('[role="main"]') ?? document.body;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.nodeValue ?? '';
+    if (text.length > 16) continue;
+    const minutes = parseZoneLabel(text);
+    const el = node.parentElement;
+    if (minutes === null || !el || el.closest('#weekly-life-pool-sidebar')) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0) continue;
+    const distance = rtl ? rect.left - edge : edge - rect.right;
+    if (distance >= -1 && distance <= GUTTER_MAX_PX) found.push({ minutes, distance });
+  }
+  return found.sort((a, b) => a.distance - b.distance).map((f) => f.minutes);
 }
 
 export function formatTime(hours: number, minutes: number): string {
