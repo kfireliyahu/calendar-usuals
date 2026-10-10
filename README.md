@@ -17,7 +17,7 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 - **Duplicate** — clone a configured item and tweak the copy
 - **Time snapping** — drops snap to the nearest 15-minute slot with a live tooltip showing day + time while hovering
 - **Loading overlay** — a pulsing placeholder in the calendar's color appears at the drop location and fades out once Google Calendar renders the real event; tracks the column as you scroll
-- **Category chips** — quickly switch which calendar an item belongs to before adding it
+- **A composer like Google's event editor** — the add-item form reads like Google Calendar's own: a title on an underline with a filled Add button beside it, then the calendar (its colour and name) and the duration as grey dropdowns; Enter adds the item
 - **Items look like their events** — each item is drawn as the chip its event will be in the week view: filled with its event colour (or its calendar's), its name and duration in Google's chip type ("workout, 1h"), with text picked for at least 4.5:1 contrast on every colour; its schedule, details and delete buttons show on hover or keyboard focus, and the drag image and the preview on the grid are the same chip
 - **Calendar sections** — each calendar with items is a section like Google's "My calendars": its colour, its name and a chevron that folds its items away (the choice syncs with your pool); calendars with nothing in them yet are listed once at the end, and clicking one opens the form set to it, or drag an item onto it
 - **Collapsible sidebar** — collapse to a 40 px icon strip when you need the full screen

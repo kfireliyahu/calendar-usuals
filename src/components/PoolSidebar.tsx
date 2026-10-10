@@ -14,7 +14,7 @@ import {
 import { formatTime, gridZoneLabels, isSameDay, visibleTimeGridDays } from '../calendarGrid';
 import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
 import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
-import { chipTextOn, readableTextOn } from '../theme';
+import { chipTextOn } from '../theme';
 
 // hidden is the stored name, kept so every synced pool reads as before: it
 // now means the calendar's section is folded to its title row, which is what
@@ -133,6 +133,15 @@ function setChipDragImage(e: React.DragEvent<HTMLElement>): void {
   setTimeout(() => copy.remove(), 0);
 }
 
+// The durations a duration select offers. A stored value outside the presets
+// still has to appear as an option, or the select would quietly display a
+// duration the item does not have.
+function durationOptions(value: number): number[] {
+  return DURATION_PRESETS.includes(value)
+    ? DURATION_PRESETS
+    : [...DURATION_PRESETS, value].sort((a, b) => a - b);
+}
+
 // Compact duration control. A native <select> so it stays keyboard accessible
 // without a custom dropdown; content.css strips the arrow to fit the 280px rail.
 // title is only a tooltip for the pointer; label is the select's accessible
@@ -142,11 +151,7 @@ const DurationSelect: React.FC<{
   label: string;
   onChange: (min: number) => void;
 }> = ({ value, label, onChange }) => {
-  // A stored value outside the presets still has to appear as an option, or the
-  // select would quietly display a duration the item does not have.
-  const options = DURATION_PRESETS.includes(value)
-    ? DURATION_PRESETS
-    : [...DURATION_PRESETS, value].sort((a, b) => a - b);
+  const options = durationOptions(value);
 
   return (
     <select
@@ -165,6 +170,42 @@ const DurationSelect: React.FC<{
     </select>
   );
 };
+
+// ── Event-editor fields ──────────────────────────────────────────────────────
+//
+// A select drawn as one of the grey fields in Google's event editor, such as
+// its calendar choice ("Kfir Raphael Eliyahu ▾") or "Does not repeat ▾": the
+// browser's arrow gives way to Google's ▾, and an optional dot in front shows
+// a colour. It stays a native <select>, so arrow keys, type-to-find, Escape
+// and the accessible name all come from the browser, and its open list is
+// drawn above the page rather than clipped by the panel it sits in. The open
+// list cannot show the dots, which only the closed field has. content.css,
+// .wlp-gselect and .wlp-gfield, has the look.
+const FieldSelect: React.FC<{
+  value: string | number;
+  label: string;
+  onChange: (value: string) => void;
+  dot?: string;
+  title?: string;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ value, label, onChange, dot, title, className, children }) => (
+  <span className={`wlp-gselect${dot ? ' wlp-gselect-has-dot' : ''}${className ? ` ${className}` : ''}`}>
+    {dot && <span aria-hidden="true" className="wlp-gselect-dot" style={{ backgroundColor: dot }} />}
+    <select
+      value={value}
+      title={title}
+      aria-label={label}
+      onChange={(e) => onChange(e.target.value)}
+      className="wlp-gfield"
+    >
+      {children}
+    </select>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="wlp-gselect-caret">
+      <path d="M7 10l5 5 5-5z"/>
+    </svg>
+  </span>
+);
 
 // ── Item template panel ──────────────────────────────────────────────────────
 //
@@ -1036,86 +1077,86 @@ const PoolSidebar: React.FC = () => {
                   flexShrink: 0,
                 }}
               >
+                {/* The composer, in the words of Google's event editor: a
+                    title on an underline with a filled "Add" beside it, as
+                    "Add title" sits beside "Save", then the calendar and the
+                    duration as grey fields. */}
                 <div className="wlp-form">
 
-                  {/* Category chips — only when there is more than one calendar */}
-                  {categories.length > 1 && (
-                    <div className="wlp-cat-chips">
-                      {categories.map((cat) => {
-                        const sel = newItemCategory === cat.calendarId;
-                        return (
-                          <button
-                            key={cat.calendarId}
-                            onClick={() => setNewItemCategory(cat.calendarId)}
-                            title={cat.name}
-                            className="wlp-cat-chip"
-                            style={{
-                              '--chip-bg':     sel ? cat.color : 'transparent',
-                              '--chip-border': sel ? cat.color : 'var(--wlp-border-subtle)',
-                              '--chip-color':  sel ? readableTextOn(cat.color) : 'var(--wlp-text-secondary)',
-                            } as React.CSSProperties}
-                          >
-                            <span
-                              className="wlp-cat-chip-dot"
-                              // On a selected chip the dot takes the text colour,
-                              // which readableTextOn picked for this calendar.
-                              style={sel ? { backgroundColor: 'currentColor', opacity: 0.75 } : { backgroundColor: cat.color }}
-                            />
-                            <span className="truncate">{cat.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Input row */}
-                  <div className="wlp-input-row">
-                    {/* Single-category color indicator */}
-                    {categories.length === 1 && selectedCategory && (
-                      <span
-                        className="wlp-input-color-dot"
-                        style={{ backgroundColor: selectedCategory.color }}
+                  <div className="wlp-form-row">
+                    <div className="wlp-title-field">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        placeholder="Add title"
+                        aria-label="Title of new item"
+                        aria-describedby="wlp-form-hint"
+                        value={newItemName}
+                        onChange={(e) => setNewItemName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                        className="wlp-title-input"
                       />
-                    )}
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      placeholder="New item…"
-                      value={newItemName}
-                      onChange={(e) => setNewItemName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && addItem()}
-                      className="[font-family:inherit] placeholder-[var(--wlp-text-muted)]"
-                    />
-                    {newItemName && (
-                      <button
-                        onClick={() => { setNewItemName(''); inputRef.current?.focus(); }}
-                        tabIndex={-1}
-                        title="Clear"
-                        aria-label="Clear"
-                        className="wlp-input-clear"
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                        </svg>
-                      </button>
-                    )}
-                    <DurationSelect value={newItemDuration} label="Duration of new item" onChange={setNewItemDuration} />
+                      {newItemName && (
+                        <button
+                          onClick={() => { setNewItemName(''); inputRef.current?.focus(); }}
+                          tabIndex={-1}
+                          title="Clear"
+                          aria-label="Clear"
+                          className="wlp-input-clear"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                     <button
                       onClick={addItem}
                       disabled={!newItemName.trim()}
                       title="Add (Enter)"
                       aria-label="Add item"
-                      className="wlp-input-add"
+                      className="wlp-btn-filled"
                     >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                      </svg>
+                      Add
                     </button>
                   </div>
 
-                  {/* The two modifiers nothing else on screen mentions. */}
-                  <p className="wlp-form-hint">
-                    Hold Shift as you drop to repeat weekly · Enter on an item's calendar icon schedules it
+                  {/* The calendar as Google's editor chooses one: a grey field
+                      with the calendar's colour and its name. It replaces a
+                      cloud of chips that grew a line for every few calendars.
+                      Every calendar is a choice, a folded one included, and an
+                      empty calendar's row sets it (startAddTo). */}
+                  <div className="wlp-form-row">
+                    {categories.length > 0 && (
+                      <FieldSelect
+                        value={newItemCategory}
+                        label="Calendar of new item"
+                        title={selectedCategory?.name}
+                        dot={selectedCategory?.color}
+                        onChange={setNewItemCategory}
+                        className="wlp-form-calendar"
+                      >
+                        {categories.map((cat) => (
+                          <option key={cat.calendarId} value={cat.calendarId}>{cat.name}</option>
+                        ))}
+                      </FieldSelect>
+                    )}
+                    <FieldSelect
+                      value={newItemDuration}
+                      label="Duration of new item"
+                      title="Duration"
+                      onChange={(v) => setNewItemDuration(Number(v))}
+                    >
+                      {durationOptions(newItemDuration).map((min) => (
+                        <option key={min} value={min}>{formatDuration(min)}</option>
+                      ))}
+                    </FieldSelect>
+                  </div>
+
+                  {/* The two modifiers nothing else on screen mentions, kept
+                      short and in the hint grey so they read as a footnote. */}
+                  <p id="wlp-form-hint" className="wlp-form-hint">
+                    Shift-drop repeats weekly · Enter on an item’s calendar icon schedules it
                   </p>
 
                 </div>

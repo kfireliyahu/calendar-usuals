@@ -37,13 +37,12 @@
   --wlp-text:            #202124;
   --wlp-text-secondary:  #5f6368;
   --wlp-text-muted:      #9aa0a6;  /* hints, empty states, the footer */
-  --wlp-icon-faint:      #bdc1c6;  /* the form's clear button, a disabled Add */
   --wlp-border:          #dadce0;  /* outlines of fields and buttons */
   --wlp-border-subtle:   #e8eaed;  /* item rows, panels, chips */
   --wlp-border-hover:    #c5c9ce;
   --wlp-divider:         rgba(218, 220, 224, 0.6);
   --wlp-accent:          #4285f4;
-  --wlp-accent-soft:     #e8f0fe;  /* a picked row, the Add button's hover */
+  --wlp-accent-soft:     #e8f0fe;  /* the row a drag would drop into */
   --wlp-primary:         #1a73e8;
   --wlp-primary-hover:   #1765cc;
   --wlp-on-primary:      #ffffff;
@@ -68,14 +67,21 @@
   --wlp-pill:            #ffffff;
   --wlp-pill-shadow:       0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
   --wlp-pill-shadow-hover: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  /* The grey of the fields in Google's event editor ("Add location",
+     "Notification ▾"): one tonal step off the page surface, with a touch of
+     the accent and of the text mixed in. Mixed rather than fixed, and from
+     whichever theme's values are in force where it is used, so the dark theme
+     needs no line of its own: about #e3e9f3 on Google's light page, close to
+     its blue-grey fields, and about #2f3133 on its dark one. */
+  --wlp-field:           color-mix(in srgb, var(--wlp-text) 4%, color-mix(in srgb, var(--wlp-primary) 6%, var(--wlp-surface)));
+  --wlp-field-hover:     color-mix(in srgb, var(--wlp-text) 6%, var(--wlp-field));
   color-scheme: light;
 }
 
 /* content.tsx sets data-wlp-theme="dark" on the same three elements whenever
    Google Calendar is showing its dark theme (see theme.ts). The palette follows
    Google's own dark greys and its light blue accent. Every text colour here meets
-   WCAG AA on the surfaces it is drawn on, and the faint icon grey keeps 3:1
-   against the rows it sits on. color-scheme gives the
+   WCAG AA on the surfaces it is drawn on. color-scheme gives the
    native controls, the checkbox, the selects' open lists and the scrollbars,
    their dark look too. */
 :is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview)[data-wlp-theme="dark"] {
@@ -86,7 +92,6 @@
   --wlp-text:            #e3e3e3;
   --wlp-text-secondary:  #c4c7c5;
   --wlp-text-muted:      #9aa0a6;
-  --wlp-icon-faint:      #80868b;
   --wlp-border:          #444746;
   --wlp-border-subtle:   #3c4043;
   --wlp-border-hover:    #5f6368;
@@ -177,6 +182,11 @@
   --wlp-weight-section:  500;
   --wlp-row-height:      32px;    /* one row of the list */
   --wlp-gutter:          16px;    /* the sidebar's left and right inset */
+  /* The event editor's fields, scaled to the rail: Google's title is 22 px
+     on 40 px fields, too large beside a 248 px column. */
+  --wlp-type-title:      18px;    /* the composer's title field */
+  --wlp-field-height:    36px;    /* a grey field, a select or a filled button */
+  --wlp-field-radius:    4px;
 }
 
 /* The sidebar paints its own surface and text colour rather than letting
@@ -272,129 +282,231 @@
 }
 
 /* ── Add-item form ─────────────────────────────────────────────────────────── */
+
+/* Laid out as Google's event editor opens: the title with the filled button
+   beside it, then a row of grey fields. */
 .wlp-form {
-  padding: 16px var(--wlp-gutter) !important;
+  padding: 12px var(--wlp-gutter) 16px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 10px !important;
+  gap: 12px !important;
 }
 
-/* Category chip row */
-.wlp-cat-chips {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 5px !important;
-}
-
-.wlp-cat-chip {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 5px !important;
-  padding: 4px 9px !important;
-  border-radius: 100px !important;
-  border: 1px solid var(--chip-border, var(--wlp-border-subtle)) !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  font-family: inherit !important;
-  cursor: pointer !important;
-  background: var(--chip-bg, transparent) !important;
-  color: var(--chip-color, var(--wlp-text-secondary)) !important;
-  max-width: 130px !important;
-  transition: opacity 0.15s !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-}
-
-.wlp-cat-chip:hover {
-  opacity: 0.8 !important;
-}
-
-.wlp-cat-chip-dot {
-  display: inline-block !important;
-  width: 6px !important;
-  height: 6px !important;
-  border-radius: 50% !important;
-  flex-shrink: 0 !important;
-}
-
-/* Unified input row */
-.wlp-input-row {
+.wlp-form-row {
   display: flex !important;
   align-items: center !important;
-  border: 1px solid var(--wlp-border) !important;
-  border-radius: 8px !important;
-  overflow: hidden !important;
-  background: var(--wlp-input) !important;
-  transition: border-color 0.15s, box-shadow 0.15s !important;
+  gap: 8px !important;
 }
 
-.wlp-input-row:focus-within {
-  border-color: var(--wlp-accent) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wlp-accent) 12%, transparent) !important;
-}
-
-.wlp-input-row input {
+/* The calendar takes what the duration leaves of the row. */
+.wlp-gselect.wlp-form-calendar {
   flex: 1 1 0 !important;
   min-width: 0 !important;
-  padding: 9px 10px !important;
+}
+
+/* Google's "Add title": no box, just a line under the text that thickens into
+   the accent while it has focus. The line is the wrapper's, drawn as an inset
+   shadow so it never moves the text, and spans the clear button too. */
+.wlp-title-field {
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  height: 40px !important;
+  box-shadow: inset 0 -1px 0 var(--wlp-text-secondary) !important;
+  transition: box-shadow 0.15s !important;
+}
+
+.wlp-title-field:hover {
+  box-shadow: inset 0 -1px 0 var(--wlp-text) !important;
+}
+
+.wlp-title-field:focus-within {
+  box-shadow: inset 0 -2px 0 var(--wlp-primary) !important;
+}
+
+.wlp-title-input {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
   border: none !important;
   outline: none !important;
   background: transparent !important;
-  font-size: 13px !important;
+  font-family: inherit !important;
+  font-size: var(--wlp-type-title) !important;
+  line-height: 24px !important;
   color: var(--wlp-text) !important;
   box-shadow: none !important;
 }
 
-.wlp-input-color-dot {
-  display: inline-block !important;
-  width: 8px !important;
-  height: 8px !important;
-  border-radius: 50% !important;
-  flex-shrink: 0 !important;
-  margin-left: 10px !important;
+.wlp-title-input::placeholder {
+  color: var(--wlp-text-secondary) !important;
 }
 
 .wlp-input-clear {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 6px !important;
-  border: none !important;
-  background: transparent !important;
-  color: var(--wlp-icon-faint) !important;
-  cursor: pointer !important;
   flex-shrink: 0 !important;
-  transition: color 0.15s !important;
-}
-
-.wlp-input-clear:hover {
+  width: 28px !important;
+  height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  background: transparent !important;
   color: var(--wlp-text-secondary) !important;
-}
-
-.wlp-input-add {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 9px 12px !important;
-  border: none !important;
-  border-left: 1px solid var(--wlp-border-subtle) !important;
-  background: transparent !important;
-  color: var(--wlp-accent) !important;
   cursor: pointer !important;
-  flex-shrink: 0 !important;
   transition: background 0.15s !important;
 }
 
-.wlp-input-add:hover:not(:disabled) {
-  background: var(--wlp-accent-soft) !important;
+.wlp-input-clear:hover {
+  background: var(--wlp-hover) !important;
 }
 
-.wlp-input-add:disabled {
-  color: var(--wlp-icon-faint) !important;
-  cursor: not-allowed !important;
+/* ── Event-editor fields ───────────────────────────────────────────────────── */
+
+/* The field vocabulary of Google's event editor, for the composer and for any
+   panel that asks for more than a name: grey fields with square-ish corners
+   and no outline (.wlp-gfield, on an input, a textarea or a select), a select
+   wrapped with Google's ▾ and an optional colour dot (.wlp-gselect, which the
+   FieldSelect component in PoolSidebar draws), and the filled pill of its
+   "Save" (.wlp-btn-filled). Colours are the --wlp-field tokens, mixed from the
+   page surface Google paints, so they follow both themes. Reset with
+   !important because Google Calendar styles bare inputs and buttons
+   globally. */
+.wlp-gfield {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--wlp-field-height) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border: none !important;
+  border-radius: var(--wlp-field-radius) !important;
+  outline: none !important;
+  background: var(--wlp-field) !important;
+  font-family: inherit !important;
+  font-size: var(--wlp-type-name) !important;
+  line-height: 20px !important;
+  color: var(--wlp-text) !important;
+  box-shadow: none !important;
+  transition: background 0.15s, box-shadow 0.15s !important;
 }
 
-/* Duration select — add form and pool item rows */
+.wlp-gfield:hover {
+  background: var(--wlp-field-hover) !important;
+}
+
+.wlp-gfield::placeholder {
+  color: var(--wlp-text-secondary) !important;
+}
+
+textarea.wlp-gfield {
+  height: auto !important;
+  padding: 8px 12px !important;
+  resize: none !important;
+}
+
+/* A text field shows focus as Google's do, with the accent drawn along its
+   bottom edge; a select, which is a button until it opens, gets a ring. */
+.wlp-gfield:is(input, textarea):focus {
+  box-shadow: inset 0 -2px 0 var(--wlp-primary) !important;
+}
+
+select.wlp-gfield {
+  /* As wide as the choice it shows, as "Busy ▾" and "Default visibility ▾"
+     are, unless its wrapper is told to grow. */
+  field-sizing: content !important;
+  padding-inline-end: 32px !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  cursor: pointer !important;
+}
+
+select.wlp-gfield:focus-visible {
+  outline: 2px solid var(--wlp-focus) !important;
+  outline-offset: -2px !important;
+}
+
+/* The wrapper holds the select's place in a row and carries the drawn caret
+   and dot, which ignore the pointer so a click anywhere opens the select.
+   Logical insets, so they swap sides in a right-to-left field. */
+.wlp-gselect {
+  position: relative !important;
+  display: inline-flex !important;
+  flex: none !important;
+  min-width: 0 !important;
+}
+
+.wlp-gselect-caret {
+  position: absolute !important;
+  top: 50% !important;
+  inset-inline-end: 6px !important;
+  transform: translateY(-50%) !important;
+  color: var(--wlp-text-secondary) !important;
+  pointer-events: none !important;
+}
+
+.wlp-gselect-dot {
+  position: absolute !important;
+  top: 50% !important;
+  inset-inline-start: 12px !important;
+  width: 12px !important;
+  height: 12px !important;
+  margin-top: -6px !important;
+  border-radius: 50% !important;
+  pointer-events: none !important;
+}
+
+.wlp-gselect-has-dot select.wlp-gfield {
+  padding-inline-start: 34px !important;
+}
+
+/* Google's filled button, "Save" in the editor: a pill in the primary colour.
+   Disabled, it goes to the text colour at 12% behind 38%, as Material's do. */
+.wlp-btn-filled {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  height: var(--wlp-field-height) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 20px !important;
+  border: none !important;
+  border-radius: calc(var(--wlp-field-height) / 2) !important;
+  background: var(--wlp-primary) !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.25px !important;
+  color: var(--wlp-on-primary) !important;
+  cursor: pointer !important;
+  transition: background 0.15s, box-shadow 0.15s !important;
+}
+
+.wlp-btn-filled:hover:not(:disabled) {
+  background: var(--wlp-primary-hover) !important;
+  box-shadow: var(--wlp-pill-shadow) !important;
+}
+
+.wlp-btn-filled:focus-visible {
+  outline: 2px solid var(--wlp-focus) !important;
+  outline-offset: 2px !important;
+}
+
+.wlp-btn-filled:disabled {
+  background: color-mix(in srgb, var(--wlp-text) 12%, transparent) !important;
+  color: color-mix(in srgb, var(--wlp-text) 38%, transparent) !important;
+  cursor: default !important;
+}
+
+/* Duration select — pool item rows */
 .wlp-duration {
   appearance: none !important;
   -webkit-appearance: none !important;
@@ -420,12 +532,6 @@
 .wlp-duration:focus-visible {
   outline: 1px solid var(--wlp-focus) !important;
   border-radius: 3px !important;
-}
-
-/* In the add row it divides the text field from the add button. */
-.wlp-input-row .wlp-duration {
-  padding: 9px 8px 9px 6px !important;
-  border-left: 1px solid var(--wlp-border-subtle) !important;
 }
 
 /* ── Category list ─────────────────────────────────────────────────────────── */
@@ -862,7 +968,6 @@
 .wlp-toast-undo:focus-visible,
 .wlp-schedule-btn:focus-visible,
 .wlp-schedule-repeat input:focus-visible,
-.wlp-cat-chip:focus-visible,
 .wlp-swatch:focus-visible,
 .wlp-dup-btn:focus-visible {
   outline: 2px solid var(--wlp-focus) !important;
