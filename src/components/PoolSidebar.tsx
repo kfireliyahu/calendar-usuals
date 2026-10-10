@@ -19,6 +19,7 @@ import { formatTime, gridZoneLabels, isSameDay, visibleTimeGridDays } from '../c
 import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
 import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
 import { chipTextOn } from '../theme';
+import { CalendarListEntry, displayName, isolate, needsPageName, textDirection, watchPrimaryName } from '../names';
 
 // hidden is the stored name, kept so every synced pool reads as before: it
 // now means the calendar's section is folded to its title row, which is what
@@ -29,15 +30,6 @@ interface PoolCategory {
   color: string;
   items: PoolItem[];
   hidden?: boolean;
-}
-
-interface CalendarListEntry {
-  id: string;
-  summary: string;
-  backgroundColor?: string;
-  accessRole?: 'owner' | 'writer' | 'reader' | 'freeBusyReader';
-  primary?: boolean;
-  timeZone?: string;
 }
 
 // The event a drop just created, as content.tsx sends it with 'created'.
@@ -82,9 +74,28 @@ interface DropTarget {
 // the sidebar laid out. The pool itself syncs between machines and belongs to
 // poolStore.ts. Every key is optional because storage is empty on a fresh
 // install, so each read needs a fallback.
+//
+// primaryCalendarName is the primary calendar's name as Google's own list
+// showed it last time it could be read (names.ts), so the sidebar has it at
+// once on the next load, even with Google's menu closed. It is kept with the
+// calendar's id, and only used for that calendar.
 interface StoredState {
   sidebarCollapsed?: boolean;
   formOpen?: boolean;
+  primaryCalendarName?: PrimaryName;
+}
+
+interface PrimaryName {
+  calendarId: string;
+  name: string;
+}
+
+// What the sidebar needs to look for the primary calendar's name on the page:
+// its id, which is the account's address, and the names of the calendars
+// listed with it.
+interface PrimaryLookup {
+  calendarId: string;
+  otherNames: string[];
 }
 
 // Said once per page, the first time Chrome Sync refuses the pool for size.
@@ -381,6 +392,7 @@ const ItemDetails: React.FC<{
         <DetailsIcon path={ICON_LOCATION} />
         <input
           type="text"
+          dir="auto"
           placeholder="Add location"
           aria-label={`Location for ${item.name}`}
           value={item.location ?? ''}
@@ -398,7 +410,7 @@ const ItemDetails: React.FC<{
           before this panel existed, and a change repaints the chip at once. */}
       <div className="wlp-details-row">
         <DetailsIcon path={ICON_CALENDAR} />
-        <span className="wlp-details-calendar" title={categoryName}>{categoryName}</span>
+        <span dir="auto" className="wlp-details-calendar" title={categoryName}>{categoryName}</span>
         <FieldSelect
           value={item.colorId ?? ''}
           label={`Colour for ${item.name}`}
@@ -420,6 +432,7 @@ const ItemDetails: React.FC<{
         <DetailsIcon path={ICON_NOTES} />
         <textarea
           rows={3}
+          dir="auto"
           placeholder="Add description"
           aria-label={`Description for ${item.name}`}
           value={item.description ?? ''}
@@ -599,6 +612,8 @@ const PoolSidebar: React.FC = () => {
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const [primaryLookup, setPrimaryLookup] = useState<PrimaryLookup | null>(null);
+  const primaryName = useRef<PrimaryName | null>(null);
   const collapsedReady = useRef(false);
   const formReady = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -678,7 +693,8 @@ const PoolSidebar: React.FC = () => {
       return;
     }
 
-    showToast(`Removing "${target.itemName}"…`, 'info', 0);
+    const name = isolate(target.itemName);
+    showToast(`Removing "${name}"…`, 'info', 0);
     try {
       chrome.runtime.sendMessage(
         { type: 'DELETE_EVENT', data: { calendarId: target.calendarId, eventId: target.eventId } },
@@ -686,7 +702,7 @@ const PoolSidebar: React.FC = () => {
           if (chrome.runtime.lastError) { fail(chrome.runtime.lastError.message); return; }
           if (!response?.success)       { fail(response?.error); return; }
           showToast(
-            target.recurring ? `Weekly series "${target.itemName}" removed` : `"${target.itemName}" removed`,
+            target.recurring ? `Weekly series "${name}" removed` : `"${name}" removed`,
             'success'
           );
           document.dispatchEvent(new CustomEvent('poolEventRemoved', { detail: { eventId: target.eventId } }));
@@ -736,11 +752,14 @@ const PoolSidebar: React.FC = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const { type, itemName, error: err, recurring, event } = (e as CustomEvent).detail;
+      // The name is isolated so a Hebrew one keeps its own order without
+      // turning the English sentence around it.
+      const name = isolate(itemName);
       if (type === 'creating') {
-        showToast(`Adding "${itemName}"${recurring ? ' weekly' : ''}…`, 'info', 0);
+        showToast(`Adding "${name}"${recurring ? ' weekly' : ''}…`, 'info', 0);
 
       } else if (type === 'created') {
-        const message = recurring ? `"${itemName}" added, repeats weekly` : `"${itemName}" added!`;
+        const message = recurring ? `"${name}" added, repeats weekly` : `"${name}" added!`;
         // Without an id there is nothing to delete, so the toast is the old one.
         if (event) showToast(message, 'success', UNDO_WINDOW_MS, { itemName, ...event });
         else       showToast(message, 'success');
@@ -870,6 +889,18 @@ const PoolSidebar: React.FC = () => {
       // category.
       const entries = items.filter((cal) => cal.accessRole === 'owner');
 
+      // Every calendar goes by the name Google's own list gives it. The
+      // primary one may only have its address from the API, so its name is
+      // looked for on the page, and until it is found (or if it never is)
+      // the address stands. A name found on an earlier load is used at once.
+      const primary = entries.find(needsPageName);
+      const nameOf = (cal: CalendarListEntry) =>
+        primaryName.current?.calendarId === cal.id ? primaryName.current.name : displayName(cal);
+      setPrimaryLookup(primary ? {
+        calendarId: primary.id,
+        otherNames: items.filter((cal) => cal !== primary && !cal.hidden).map(displayName),
+      } : null);
+
       // Items stored under a calendar that is not in this list, say one from
       // the Google account another machine is signed into, are not shown but
       // stay in storage: poolStore only replaces the calendars passed to it.
@@ -877,7 +908,7 @@ const PoolSidebar: React.FC = () => {
         (pool) => {
           const newCategories: PoolCategory[] = entries.map((cal) => ({
             calendarId: cal.id,
-            name: cal.summary,
+            name: nameOf(cal),
             color: cal.backgroundColor ?? '#4285f4',
             items: pool.items[cal.id] ?? [],
             hidden: pool.hidden.includes(cal.id),
@@ -897,6 +928,36 @@ const PoolSidebar: React.FC = () => {
   };
 
   useEffect(() => { fetchCalendars(); }, []);
+
+  // The primary calendar's name, from this device's last reading and then
+  // from the page (names.ts, watchPrimaryName), which keeps looking until
+  // Google's list is there to read. A fresh reading replaces the stored one.
+  useEffect(() => {
+    if (!primaryLookup) return;
+    const { calendarId, otherNames } = primaryLookup;
+    let active = true;
+
+    const apply = (name: string) => {
+      if (!active) return;
+      primaryName.current = { calendarId, name };
+      setCategories((prev) =>
+        prev.map((cat) => (cat.calendarId === calendarId && cat.name !== name ? { ...cat, name } : cat))
+      );
+    };
+
+    if (extensionAlive()) {
+      chrome.storage.local.get<StoredState>('primaryCalendarName', (result) => {
+        const stored = result.primaryCalendarName;
+        if (stored?.calendarId === calendarId && primaryName.current?.calendarId !== calendarId) apply(stored.name);
+      });
+    }
+
+    const stop = watchPrimaryName(calendarId, otherNames, (name) => {
+      apply(name);
+      if (extensionAlive()) chrome.storage.local.set({ primaryCalendarName: { calendarId, name } });
+    });
+    return () => { active = false; stop(); };
+  }, [primaryLookup]);
 
   // Only persist when loaded and non-empty to avoid wiping items on auth hiccups.
   // poolStore compares against what it holds, so a render that changed nothing
@@ -1254,6 +1315,7 @@ const PoolSidebar: React.FC = () => {
                       <input
                         ref={inputRef}
                         type="text"
+                        dir="auto"
                         placeholder="Add title"
                         aria-label="Title of new item"
                         aria-describedby="wlp-form-hint"
@@ -1303,7 +1365,7 @@ const PoolSidebar: React.FC = () => {
                         className="wlp-form-calendar"
                       >
                         {categories.map((cat) => (
-                          <option key={cat.calendarId} value={cat.calendarId}>{cat.name}</option>
+                          <option key={cat.calendarId} value={cat.calendarId} dir="auto">{cat.name}</option>
                         ))}
                       </FieldSelect>
                     )}
@@ -1391,7 +1453,7 @@ const PoolSidebar: React.FC = () => {
                               className="wlp-cat-marker"
                               style={{ backgroundColor: category.color }}
                             />
-                            <span className="wlp-cat-title">{category.name}</span>
+                            <span dir="auto" className="wlp-cat-title">{category.name}</span>
                             {/* Folded, the row still says how much is inside. */}
                             {!open && (
                               <span className="wlp-cat-count">
@@ -1452,6 +1514,14 @@ const PoolSidebar: React.FC = () => {
                                     setDropTarget(null);
                                     document.dispatchEvent(new CustomEvent('poolDragEnd'));
                                   }}
+                                  // The chip runs in its name's direction, as
+                                  // Google's does: a Hebrew name starts at the
+                                  // right edge with ", 1h" to its left, and the
+                                  // controls unfold on the left. Worked out here
+                                  // rather than with dir="auto", which would read
+                                  // the duration's "1h" past the name's own
+                                  // dir="auto" and always say left to right.
+                                  dir={textDirection(item.name)}
                                   // An open schedule form or details panel keeps
                                   // the row's controls showing, so the one that
                                   // opened it stays where the pointer left it.
@@ -1470,6 +1540,7 @@ const PoolSidebar: React.FC = () => {
                                       // without this the caret lands at the end and
                                       // typing extends the old name.
                                       onFocus={(e) => e.currentTarget.select()}
+                                      dir="auto"
                                       value={editingName}
                                       aria-label={`Rename ${item.name}`}
                                       onChange={(e) => setEditingName(e.target.value)}
@@ -1482,6 +1553,7 @@ const PoolSidebar: React.FC = () => {
                                     />
                                   ) : (
                                     <span
+                                      dir="auto"
                                       onDoubleClick={() => startRename(item)}
                                       title={`${item.name} — drag onto the calendar (hold Shift to repeat weekly), double-click to rename`}
                                       className="wlp-item-name"
@@ -1610,7 +1682,7 @@ const PoolSidebar: React.FC = () => {
                           className="wlp-cat-marker"
                           style={{ backgroundColor: cat.color }}
                         />
-                        <span className="wlp-empty-name">{cat.name}</span>
+                        <span dir="auto" className="wlp-empty-name">{cat.name}</span>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="wlp-empty-add">
                           <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                         </svg>

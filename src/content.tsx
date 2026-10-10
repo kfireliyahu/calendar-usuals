@@ -5,6 +5,7 @@ import { PoolItem, durationOf, eventColorHex } from './poolItem';
 import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, timeGridCellFor } from './calendarGrid';
 import { EventDateTime, eventTimes } from './calendarZone';
 import { PageLook, Theme, chipTextOn, watchTheme } from './theme';
+import { isolate } from './names';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
@@ -143,6 +144,9 @@ function getPreview(): HTMLElement {
     previewEl = document.createElement('div');
     previewEl.id = 'wlp-event-preview';
     previewEl.setAttribute('data-wlp-theme', currentTheme);
+    // It only ever holds an item's name, so it takes the name's direction: a
+    // Hebrew one starts at the right, as Google's own chip for it will.
+    previewEl.dir = 'auto';
     Object.assign(previewEl.style, {
       position: 'fixed', zIndex: '9999', pointerEvents: 'none',
       borderRadius: '4px', fontSize: '12px', lineHeight: '16px',
@@ -533,7 +537,8 @@ function showPlacementHint(cell: Element, clientX: number, clientY: number, item
   const { hours, minutes } = timeFromDrop(cell, clientY);
   const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const repeats = recurring ? '  ·  ↻ repeats weekly' : '';
-  showTooltip(clientX, clientY, `${item.name}  ·  ${day}, ${formatRange(hours, minutes, durationOf(item))}${repeats}`);
+  // The name is isolated so a Hebrew one does not reorder the day and time.
+  showTooltip(clientX, clientY, `${isolate(item.name)}  ·  ${day}, ${formatRange(hours, minutes, durationOf(item))}${repeats}`);
   if (!isLoading) showPreview(cell, clientY, item, recurring);
 }
 

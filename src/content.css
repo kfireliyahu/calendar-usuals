@@ -330,6 +330,7 @@
   font-size: var(--wlp-type-title) !important;
   line-height: 24px !important;
   color: var(--wlp-text) !important;
+  text-align: start !important;
   box-shadow: none !important;
 }
 
@@ -396,6 +397,12 @@
 
 .wlp-gfield::placeholder {
   color: var(--wlp-text-secondary) !important;
+}
+
+/* Text fields carry dir="auto", so a Hebrew location or description starts at
+   the right; start alignment lets it, whatever Google sets on bare inputs. */
+.wlp-gfield:is(input, textarea) {
+  text-align: start !important;
 }
 
 textarea.wlp-gfield {
@@ -649,14 +656,16 @@ select.wlp-gfield:focus-visible {
    both themes, so is everything drawn on it: the controls, the focus rings and
    the rename field all take currentColor rather than the theme's greys, which
    would vanish on some of Google's colours. 28 px is about the height of a
-   half-hour event in the week view. */
+   half-hour event in the week view. A chip whose name is right to left runs
+   right to left (PoolSidebar sets its dir), so its insets are logical. */
 .wlp-item {
   display: flex !important;
   align-items: center !important;
   min-height: 28px !important;
   box-sizing: border-box !important;
   margin: 0 !important;
-  padding: 0 4px 0 8px !important;
+  padding-block: 0 !important;
+  padding-inline: 8px 4px !important;
   border-radius: 4px !important;
   background: var(--wlp-chip) !important;
   color: var(--wlp-chip-text) !important;
@@ -704,7 +713,7 @@ select.wlp-gfield:focus-visible {
 
 .wlp-item-sep {
   flex-shrink: 0 !important;
-  margin-right: 4px !important;
+  margin-inline-end: 4px !important;
 }
 
 /* The duration as Google writes an event's time: the chip's own text colour
@@ -741,7 +750,7 @@ select.wlp-gfield:focus-visible {
   align-items: center !important;
   flex-shrink: 0 !important;
   gap: 2px !important;
-  margin-left: auto !important;
+  margin-inline-start: auto !important;
   max-width: 0 !important;
   overflow: hidden !important;
   opacity: 0 !important;
@@ -752,7 +761,7 @@ select.wlp-gfield:focus-visible {
 .wlp-item:focus-within .wlp-item-actions,
 .wlp-item-active .wlp-item-actions {
   max-width: 72px !important;
-  padding-left: 4px !important;
+  padding-inline-start: 4px !important;
   opacity: 1 !important;
 }
 
@@ -894,6 +903,7 @@ select.wlp-gfield:focus-visible {
   font-weight: 500 !important;
   line-height: 16px !important;
   color: inherit !important;
+  text-align: start !important;
   box-shadow: none !important;
   border-bottom: 1px solid currentColor !important;
 }
@@ -1050,6 +1060,7 @@ select.wlp-gfield:focus-visible {
 .wlp-details-calendar {
   flex: 1 1 0 !important;
   min-width: 0 !important;
+  text-align: start !important;
   overflow: hidden !important;
   white-space: nowrap !important;
   text-overflow: ellipsis !important;
