@@ -20,7 +20,7 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 - **Category chips** — quickly switch which calendar an item belongs to before adding it
 - **Hide categories** — collapse calendars you don't need to reduce sidebar noise; the choice syncs with your pool
 - **Collapsible sidebar** — collapse to a 40 px icon strip when you need the full screen
-- **Collapsible input form** — toggle the add-item form open/closed with the pencil icon; preference is saved
+- **Collapsible input form** — the "+ New item" button at the top of the sidebar, shaped like Google Calendar's own "Create", opens and closes the add-item form; preference is saved
 - **Follows Google Calendar's theme** — the sidebar, its forms and toasts, and the tooltip, drag preview and loading placeholder it draws on the calendar turn dark whenever Google Calendar is showing its dark theme and light when it is not, going by Google Calendar's own Appearance setting rather than the operating system's; changing it switches them over without a reload
 - **Syncs across your Chrome profile** — pool items and hidden categories are saved with `chrome.storage.sync`, so every computer signed into the same Chrome profile sees the same pool, and an edit on one shows up on the others (and in other Calendar tabs) without a reload
 - **Persistent storage** — whether the sidebar and the add-item form are collapsed is saved per computer in Chrome local storage, and the pool keeps a copy there too, so an edit is never lost if it has not reached sync yet

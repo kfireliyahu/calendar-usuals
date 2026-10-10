@@ -56,6 +56,11 @@
   --wlp-tooltip-bg:      #202124;
   --wlp-tooltip-text:    #ffffff;
   --wlp-swatch-outline:  rgba(0, 0, 0, 0.12);
+  /* The header's "New item" pill, raised the way Google's "Create" is: white,
+     with Google's two-layer elevation shadow, deeper on hover. */
+  --wlp-pill:            #ffffff;
+  --wlp-pill-shadow:       0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --wlp-pill-shadow-hover: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
   color-scheme: light;
 }
 
@@ -99,6 +104,11 @@
   --wlp-tooltip-bg:      #e3e3e3;
   --wlp-tooltip-text:    #1f1f1f;
   --wlp-swatch-outline:  rgba(255, 255, 255, 0.24);
+  /* In the dark theme Google's "Create" is a tonal grey a step lighter than
+     the nav, and its shadow is drawn in black. */
+  --wlp-pill:            #37393b;
+  --wlp-pill-shadow:       0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --wlp-pill-shadow-hover: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
   color-scheme: dark;
 }
 
@@ -176,9 +186,65 @@
   z-index: 1000 !important;
 }
 
-/* Force spacing to win over Google Calendar's global stylesheet */
+/* Force spacing to win over Google Calendar's global stylesheet. 8 px above
+   and below a 48 px pill makes the header 64 px, the height of Google
+   Calendar's own top bar beside it, so the two read as one band. */
 .wlp-header {
-  padding: 16px 20px !important;
+  padding: 8px 12px 8px 16px !important;
+}
+
+/* ── "New item" pill ───────────────────────────────────────────────────────── */
+
+/* Shaped after Google's "Create": a 16 px rounded rectangle on a raised
+   surface, an icon and a label in Google Sans. Its colours are the sidebar's
+   own tokens rather than read from Google's button, which could only be found
+   by its class names or its translated label. Reset with !important because
+   Google Calendar styles bare buttons globally. */
+.wlp-new-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  height: 48px !important;
+  margin: 0 !important;
+  padding: 0 20px 0 14px !important;
+  border: none !important;
+  border-radius: 16px !important;
+  background: var(--wlp-pill) !important;
+  box-shadow: var(--wlp-pill-shadow) !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.25px !important;
+  color: var(--wlp-text) !important;
+  cursor: pointer !important;
+  transition: box-shadow 0.15s, background 0.15s !important;
+}
+
+/* Google's hover: a faint state layer of the text colour, and a deeper
+   shadow. */
+.wlp-new-pill:hover {
+  background: color-mix(in srgb, var(--wlp-text) 6%, var(--wlp-pill)) !important;
+  box-shadow: var(--wlp-pill-shadow-hover) !important;
+}
+
+.wlp-new-pill:active {
+  background: color-mix(in srgb, var(--wlp-text) 10%, var(--wlp-pill)) !important;
+}
+
+.wlp-new-pill:focus-visible {
+  outline: 2px solid var(--wlp-focus) !important;
+  outline-offset: 2px !important;
+}
+
+.wlp-new-pill-icon {
+  flex-shrink: 0 !important;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* While the form is open the plus is turned into a cross, so the pill's next
+   click reads as closing it. */
+.wlp-new-pill-open .wlp-new-pill-icon {
+  transform: rotate(45deg) !important;
 }
 
 /* ── Add-item form ─────────────────────────────────────────────────────────── */

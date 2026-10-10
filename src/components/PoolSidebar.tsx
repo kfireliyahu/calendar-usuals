@@ -932,47 +932,40 @@ const PoolSidebar: React.FC = () => {
         /* ── Expanded view ────────────────────────────────────────────────── */
         <div className="flex flex-col h-full w-[280px]">
 
-          {/* Header */}
-          <div className="wlp-header flex items-center justify-between border-b border-[var(--wlp-border)] shrink-0">
-            <div className="flex items-center gap-[9px]">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 text-[var(--wlp-accent)]">
-                <rect x="3" y="6" width="18" height="15" rx="2" stroke="currentColor" strokeWidth="1.8" fill="none"/>
-                <path d="M3 10h18" stroke="currentColor" strokeWidth="1.8"/>
-                <path d="M8 3v4M16 3v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                <circle cx="8" cy="15" r="1.1" fill="currentColor"/>
-                <circle cx="12" cy="15" r="1.1" fill="currentColor"/>
-                <circle cx="16" cy="15" r="1.1" fill="currentColor"/>
+          {/* Header. No title: the sidebar sits beside Google Calendar's own
+              top bar and reads as part of it, so it opens with the add action
+              as Google's left nav opens with "Create". */}
+          <div className="wlp-header flex items-center justify-between shrink-0">
+            {/* Shows and hides the add form, which the pencil icon did before
+                it. A toggle rather than "always open", so a pool that is only
+                being dragged from can keep the form out of the way; the plus
+                turns into a cross while the form is open, so the second click
+                reads as closing it. aria-expanded says the same to a screen
+                reader. */}
+            <button
+              type="button"
+              onClick={() => setFormOpen((v) => !v)}
+              title={formOpen ? 'Hide the new item form' : 'Add an item to the pool'}
+              aria-label="New item"
+              aria-expanded={formOpen}
+              className={`wlp-new-pill${formOpen ? ' wlp-new-pill-open' : ''}`}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="wlp-new-pill-icon">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
               </svg>
-              <h2 className="m-[0] text-[14px] font-[500] text-[var(--wlp-text)] tracking-[0.1px]">
-                Weekly Pool
-              </h2>
-            </div>
-            <div className="flex items-center gap-[2px]">
-              {/* Toggle form */}
-              <button
-                onClick={() => setFormOpen((v) => !v)}
-                title={formOpen ? 'Hide input' : 'Add items'}
-                aria-label="Add items"
-                aria-expanded={formOpen}
-                className={iconBtnCls}
-                style={{ color: formOpen ? 'var(--wlp-accent)' : undefined }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                </svg>
-              </button>
-              {/* Collapse sidebar */}
-              <button
-                onClick={() => { setPickedId(null); setCollapsed(true); }}
-                title="Hide sidebar"
-                aria-label="Hide sidebar"
-                className={iconBtnCls}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
-                </svg>
-              </button>
-            </div>
+              New item
+            </button>
+            {/* Collapse sidebar */}
+            <button
+              onClick={() => { setPickedId(null); setCollapsed(true); }}
+              title="Hide sidebar"
+              aria-label="Hide sidebar"
+              className={iconBtnCls}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+              </svg>
+            </button>
           </div>
 
           {/* Loading */}
