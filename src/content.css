@@ -58,11 +58,9 @@
   --wlp-swatch-outline:  rgba(0, 0, 0, 0.12);  /* around the event colour's dot */
   /* A thin scrollbar's thumb, as on Google's nav: the text colour, faint. */
   --wlp-scrollbar:       color-mix(in srgb, var(--wlp-text) 24%, transparent);
-  /* The header's "New item" pill, raised the way Google's "Create" is: white,
-     with Google's two-layer elevation shadow, deeper on hover. */
-  --wlp-pill:            #ffffff;
-  --wlp-pill-shadow:       0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
-  --wlp-pill-shadow-hover: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  /* Google's two-layer elevation shadow, which lifts a chip under the
+     pointer and a filled button on hover. */
+  --wlp-shadow:          0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
   /* The grey of the fields in Google's event editor ("Add location",
      "Notification ▾"): one tonal step off the page surface, with a touch of
      the accent and of the text mixed in. Mixed rather than fixed, and from
@@ -108,13 +106,8 @@
   --wlp-tooltip-text:    #1f1f1f;
   --wlp-swatch-outline:  rgba(255, 255, 255, 0.24);
   --wlp-scrollbar:       color-mix(in srgb, var(--wlp-text) 30%, transparent);
-  /* In the dark theme Google's "Create" is a tonal grey a step lighter than
-     the nav, and its shadow is drawn in black. Mixed from the surface rather
-     than fixed, so it stays that one step above whatever grey Google's page
-     is; on the fallback surface it comes to about #373737. */
-  --wlp-pill:            color-mix(in srgb, var(--wlp-text) 12%, var(--wlp-surface));
-  --wlp-pill-shadow:       0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
-  --wlp-pill-shadow-hover: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+  /* In the dark theme Google draws its shadows in black. */
+  --wlp-shadow:          0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   color-scheme: dark;
 }
 
@@ -208,13 +201,14 @@
   z-index: 1000 !important;
 }
 
-/* The expanded sidebar is a column of the header, the composer, the toast,
-   the list and the footer, and it must never be taller than the sidebar: the
-   column fills the sidebar and no more (min-height 0, which a flex child does
-   not have by default), the header and footer keep their height, and the
-   list takes whatever is left and scrolls. In a window too short for the
-   composer as well, the list is down to nothing and the composer gives way
-   next, scrolling inside itself (PoolSidebar); the header and footer stay. */
+/* The expanded sidebar is a column of the header, the rest of the composer,
+   the toast, the list and the footer, and it must never be taller than the
+   sidebar: the column fills the sidebar and no more (min-height 0, which a
+   flex child does not have by default), the header, which holds the
+   composer's title row, and the footer keep their height, and the list takes
+   whatever is left and scrolls. In a window too short for the composer as
+   well, the list is down to nothing and the composer gives way next,
+   scrolling inside itself (.wlp-composer); the header and footer stay. */
 .wlp-column {
   display: flex !important;
   flex-direction: column !important;
@@ -242,77 +236,42 @@
   scrollbar-color: var(--wlp-scrollbar) transparent !important;
 }
 
-/* Force spacing to win over Google Calendar's global stylesheet. 8 px above
-   and below a 48 px pill makes the header 64 px, the height of Google
-   Calendar's own top bar beside it, so the two read as one band. */
+/* The header is the composer's title row with the sidebar's chevron at its
+   end (PoolSidebar). 12 px above and below the 40 px title field make it
+   64 px, the height of Google Calendar's own top bar beside it, so the two
+   read as one band. The chevron is pushed to the end, where it stays while
+   the calendars load and the title row is not drawn yet. Force spacing to
+   win over Google Calendar's global stylesheet. */
 .wlp-header {
-  flex-shrink: 0 !important;
-  padding: 8px 12px 8px 16px !important;
-}
-
-/* ── "New item" pill ───────────────────────────────────────────────────────── */
-
-/* Shaped after Google's "Create": a 16 px rounded rectangle on a raised
-   surface, an icon and a label in Google Sans. Its colours are the sidebar's
-   own tokens rather than read from Google's button, which could only be found
-   by its class names or its translated label. Reset with !important because
-   Google Calendar styles bare buttons globally. */
-.wlp-new-pill {
-  display: inline-flex !important;
+  display: flex !important;
   align-items: center !important;
-  gap: 12px !important;
-  height: 48px !important;
-  margin: 0 !important;
-  padding: 0 20px 0 14px !important;
-  border: none !important;
-  border-radius: 16px !important;
-  background: var(--wlp-pill) !important;
-  box-shadow: var(--wlp-pill-shadow) !important;
-  font-family: inherit !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.25px !important;
-  color: var(--wlp-text) !important;
-  cursor: pointer !important;
-  transition: box-shadow 0.15s, background 0.15s !important;
-}
-
-/* Google's hover: a faint state layer of the text colour, and a deeper
-   shadow. */
-.wlp-new-pill:hover {
-  background: color-mix(in srgb, var(--wlp-text) 6%, var(--wlp-pill)) !important;
-  box-shadow: var(--wlp-pill-shadow-hover) !important;
-}
-
-.wlp-new-pill:active {
-  background: color-mix(in srgb, var(--wlp-text) 10%, var(--wlp-pill)) !important;
-}
-
-.wlp-new-pill:focus-visible {
-  outline: 2px solid var(--wlp-focus) !important;
-  outline-offset: 2px !important;
-}
-
-.wlp-new-pill-icon {
+  gap: 8px !important;
   flex-shrink: 0 !important;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  height: 64px !important;
+  box-sizing: border-box !important;
+  padding: 0 12px 0 var(--wlp-gutter) !important;
 }
 
-/* While the form is open the plus is turned into a cross, so the pill's next
-   click reads as closing it. */
-.wlp-new-pill-open .wlp-new-pill-icon {
-  transform: rotate(45deg) !important;
+.wlp-header-hide {
+  margin-inline-start: auto !important;
 }
 
 /* ── Add-item form ─────────────────────────────────────────────────────────── */
 
 /* Laid out as Google's event editor opens: the title with the filled button
-   beside it, then a row of grey fields. */
-.wlp-form {
-  padding: 12px var(--wlp-gutter) 16px !important;
+   beside it, in the header, then a row of grey fields and the hint under it.
+   The composer is always open. In a window too short for it and the list it
+   shrinks and scrolls rather than push the footer off (see .wlp-column). */
+.wlp-composer {
   display: flex !important;
   flex-direction: column !important;
   gap: 12px !important;
+  flex: 0 1 auto !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding: 0 var(--wlp-gutter) 16px !important;
+  border-bottom: 1px solid var(--wlp-divider) !important;
 }
 
 .wlp-form-row {
@@ -522,7 +481,7 @@ select.wlp-gfield:focus-visible {
 
 .wlp-btn-filled:hover:not(:disabled) {
   background: var(--wlp-primary-hover) !important;
-  box-shadow: var(--wlp-pill-shadow) !important;
+  box-shadow: var(--wlp-shadow) !important;
 }
 
 .wlp-btn-filled:focus-visible {
@@ -709,7 +668,7 @@ select.wlp-gfield:focus-visible {
 
 /* Google lifts a chip under the pointer with its elevation shadow. */
 .wlp-item:hover {
-  box-shadow: var(--wlp-pill-shadow) !important;
+  box-shadow: var(--wlp-shadow) !important;
 }
 
 .wlp-item:active {

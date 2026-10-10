@@ -82,7 +82,6 @@ interface DropTarget {
 // calendar's id, and only used for that calendar.
 interface StoredState {
   sidebarCollapsed?: boolean;
-  formOpen?: boolean;
   primaryCalendarName?: PrimaryName;
 }
 
@@ -609,8 +608,6 @@ const PoolSidebar: React.FC = () => {
   const [layoutReady, setLayoutReady] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [besideNav, setBesideNav] = useState(false);
-  const [formOpen, setFormOpen] = useState(true);
-  const [formSettled, setFormSettled] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -620,8 +617,6 @@ const PoolSidebar: React.FC = () => {
   const [primaryLookup, setPrimaryLookup] = useState<PrimaryLookup | null>(null);
   const primaryName = useRef<PrimaryName | null>(null);
   const collapsedReady = useRef(false);
-  const formReady = useRef(false);
-  const formMounted = useRef(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const showButton = useRef<HTMLButtonElement>(null);
   const hideButton = useRef<HTMLButtonElement>(null);
@@ -738,15 +733,17 @@ const PoolSidebar: React.FC = () => {
 
   const shownCollapsed = collapsed || (navOpen && !besideNav);
 
+  // Earlier versions also kept whether the add form was open, under formOpen.
+  // The composer no longer closes, so that key is never read, and it is
+  // removed so a closed form stored long ago leaves nothing behind.
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage) return;
-    chrome.storage.local.get<StoredState>(['sidebarCollapsed', 'formOpen'], (result) => {
+    chrome.storage.local.get<StoredState>('sidebarCollapsed', (result) => {
       collapsedReady.current = true;
-      formReady.current = true;
       setCollapsed(result.sidebarCollapsed === true);
       setLayoutReady(true);
-      if (result.formOpen === false) setFormOpen(false);
     });
+    chrome.storage.local.remove('formOpen');
   }, []);
 
   useEffect(() => {
@@ -801,27 +798,6 @@ const PoolSidebar: React.FC = () => {
     focusToggle.current = true;
     setCollapsed(true);
   };
-
-  useEffect(() => {
-    if (!formReady.current) return;
-    if (extensionAlive()) {
-      chrome.storage.local.set({ formOpen });
-    }
-  }, [formOpen]);
-
-  // Focus input when form opens
-  useEffect(() => {
-    if (formOpen) setTimeout(() => inputRef.current?.focus(), 50);
-  }, [formOpen]);
-
-  // The composer only scrolls once it has finished opening, for a window too
-  // short to show all of it; while it opens or closes its content is meant to
-  // be cut off, and a scrollbar would flash in and narrow its fields. It
-  // starts settled, as it mounts open with nothing to animate.
-  useEffect(() => {
-    if (!formMounted.current) { formMounted.current = true; return; }
-    setFormSettled(false);
-  }, [formOpen]);
 
   // ── Drop toast listener ──────────────────────────────────────────────────────
 
@@ -1173,13 +1149,15 @@ const PoolSidebar: React.FC = () => {
     );
   };
 
-  // An empty calendar's row opens the form already set to that calendar, so
-  // adding the first item to it is one click and then typing, as it is from
-  // the form itself.
+  // An empty calendar's row sets the composer to that calendar and puts the
+  // caret in its title, so adding the first item to it is one click and then
+  // typing. That, and adding an item, which leaves the caret there for the
+  // next one, are the only times the sidebar puts focus in the title: on load
+  // it is left alone, so opening Google Calendar never takes the keyboard
+  // away from Google's page.
   const startAddTo = (calendarId: string) => {
     setNewItemCategory(calendarId);
-    setFormOpen(true);
-    setTimeout(() => inputRef.current?.focus(), 50);
+    inputRef.current?.focus();
   };
 
   // ── Rename ───────────────────────────────────────────────────────────────────
@@ -1310,36 +1288,63 @@ const PoolSidebar: React.FC = () => {
         /* ── Expanded view ────────────────────────────────────────────────── */
         <div className="wlp-column w-[280px]">
 
-          {/* Header. No title: the sidebar sits beside Google Calendar's own
-              top bar and reads as part of it, so it opens with the add action
-              as Google's left nav opens with "Create". */}
-          <div className="wlp-header flex items-center justify-between shrink-0">
-            {/* Shows and hides the add form, which the pencil icon did before
-                it. A toggle rather than "always open", so a pool that is only
-                being dragged from can keep the form out of the way; the plus
-                turns into a cross while the form is open, so the second click
-                reads as closing it. aria-expanded says the same to a screen
-                reader. */}
-            <button
-              type="button"
-              onClick={() => setFormOpen((v) => !v)}
-              title={formOpen ? 'Hide the new item form' : 'Add an item to the pool'}
-              aria-label="New item"
-              aria-expanded={formOpen}
-              className={`wlp-new-pill${formOpen ? ' wlp-new-pill-open' : ''}`}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="wlp-new-pill-icon">
-                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-              </svg>
-              New item
-            </button>
+          {/* Header: the composer's first row, with the chevron that hides the
+              sidebar at its end. There is no title and no "New item" button:
+              the composer is always open, so its title is what the sidebar
+              opens with, in a 64 px band level with Google Calendar's own top
+              bar beside it, as "Add title" heads Google's event editor. The
+              chevron shares that row rather than taking one of its own, which
+              would be a band of nothing else. Until the calendars are loaded
+              there is nothing to add to, and the chevron stands alone at the
+              end. */}
+          <div className="wlp-header">
+            {!loading && !fetchError && (
+              <>
+                <div className="wlp-title-field">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    dir="auto"
+                    placeholder="Add title"
+                    aria-label="Title of new item"
+                    aria-describedby="wlp-form-hint"
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                    className="wlp-title-input"
+                  />
+                  {newItemName && (
+                    <button
+                      onClick={() => { setNewItemName(''); inputRef.current?.focus(); }}
+                      tabIndex={-1}
+                      title="Clear"
+                      aria-label="Clear"
+                      className="wlp-input-clear"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={addItem}
+                  disabled={!newItemName.trim()}
+                  title="Add (Enter)"
+                  aria-label="Add item"
+                  className="wlp-btn-filled"
+                >
+                  Add
+                </button>
+              </>
+            )}
             {/* Collapse sidebar */}
             <button
               ref={hideButton}
               onClick={hideSidebar}
               title="Hide sidebar"
               aria-label="Hide sidebar"
-              className={iconBtnCls}
+              className={`${iconBtnCls} wlp-header-hide`}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
@@ -1370,110 +1375,51 @@ const PoolSidebar: React.FC = () => {
           {/* Content (loaded) */}
           {!loading && !fetchError && (
             <>
-              {/* Add item form — always in DOM, animated via max-height/opacity.
-                  In a window too short for it and the list it gives way
-                  (.wlp-column), and once open it scrolls rather than cut off. */}
-              <div
-                onTransitionEnd={(e) => {
-                  if (e.target === e.currentTarget && e.propertyName === 'max-height' && formOpen) setFormSettled(true);
-                }}
-                className="wlp-scroll"
-                style={{
-                  maxHeight: formOpen ? '300px' : '0',
-                  opacity: formOpen ? 1 : 0,
-                  overflowX: 'hidden',
-                  overflowY: formOpen && formSettled ? 'auto' : 'hidden',
-                  pointerEvents: formOpen ? undefined : 'none',
-                  transition: 'max-height 0.22s ease, opacity 0.15s ease',
-                  borderBottom: '1px solid var(--wlp-divider)',
-                  flexShrink: 1,
-                  minHeight: 0,
-                }}
-              >
-                {/* The composer, in the words of Google's event editor: a
-                    title on an underline with a filled "Add" beside it, as
-                    "Add title" sits beside "Save", then the calendar and the
-                    duration as grey fields. */}
-                <div className="wlp-form">
+              {/* The rest of the composer, in the words of Google's event
+                  editor: under the title, the calendar and the duration as
+                  grey fields. Always shown. In a window too short for it and
+                  the list it gives way (.wlp-column) and scrolls rather than
+                  cut off; the title row above stays in the header. */}
+              <div className="wlp-composer wlp-scroll">
 
-                  <div className="wlp-form-row">
-                    <div className="wlp-title-field">
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        dir="auto"
-                        placeholder="Add title"
-                        aria-label="Title of new item"
-                        aria-describedby="wlp-form-hint"
-                        value={newItemName}
-                        onChange={(e) => setNewItemName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && addItem()}
-                        className="wlp-title-input"
-                      />
-                      {newItemName && (
-                        <button
-                          onClick={() => { setNewItemName(''); inputRef.current?.focus(); }}
-                          tabIndex={-1}
-                          title="Clear"
-                          aria-label="Clear"
-                          className="wlp-input-clear"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                    <button
-                      onClick={addItem}
-                      disabled={!newItemName.trim()}
-                      title="Add (Enter)"
-                      aria-label="Add item"
-                      className="wlp-btn-filled"
-                    >
-                      Add
-                    </button>
-                  </div>
-
-                  {/* The calendar as Google's editor chooses one: a grey field
-                      with the calendar's colour and its name. It replaces a
-                      cloud of chips that grew a line for every few calendars.
-                      Every calendar is a choice, a folded one included, and an
-                      empty calendar's row sets it (startAddTo). */}
-                  <div className="wlp-form-row">
-                    {categories.length > 0 && (
-                      <FieldSelect
-                        value={newItemCategory}
-                        label="Calendar of new item"
-                        title={selectedCategory?.name}
-                        dot={selectedCategory?.color}
-                        onChange={setNewItemCategory}
-                        className="wlp-form-calendar"
-                      >
-                        {categories.map((cat) => (
-                          <option key={cat.calendarId} value={cat.calendarId} dir="auto">{cat.name}</option>
-                        ))}
-                      </FieldSelect>
-                    )}
+                {/* The calendar as Google's editor chooses one: a grey field
+                    with the calendar's colour and its name. It replaces a
+                    cloud of chips that grew a line for every few calendars.
+                    Every calendar is a choice, a folded one included, and an
+                    empty calendar's row sets it (startAddTo). */}
+                <div className="wlp-form-row">
+                  {categories.length > 0 && (
                     <FieldSelect
-                      value={newItemDuration}
-                      label="Duration of new item"
-                      title="Duration"
-                      onChange={(v) => setNewItemDuration(Number(v))}
+                      value={newItemCategory}
+                      label="Calendar of new item"
+                      title={selectedCategory?.name}
+                      dot={selectedCategory?.color}
+                      onChange={setNewItemCategory}
+                      className="wlp-form-calendar"
                     >
-                      {durationOptions(newItemDuration).map((min) => (
-                        <option key={min} value={min}>{formatDuration(min)}</option>
+                      {categories.map((cat) => (
+                        <option key={cat.calendarId} value={cat.calendarId} dir="auto">{cat.name}</option>
                       ))}
                     </FieldSelect>
-                  </div>
-
-                  {/* The two modifiers nothing else on screen mentions, kept
-                      short and in the hint grey so they read as a footnote. */}
-                  <p id="wlp-form-hint" className="wlp-form-hint">
-                    Shift-drop repeats weekly · Enter on an item’s calendar icon schedules it
-                  </p>
-
+                  )}
+                  <FieldSelect
+                    value={newItemDuration}
+                    label="Duration of new item"
+                    title="Duration"
+                    onChange={(v) => setNewItemDuration(Number(v))}
+                  >
+                    {durationOptions(newItemDuration).map((min) => (
+                      <option key={min} value={min}>{formatDuration(min)}</option>
+                    ))}
+                  </FieldSelect>
                 </div>
+
+                {/* The two modifiers nothing else on screen mentions, kept
+                    short and in the hint grey so they read as a footnote. */}
+                <p id="wlp-form-hint" className="wlp-form-hint">
+                  Shift-drop repeats weekly · Enter on an item’s calendar icon schedules it
+                </p>
+
               </div>
 
               {/* Toast. A screen reader only announces a live region that was
@@ -1741,7 +1687,7 @@ const PoolSidebar: React.FC = () => {
 
                 {/* Calendars with nothing in them yet, under one quiet line
                     instead of a "No items yet" each. A row is a button that
-                    opens the form set to that calendar, and a drop target
+                    sets the composer to that calendar, and a drop target
                     that takes a dragged item into it, which unfolds it into
                     a section of its own above. There is nothing in one to
                     fold, so a row has no chevron; a calendar folded before it
