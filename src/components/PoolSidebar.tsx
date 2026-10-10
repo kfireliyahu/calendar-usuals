@@ -875,7 +875,7 @@ const PoolSidebar: React.FC = () => {
 
   // ── Shared styles ────────────────────────────────────────────────────────────
 
-  const sidebarCls = `wlp-sidebar fixed left-0 top-0 h-screen border-r border-[var(--wlp-divider)] flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+  const sidebarCls = `wlp-sidebar fixed left-0 top-0 h-screen flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${
     collapsed ? 'w-[40px]' : 'w-[280px]'
   }`;
 
@@ -1115,7 +1115,7 @@ const PoolSidebar: React.FC = () => {
 
               {/* Category list */}
               <div
-                className="flex-1 overflow-y-auto py-[12px]"
+                className="wlp-scroll flex-1 overflow-y-auto py-[12px]"
                 onDragOver={(e) => { if (isReorderDrag(e) && !wasHandled(e)) setDropTarget(null); }}
                 onDrop={handleListDrop}
               >
@@ -1129,7 +1129,7 @@ const PoolSidebar: React.FC = () => {
                         className="w-[10px] h-[10px] rounded-full shrink-0"
                         style={{ backgroundColor: category.color }}
                       />
-                      <h3 className="flex-1 m-[0] text-[11px] font-[600] text-[var(--wlp-text-secondary)] uppercase tracking-[0.6px]">
+                      <h3 className="wlp-cat-title flex-1 min-w-[0] m-[0] truncate">
                         {category.name}
                       </h3>
                       <button
@@ -1184,7 +1184,7 @@ const PoolSidebar: React.FC = () => {
                                 setDropTarget(null);
                                 document.dispatchEvent(new CustomEvent('poolDragEnd'));
                               }}
-                              className={`wlp-item group flex items-center justify-between bg-[var(--wlp-surface-raised)] border border-[var(--wlp-border-subtle)] rounded-[6px] text-[13px] text-[var(--wlp-text)] cursor-grab select-none transition-all duration-150 hover:border-[var(--wlp-border-hover)] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
+                              className={`wlp-item group flex items-center justify-between bg-[var(--wlp-surface-raised)] border border-[var(--wlp-border-subtle)] rounded-[6px] text-[var(--wlp-text)] cursor-grab select-none transition-all duration-150 hover:border-[var(--wlp-border-hover)] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
                                 draggingId === item.id ? ' opacity-40' : ''
                               }${picked ? ' wlp-item-picked' : ''}`}
                               style={{ borderLeft: `3px solid ${eventColorHex(item.colorId, category.color)}` }}
@@ -1297,7 +1297,7 @@ const PoolSidebar: React.FC = () => {
                   </div>
                 ))}
                 {visibleCategories.length === 0 && hiddenCategories.length === 0 && (
-                  <p className="px-[20px] pt-[20px] text-[13px] text-[var(--wlp-text-secondary)]">No calendars found.</p>
+                  <p className="px-[16px] pt-[20px] text-[13px] text-[var(--wlp-text-secondary)]">No calendars found.</p>
                 )}
 
                 {/* Hidden categories restore strip */}

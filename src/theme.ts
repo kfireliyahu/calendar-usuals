@@ -1,5 +1,6 @@
 // Which theme Google Calendar is showing, so the sidebar and everything the
-// content script draws on the page can match it.
+// content script draws on the page can match it, and the colour of the page
+// surface the sidebar sits on.
 //
 // Google Calendar has its own Light / Dark / Device default setting (Settings
 // → Appearance), so prefers-color-scheme alone gets it wrong whenever the two
@@ -116,6 +117,47 @@ export function detectTheme(): Theme {
   return 'light';
 }
 
+// ── Reading the page surface ──────────────────────────────────────────────────
+
+// The colour Google paints behind its top bar and left nav, which the sidebar
+// sits on so it reads as part of the same band rather than as a card beside
+// it. In the light theme that is not the calendar's own colour: the grid in
+// [role="main"] is a white card on a faintly blue page, so the walk starts
+// from the top bar instead, [role="banner"], the header landmark every Google
+// app gives it, and goes up to the first element that paints a background.
+// Without a banner it starts from <body>.
+//
+// Null when there is no answer the sidebar can trust, and content.css then
+// keeps its own constant for the theme: when nothing paints, when what paints
+// is see-through (its colour would depend on what is under it), or when the
+// colour disagrees with the theme detectTheme read from the calendar, which
+// would leave the sidebar's text colours on the wrong kind of background.
+export function detectSurface(theme: Theme): string | null {
+  const start = document.querySelector('[role="banner"]') ?? document.body;
+  for (let el: Element | null = start; el; el = el.parentElement) {
+    const color = parseColor(getComputedStyle(el).backgroundColor);
+    if (!color || color[3] < OPAQUE_ENOUGH) continue;
+    if (color[3] < 1) return null;
+    const dark = relativeLuminance(color) < DARK_BELOW_LUMINANCE;
+    if (dark !== (theme === 'dark')) return null;
+    const [r, g, b] = color.map(Math.round);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+  return null;
+}
+
+// What the extension matches on the page: the theme, and the surface colour
+// when one could be read.
+export interface PageLook {
+  theme:   Theme;
+  surface: string | null;
+}
+
+function detectLook(): PageLook {
+  const theme = detectTheme();
+  return { theme, surface: detectSurface(theme) };
+}
+
 // ── Watching for a change ─────────────────────────────────────────────────────
 
 // Mutations come in bursts, and the check reads computed styles, so a burst
@@ -127,15 +169,16 @@ const RECHECK_DELAY_MS = 150;
 // while the tab is visible; the check is a handful of getComputedStyle calls.
 const RECHECK_POLL_MS = 3000;
 
-// Calls apply with the current theme straight away, then again whenever it
-// changes. It never calls apply twice in a row with the same theme.
+// Calls apply with the current theme and surface straight away, then again
+// whenever either changes. It never calls apply twice in a row with the same
+// pair.
 //
-// What can change it: Google toggling a class or style on <html> or <body>,
+// What can change them: Google toggling a class or style on <html> or <body>,
 // replacing the app's root under <body>, adding or swapping a stylesheet in
 // <head>, and, under "Device default", the OS switching between light and
 // dark, which only Google's reaction to it would otherwise reveal.
-export function watchTheme(apply: (theme: Theme) => void): void {
-  let current = detectTheme();
+export function watchTheme(apply: (look: PageLook) => void): void {
+  let current = detectLook();
   apply(current);
 
   let pending: ReturnType<typeof setTimeout> | null = null;
@@ -143,8 +186,8 @@ export function watchTheme(apply: (theme: Theme) => void): void {
     if (pending) return;
     pending = setTimeout(() => {
       pending = null;
-      const next = detectTheme();
-      if (next === current) return;
+      const next = detectLook();
+      if (next.theme === current.theme && next.surface === current.surface) return;
       current = next;
       apply(next);
     }, RECHECK_DELAY_MS);

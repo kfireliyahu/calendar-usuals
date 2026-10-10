@@ -24,11 +24,17 @@
    Calendar's own elements. The sidebar's Tailwind classes read them as
    bracket values, bg-[var(--wlp-surface)] and so on. */
 :is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview) {
-  --wlp-surface:         #ffffff;  /* the sidebar and its collapsed strip */
+  /* The sidebar and its collapsed strip sit on Google's page surface, the
+     colour behind its top bar and left nav, which content.tsx reads off the
+     page (theme.ts, detectSurface) and sets as --wlp-page. The constant is
+     Google's light page colour, for when it cannot be read. */
+  --wlp-surface:         var(--wlp-page, #f8fafd);
   --wlp-surface-raised:  #ffffff;  /* item rows */
   --wlp-panel:           #f8f9fa;  /* schedule form and details panel */
   --wlp-input:           #ffffff;  /* text fields, selects and the buttons beside them */
-  --wlp-hover:           #f1f3f4;
+  /* Google's hover state layer: the text colour at 8% over whatever is
+     under it, so it shows on the page surface and on a field alike. */
+  --wlp-hover:           color-mix(in srgb, var(--wlp-text) 8%, transparent);
   --wlp-text:            #202124;
   --wlp-text-secondary:  #5f6368;
   --wlp-text-muted:      #9aa0a6;  /* hints, empty states, the footer */
@@ -56,6 +62,8 @@
   --wlp-tooltip-bg:      #202124;
   --wlp-tooltip-text:    #ffffff;
   --wlp-swatch-outline:  rgba(0, 0, 0, 0.12);
+  /* A thin scrollbar's thumb, as on Google's nav: the text colour, faint. */
+  --wlp-scrollbar:       color-mix(in srgb, var(--wlp-text) 24%, transparent);
   /* The header's "New item" pill, raised the way Google's "Create" is: white,
      with Google's two-layer elevation shadow, deeper on hover. */
   --wlp-pill:            #ffffff;
@@ -72,11 +80,11 @@
    native controls, the checkbox, the selects' open lists and the scrollbars,
    their dark look too. */
 :is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview)[data-wlp-theme="dark"] {
-  --wlp-surface:         #1f1f1f;
+  --wlp-surface:         var(--wlp-page, #1f1f1f);
   --wlp-surface-raised:  #28292a;
   --wlp-panel:           #2d2e30;
   --wlp-input:           #1f1f1f;
-  --wlp-hover:           #37393b;
+  --wlp-hover:           color-mix(in srgb, var(--wlp-text) 8%, transparent);
   --wlp-text:            #e3e3e3;
   --wlp-text-secondary:  #c4c7c5;
   --wlp-text-muted:      #9aa0a6;
@@ -104,9 +112,12 @@
   --wlp-tooltip-bg:      #e3e3e3;
   --wlp-tooltip-text:    #1f1f1f;
   --wlp-swatch-outline:  rgba(255, 255, 255, 0.24);
+  --wlp-scrollbar:       color-mix(in srgb, var(--wlp-text) 30%, transparent);
   /* In the dark theme Google's "Create" is a tonal grey a step lighter than
-     the nav, and its shadow is drawn in black. */
-  --wlp-pill:            #37393b;
+     the nav, and its shadow is drawn in black. Mixed from the surface rather
+     than fixed, so it stays that one step above whatever grey Google's page
+     is; on the fallback surface it comes to about #373737. */
+  --wlp-pill:            color-mix(in srgb, var(--wlp-text) 12%, var(--wlp-surface));
   --wlp-pill-shadow:       0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
   --wlp-pill-shadow-hover: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
   color-scheme: dark;
@@ -171,12 +182,29 @@
   line-height: 1;
 }
 
-/* Google Sans → Roboto fallback to match Google Calendar's typeface.
-   The sidebar paints its own surface and text colour rather than letting
+/* ── Type and spacing ──────────────────────────────────────────────────────── */
+
+/* Google's left nav, measured off its "My calendars" list: Google Sans, a
+   calendar's name at 14 px in rows 32 px apart, a section title such as "My
+   calendars" at 16 px medium. Set on the sidebar's mount so every part of
+   it, and anything later drawn in it, can size itself from the same values. */
+#weekly-life-pool-sidebar {
+  --wlp-font:            'Google Sans', Roboto, Arial, sans-serif;
+  --wlp-type-name:       14px;    /* an item's or a calendar's name */
+  --wlp-type-section:    16px;    /* a section title */
+  --wlp-weight-section:  500;
+  --wlp-row-height:      32px;    /* one row of the list */
+  --wlp-gutter:          16px;    /* the sidebar's left and right inset */
+}
+
+/* The sidebar paints its own surface and text colour rather than letting
    Google Calendar's page show through: what is behind it is whatever Google
-   gives <body>, which only matches the sidebar's colours by accident. */
+   gives <body>, which only matches the sidebar's colours by accident. The
+   surface is Google's own page colour (see --wlp-surface), and there is no
+   border at its edge, as there is none between Google's nav and its grid. */
 .wlp-sidebar {
-  font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--wlp-font) !important;
+  font-size: var(--wlp-type-name) !important;
   position: fixed !important;
   left: 0 !important;
   top: 0 !important;
@@ -184,6 +212,20 @@
   background: var(--wlp-surface) !important;
   color: var(--wlp-text) !important;
   z-index: 1000 !important;
+}
+
+/* A thin scrollbar like the one on Google's nav, in place of the browser's
+   wide grey one, and like Google's it only shows its thumb while the pointer
+   is over the list or focus is inside it. The track stays transparent, so the
+   list reads as part of the page surface. */
+.wlp-scroll {
+  scrollbar-width: thin !important;
+  scrollbar-color: transparent transparent !important;
+}
+
+.wlp-scroll:hover,
+.wlp-scroll:focus-within {
+  scrollbar-color: var(--wlp-scrollbar) transparent !important;
 }
 
 /* Force spacing to win over Google Calendar's global stylesheet. 8 px above
@@ -249,7 +291,7 @@
 
 /* ── Add-item form ─────────────────────────────────────────────────────────── */
 .wlp-form {
-  padding: 16px 20px !important;
+  padding: 16px var(--wlp-gutter) !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 10px !important;
@@ -415,26 +457,41 @@
 }
 
 /* ── Category list ─────────────────────────────────────────────────────────── */
+
+/* Spaced like Google's "My calendars": a section title on a row of its own
+   with room above it, then rows 32 px tall. */
 .wlp-cat-group {
-  margin-bottom: 10px !important;
+  margin-bottom: 8px !important;
 }
 
 .wlp-cat-header {
-  padding: 12px 20px 8px !important;
+  min-height: 40px !important;
+  padding: 4px var(--wlp-gutter) !important;
+  box-sizing: border-box !important;
+}
+
+.wlp-cat-title {
+  font-size: var(--wlp-type-section) !important;
+  font-weight: var(--wlp-weight-section) !important;
+  line-height: 24px !important;
+  color: var(--wlp-text) !important;
 }
 
 .wlp-items-list {
-  padding: 0 16px !important;
-  gap: 6px !important;
+  padding: 0 var(--wlp-gutter) !important;
+  gap: 4px !important;
 }
 
 .wlp-item {
-  padding: 10px 14px !important;
+  min-height: var(--wlp-row-height) !important;
+  box-sizing: border-box !important;
+  padding: 0 12px !important;
   margin: 0 !important;
+  font-size: var(--wlp-type-name) !important;
 }
 
 .wlp-hidden-strip {
-  padding: 14px 20px 12px !important;
+  padding: 14px var(--wlp-gutter) 12px !important;
   margin-top: 10px !important;
 }
 
@@ -450,7 +507,7 @@
 .wlp-footer {
   flex-shrink: 0 !important;
   margin-top: auto !important;
-  padding: 10px 20px 12px !important;
+  padding: 10px var(--wlp-gutter) 12px !important;
   border-top: 1px solid var(--wlp-divider) !important;
 }
 
@@ -512,7 +569,7 @@
   outline: none !important;
   background: transparent !important;
   font-family: inherit !important;
-  font-size: 13px !important;
+  font-size: var(--wlp-type-name) !important;
   color: var(--wlp-text) !important;
   box-shadow: none !important;
   border-bottom: 1px solid var(--wlp-accent) !important;

@@ -4,7 +4,7 @@ import PoolSidebar from './components/PoolSidebar';
 import { PoolItem, durationOf, eventColorHex } from './poolItem';
 import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, timeGridCellFor } from './calendarGrid';
 import { EventDateTime, eventTimes } from './calendarZone';
-import { Theme, readableTextOn, watchTheme } from './theme';
+import { PageLook, Theme, readableTextOn, watchTheme } from './theme';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
@@ -56,13 +56,20 @@ function adjustLayout(collapsed: boolean): void {
 // the extension adds to the page, and content.css keys every colour off this
 // attribute on them. The tooltip and preview are created lazily, so each picks
 // up the current theme when it is made.
+//
+// The page surface goes on the sidebar's mount alone, as --wlp-page, which
+// content.css paints the sidebar with in place of its own constant. The
+// tooltip and preview sit over the grid, not beside the nav, and never use it.
 let currentTheme: Theme = 'light';
 
-function applyTheme(theme: Theme): void {
+function applyTheme({ theme, surface }: PageLook): void {
   currentTheme = theme;
-  for (const el of [document.getElementById('weekly-life-pool-sidebar'), tooltipEl, previewEl]) {
+  const sidebarEl = document.getElementById('weekly-life-pool-sidebar');
+  for (const el of [sidebarEl, tooltipEl, previewEl]) {
     el?.setAttribute('data-wlp-theme', theme);
   }
+  if (surface) sidebarEl?.style.setProperty('--wlp-page', surface);
+  else sidebarEl?.style.removeProperty('--wlp-page');
 }
 
 // ── Time helper ───────────────────────────────────────────────────────────────
