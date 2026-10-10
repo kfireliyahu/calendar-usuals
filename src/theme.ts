@@ -80,24 +80,10 @@ export function relativeLuminance([r, g, b]: Rgba): number {
 const LIGHT_TEXT = '#ffffff';
 const DARK_TEXT  = '#202124';
 
-// White text on a calendar or event colour, as Google Calendar draws its own
-// event chips, unless the colour is so light that white falls below 3:1
-// (Banana, Sage, Flamingo, the pastel calendar colours); then near-black, which
-// beats white by far on all of those. The colour is the same in both themes,
-// so the choice is too.
-const MIN_LIGHT_TEXT_CONTRAST = 3;
-
-export function readableTextOn(color: string): string {
-  const parsed = parseColor(color);
-  if (!parsed) return LIGHT_TEXT;
-  const contrastWithWhite = 1.05 / (relativeLuminance(parsed) + 0.05);
-  return contrastWithWhite >= MIN_LIGHT_TEXT_CONTRAST ? LIGHT_TEXT : DARK_TEXT;
-}
-
 // The text on a pool item's chip, and on the preview and placeholder that
 // stand for it on the grid, where an item's name is 12 px and so needs 4.5:1
-// to meet AA. readableTextOn's 3:1 leaves white on Peacock, Tangerine and
-// Lavender, which Google does too and which falls short of that, so this takes
+// to meet AA. Google draws white on Peacock, Tangerine and Lavender, which
+// falls short of that, so this takes
 // whichever of white and Google's near-black reads better. On a mid-tone where
 // neither reaches 4.5:1 (luminance about 0.18 to 0.24) it uses pure black,
 // which gets at least 4.6:1 on any colour white does not. The colour is the

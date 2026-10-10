@@ -29,17 +29,13 @@
      page (theme.ts, detectSurface) and sets as --wlp-page. The constant is
      Google's light page colour, for when it cannot be read. */
   --wlp-surface:         var(--wlp-page, #f8fafd);
-  --wlp-panel:           #f8f9fa;  /* schedule form and details panel */
-  --wlp-input:           #ffffff;  /* text fields, selects and the buttons beside them */
+  --wlp-input:           #ffffff;  /* behind a select's open list */
   /* Google's hover state layer: the text colour at 8% over whatever is
      under it, so it shows on the page surface and on a field alike. */
   --wlp-hover:           color-mix(in srgb, var(--wlp-text) 8%, transparent);
   --wlp-text:            #202124;
   --wlp-text-secondary:  #5f6368;
   --wlp-text-muted:      #9aa0a6;  /* hints, empty states, the footer */
-  --wlp-border:          #dadce0;  /* outlines of fields and buttons */
-  --wlp-border-subtle:   #e8eaed;  /* item rows, panels, chips */
-  --wlp-border-hover:    #c5c9ce;
   --wlp-divider:         rgba(218, 220, 224, 0.6);
   --wlp-accent:          #4285f4;
   --wlp-accent-soft:     #e8f0fe;  /* the row a drag would drop into */
@@ -59,7 +55,7 @@
   --wlp-error-border:    #f5c6c3;
   --wlp-tooltip-bg:      #202124;
   --wlp-tooltip-text:    #ffffff;
-  --wlp-swatch-outline:  rgba(0, 0, 0, 0.12);
+  --wlp-swatch-outline:  rgba(0, 0, 0, 0.12);  /* around the event colour's dot */
   /* A thin scrollbar's thumb, as on Google's nav: the text colour, faint. */
   --wlp-scrollbar:       color-mix(in srgb, var(--wlp-text) 24%, transparent);
   /* The header's "New item" pill, raised the way Google's "Create" is: white,
@@ -82,19 +78,15 @@
    Google Calendar is showing its dark theme (see theme.ts). The palette follows
    Google's own dark greys and its light blue accent. Every text colour here meets
    WCAG AA on the surfaces it is drawn on. color-scheme gives the
-   native controls, the checkbox, the selects' open lists and the scrollbars,
+   native controls, the selects' open lists, the number field and the scrollbars,
    their dark look too. */
 :is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview)[data-wlp-theme="dark"] {
   --wlp-surface:         var(--wlp-page, #1f1f1f);
-  --wlp-panel:           #2d2e30;
   --wlp-input:           #1f1f1f;
   --wlp-hover:           color-mix(in srgb, var(--wlp-text) 8%, transparent);
   --wlp-text:            #e3e3e3;
   --wlp-text-secondary:  #c4c7c5;
   --wlp-text-muted:      #9aa0a6;
-  --wlp-border:          #444746;
-  --wlp-border-subtle:   #3c4043;
-  --wlp-border-hover:    #5f6368;
   --wlp-divider:         #3c4043;
   --wlp-accent:          #a8c7fa;
   --wlp-accent-soft:     #1e3150;
@@ -966,10 +958,8 @@ select.wlp-gfield:focus-visible {
    enough for the ring. */
 .wlp-icon-btn:focus-visible,
 .wlp-toast-undo:focus-visible,
-.wlp-schedule-btn:focus-visible,
-.wlp-schedule-repeat input:focus-visible,
-.wlp-swatch:focus-visible,
-.wlp-dup-btn:focus-visible {
+.wlp-btn-text:focus-visible,
+.wlp-btn-icon:focus-visible {
   outline: 2px solid var(--wlp-focus) !important;
   outline-offset: 2px !important;
 }
@@ -986,65 +976,33 @@ select.wlp-gfield:focus-visible {
   outline: none !important;
 }
 
-/* ── Schedule form ─────────────────────────────────────────────────────────── */
+/* ── Schedule form and details panel ───────────────────────────────────────── */
 
-/* Same panel as the template details, so the row's two drop-downs look like
-   one family. */
-.wlp-schedule {
+/* Both open under their item's chip, laid out with the fields of Google's
+   event editor (.wlp-gfield, .wlp-gselect, .wlp-btn-filled above). The editor
+   draws its fields straight on the page rather than in a box, so these have no
+   card of their own: the grey fields are what reads, and the next item's
+   filled chip is what ends them. */
+.wlp-schedule,
+.wlp-item-details {
   display: flex !important;
   flex-direction: column !important;
   gap: 8px !important;
-  padding: 10px !important;
-  margin: 4px 0 0 !important;
-  border: 1px solid var(--wlp-border-subtle) !important;
-  border-radius: 6px !important;
-  background: var(--wlp-panel) !important;
+  margin: 0 !important;
+  padding: 8px 0 12px !important;
 }
 
 .wlp-schedule-row {
   display: flex !important;
-  gap: 6px !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
-.wlp-schedule-field {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 3px !important;
+/* The day takes what the start time leaves of the row, as the date field and
+   the time field share the editor's. */
+.wlp-gselect.wlp-schedule-day {
   flex: 1 1 0 !important;
   min-width: 0 !important;
-}
-
-.wlp-schedule-time {
-  flex: 0 0 92px !important;
-}
-
-.wlp-schedule-label {
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  color: var(--wlp-text-secondary) !important;
-}
-
-.wlp-schedule .wlp-field {
-  cursor: pointer !important;
-}
-
-.wlp-schedule .wlp-field:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wlp-focus) 35%, transparent) !important;
-}
-
-.wlp-schedule-repeat {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  font-size: 12px !important;
-  color: var(--wlp-text) !important;
-  cursor: pointer !important;
-}
-
-.wlp-schedule-repeat input {
-  margin: 0 !important;
-  accent-color: var(--wlp-primary) !important;
-  cursor: pointer !important;
 }
 
 .wlp-schedule-hint,
@@ -1055,138 +1013,128 @@ select.wlp-gfield:focus-visible {
   color: var(--wlp-text-muted) !important;
 }
 
-.wlp-schedule-actions {
+.wlp-schedule-actions,
+.wlp-details-actions {
   display: flex !important;
   justify-content: flex-end !important;
-  gap: 6px !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
-.wlp-schedule-btn {
-  margin: 0 !important;
-  padding: 6px 12px !important;
-  border: 1px solid var(--wlp-border) !important;
-  border-radius: 4px !important;
-  background: var(--wlp-input) !important;
-  font-family: inherit !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  color: var(--wlp-text-secondary) !important;
-  cursor: pointer !important;
-  transition: background 0.15s, color 0.15s !important;
-}
-
-.wlp-schedule-btn:hover {
-  background: var(--wlp-hover) !important;
-  color: var(--wlp-text) !important;
-}
-
-.wlp-schedule-btn-primary {
-  border-color: var(--wlp-primary) !important;
-  background: var(--wlp-primary) !important;
-  color: var(--wlp-on-primary) !important;
-}
-
-.wlp-schedule-btn-primary:hover {
-  background: var(--wlp-primary-hover) !important;
-  color: var(--wlp-on-primary) !important;
-}
-
-/* ── Item template panel ───────────────────────────────────────────────────── */
-
-.wlp-item-details {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 7px !important;
-  padding: 10px !important;
-  margin-top: 4px !important;
-  border: 1px solid var(--wlp-border-subtle) !important;
-  border-radius: 6px !important;
-  background: var(--wlp-panel) !important;
-}
-
-.wlp-field {
-  width: 100% !important;
-  box-sizing: border-box !important;
-  padding: 6px 8px !important;
-  border: 1px solid var(--wlp-border) !important;
-  border-radius: 4px !important;
-  outline: none !important;
-  background: var(--wlp-input) !important;
-  font-family: inherit !important;
-  font-size: 12px !important;
-  color: var(--wlp-text) !important;
-  box-shadow: none !important;
-  resize: none !important;
-}
-
-.wlp-field:focus {
-  border-color: var(--wlp-accent) !important;
-}
-
-.wlp-field::placeholder {
-  color: var(--wlp-text-muted) !important;
-}
-
+/* A row of the details panel: an icon in a column of its own, as the
+   editor's location pin, bell and calendar sit to the left of their fields,
+   then the field. A row whose field is taller than one line keeps its icon
+   level with the first line. */
 .wlp-details-row {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 8px !important;
+  min-width: 0 !important;
 }
 
-.wlp-details-select {
+.wlp-details-icon {
+  flex-shrink: 0 !important;
+  color: var(--wlp-text-secondary) !important;
+}
+
+.wlp-details-row-top {
+  align-items: flex-start !important;
+}
+
+.wlp-details-row-top .wlp-details-icon {
+  margin-top: 8px !important;
+}
+
+/* The calendar the item belongs to, shown rather than chosen, in plain text
+   so it does not read as a field. */
+.wlp-details-calendar {
   flex: 1 1 0 !important;
   min-width: 0 !important;
-  cursor: pointer !important;
-}
-
-.wlp-dup-btn {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-  flex-shrink: 0 !important;
-  padding: 6px 8px !important;
-  border: 1px solid var(--wlp-border) !important;
-  border-radius: 4px !important;
-  background: var(--wlp-input) !important;
-  font-family: inherit !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  color: var(--wlp-text-secondary) !important;
-  cursor: pointer !important;
-  transition: background 0.15s, color 0.15s !important;
-}
-
-.wlp-dup-btn:hover {
-  background: var(--wlp-hover) !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  font-size: var(--wlp-type-name) !important;
   color: var(--wlp-text) !important;
 }
 
-/* Twelve swatches: the calendar's own colour first, then Google's eleven. */
-.wlp-swatches {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 5px !important;
+/* The notification's count, the editor's "30": a short grey field without
+   the browser's spin arrows, which the arrow keys stand in for. */
+.wlp-gfield.wlp-notify-count {
+  flex: none !important;
+  width: 56px !important;
+  padding: 0 10px !important;
+  -moz-appearance: textfield !important;
 }
 
-.wlp-swatch {
-  width: 15px !important;
-  height: 15px !important;
+.wlp-notify-count::-webkit-inner-spin-button,
+.wlp-notify-count::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+/* The event colour, the editor's "● ▾": only the dot and the caret are drawn.
+   The select's text is still there for a screen reader and type-to-find, but
+   painted in no colour; the open list keeps its own colours (see option
+   above). The dot gets a faint outline, so Banana and the pastel calendar
+   colours do not melt into a light field. */
+.wlp-gselect-dot-only select.wlp-gfield {
+  field-sizing: fixed !important;
+  width: 68px !important;
+  color: transparent !important;
+}
+
+.wlp-gselect-dot-only .wlp-gselect-dot {
+  box-shadow: 0 0 0 1px var(--wlp-swatch-outline) !important;
+}
+
+/* Google's text button, "Cancel" beside "Save" or "Add notification": the
+   primary colour on nothing, a pill of its state layer on hover. */
+.wlp-btn-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+  height: var(--wlp-field-height) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border: none !important;
+  border-radius: calc(var(--wlp-field-height) / 2) !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.25px !important;
+  color: var(--wlp-primary) !important;
+  cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+
+.wlp-btn-text:hover {
+  background: color-mix(in srgb, var(--wlp-primary) 8%, transparent) !important;
+}
+
+/* A round icon button, the editor's × after a notification. */
+.wlp-btn-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  width: 32px !important;
+  height: 32px !important;
+  margin: 0 !important;
   padding: 0 !important;
   border: none !important;
   border-radius: 50% !important;
+  background: transparent !important;
+  color: var(--wlp-text-secondary) !important;
   cursor: pointer !important;
-  box-shadow: 0 0 0 1px var(--wlp-swatch-outline) !important;
-  transition: transform 0.12s !important;
+  transition: background 0.15s !important;
 }
 
-.wlp-swatch:hover {
-  transform: scale(1.15) !important;
-}
-
-/* A ring rather than a checkmark: the swatch is 15px and a tick would hide
-   the colour it is marking. */
-.wlp-swatch-on {
-  box-shadow: 0 0 0 2px var(--wlp-panel), 0 0 0 3px var(--wlp-text) !important;
+.wlp-btn-icon:hover {
+  background: var(--wlp-hover) !important;
 }
 
 /* ── Toast ─────────────────────────────────────────────────────────────────── */

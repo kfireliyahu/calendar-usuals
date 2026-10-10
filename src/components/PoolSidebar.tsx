@@ -4,12 +4,16 @@ import {
   DEFAULT_DURATION_MIN,
   DURATION_PRESETS,
   EVENT_COLORS,
-  REMINDER_PRESETS,
+  REMINDER_UNITS,
+  MAX_REMINDER_MIN,
+  DEFAULT_REMINDER_MIN,
+  ReminderUnit,
   durationOf,
   eventColorHex,
   formatDuration,
-  formatReminder,
   newItemId,
+  reminderUnitMin,
+  splitReminder,
 } from '../poolItem';
 import { formatTime, gridZoneLabels, isSameDay, visibleTimeGridDays } from '../calendarGrid';
 import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
@@ -181,21 +185,34 @@ const DurationSelect: React.FC<{
 // drawn above the page rather than clipped by the panel it sits in. The open
 // list cannot show the dots, which only the closed field has. content.css,
 // .wlp-gselect and .wlp-gfield, has the look.
+//
+// dotOnly draws just the dot and the ▾, as the editor's event colour field
+// does: the choice's name is still the select's value, so a screen reader and
+// type-to-find have it, but it is not painted.
 const FieldSelect: React.FC<{
   value: string | number;
   label: string;
   onChange: (value: string) => void;
   dot?: string;
+  dotOnly?: boolean;
   title?: string;
   className?: string;
+  autoFocus?: boolean;
+  onFocus?: () => void;
   children: React.ReactNode;
-}> = ({ value, label, onChange, dot, title, className, children }) => (
-  <span className={`wlp-gselect${dot ? ' wlp-gselect-has-dot' : ''}${className ? ` ${className}` : ''}`}>
+}> = ({ value, label, onChange, dot, dotOnly, title, className, autoFocus, onFocus, children }) => (
+  <span
+    className={`wlp-gselect${dot ? ' wlp-gselect-has-dot' : ''}${dotOnly ? ' wlp-gselect-dot-only' : ''}${
+      className ? ` ${className}` : ''
+    }`}
+  >
     {dot && <span aria-hidden="true" className="wlp-gselect-dot" style={{ backgroundColor: dot }} />}
     <select
       value={value}
       title={title}
       aria-label={label}
+      autoFocus={autoFocus}
+      onFocus={onFocus}
       onChange={(e) => onChange(e.target.value)}
       className="wlp-gfield"
     >
@@ -212,81 +229,216 @@ const FieldSelect: React.FC<{
 // Everything an item carries beyond its name and duration. Collapsed by
 // default: the pool is meant to be scannable at 280px, so these fields never
 // sit on the always-visible row.
+//
+// Laid out as the "Event details" of Google's event editor: an icon column on
+// the left, then location, the notification, the event colour beside the
+// calendar, and the description, each a grey field. Every change is saved as
+// it is made, as before, so there is no Save button.
+
+const DetailsIcon: React.FC<{ path: string }> = ({ path }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="wlp-details-icon">
+    <path d={path}/>
+  </svg>
+);
+
+const ICON_LOCATION = 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z';
+const ICON_BELL = 'M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z';
+const ICON_CALENDAR = 'M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1h-2zm3 18H5V8h14v11z';
+const ICON_NOTES = 'M14 17H4v2h10v-2zm6-8H4v2h16V9zM4 15h16v-2H4v2zM4 5v2h16V5H4z';
+
+// The editor's notification row, "30 | minutes ▾ | ×", for reminderMin. An
+// item with no reminderMin leaves the event on the calendar's own default
+// notifications, which is not the same as none, so that state shows "Add
+// notification" rather than an empty row; × goes back to it. Google's first
+// field, Notification or Email, is left out: the sidebar only ever sets a
+// popup, and the row would not fit the rail with it.
+//
+// The count and unit are kept here while they are typed, so 60 in minutes
+// stays "60 minutes" rather than jumping to "1 hours" under the caret. They
+// are read again from the item when its reminder changes elsewhere, another
+// machine or tab, and when the field is left holding something that was not
+// stored, empty or past the four weeks the Calendar API allows.
+const NotificationRow: React.FC<{
+  item: PoolItem;
+  onChange: (patch: Partial<PoolItem>) => void;
+}> = ({ item, onChange }) => {
+  const min = item.reminderMin;
+  const [count, setCount] = useState(() => String(min === undefined ? DEFAULT_REMINDER_MIN : splitReminder(min).count));
+  const [unit, setUnit] = useState<ReminderUnit>(() => (min === undefined ? 'minutes' : splitReminder(min).unit));
+  const countRef = useRef<HTMLInputElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  // Adding a notification and removing it each replace the control that was
+  // clicked, so focus is moved to the one that takes its place.
+  const focusNext = useRef<'count' | 'add' | null>(null);
+
+  const shows = (c: string, u: ReminderUnit) => c.trim() !== '' && Number(c) * reminderUnitMin(u) === min;
+
+  const showStored = () => {
+    if (min === undefined) return;
+    const s = splitReminder(min);
+    setCount(String(s.count));
+    setUnit(s.unit);
+  };
+
+  useEffect(() => {
+    if (!shows(count, unit)) showStored();
+  }, [min]);
+
+  useEffect(() => {
+    if (focusNext.current === 'count') countRef.current?.focus();
+    if (focusNext.current === 'add')   addRef.current?.focus();
+    focusNext.current = null;
+  });
+
+  const store = (c: string, u: ReminderUnit) => {
+    const n = Number(c);
+    if (c.trim() === '' || !Number.isInteger(n) || n < 0) return;
+    onChange({ reminderMin: Math.min(n * reminderUnitMin(u), MAX_REMINDER_MIN) });
+  };
+
+  const add = () => {
+    focusNext.current = 'count';
+    setCount(String(DEFAULT_REMINDER_MIN));
+    setUnit('minutes');
+    onChange({ reminderMin: DEFAULT_REMINDER_MIN });
+  };
+
+  const remove = () => {
+    focusNext.current = 'add';
+    onChange({ reminderMin: undefined });
+  };
+
+  return (
+    <div className="wlp-details-row">
+      <DetailsIcon path={ICON_BELL} />
+      {min === undefined ? (
+        <button
+          ref={addRef}
+          type="button"
+          onClick={add}
+          aria-label={`Add notification for ${item.name}`}
+          title="Until you add one, the event gets the calendar’s default notifications"
+          className="wlp-btn-text"
+        >
+          Add notification
+        </button>
+      ) : (
+        <>
+          <input
+            ref={countRef}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={Math.floor(MAX_REMINDER_MIN / reminderUnitMin(unit))}
+            step={1}
+            value={count}
+            aria-label={`Notification for ${item.name}`}
+            title="How long before the event"
+            onChange={(e) => { setCount(e.target.value); store(e.target.value, unit); }}
+            onBlur={() => { if (!shows(count, unit)) showStored(); }}
+            className="wlp-gfield wlp-notify-count"
+          />
+          <FieldSelect
+            value={unit}
+            label={`Notification unit for ${item.name}`}
+            onChange={(v) => { const u = v as ReminderUnit; setUnit(u); store(count, u); }}
+          >
+            {REMINDER_UNITS.map((u) => (
+              <option key={u.unit} value={u.unit}>{u.unit}</option>
+            ))}
+          </FieldSelect>
+          <button
+            type="button"
+            onClick={remove}
+            aria-label={`Use the default notification for ${item.name}`}
+            title="Use the calendar’s default notifications"
+            className="wlp-btn-icon"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
 
 const ItemDetails: React.FC<{
   item: PoolItem;
+  categoryName: string;
   categoryColor: string;
   onChange: (patch: Partial<PoolItem>) => void;
   onDuplicate: () => void;
-}> = ({ item, categoryColor, onChange, onDuplicate }) => (
-  <div className="wlp-item-details">
-    <textarea
-      rows={2}
-      placeholder="Description"
-      aria-label={`Description for ${item.name}`}
-      value={item.description ?? ''}
-      onChange={(e) => onChange({ description: e.target.value })}
-      className="wlp-field"
-    />
-    <input
-      type="text"
-      placeholder="Location"
-      aria-label={`Location for ${item.name}`}
-      value={item.location ?? ''}
-      onChange={(e) => onChange({ location: e.target.value })}
-      className="wlp-field"
-    />
+}> = ({ item, categoryName, categoryColor, onChange, onDuplicate }) => {
+  // A colorId this version does not know still has to be a choice, or the
+  // select would show "Calendar colour" for an item that sends another.
+  const knownColor = !item.colorId || EVENT_COLORS.some((c) => c.id === item.colorId);
 
-    <div className="wlp-swatches">
-      {/* No colorId means "whatever colour the calendar uses", which is what
-          every item did before this panel existed. */}
-      <button
-        type="button"
-        title="Calendar colour"
-        aria-label="Calendar colour"
-        aria-pressed={!item.colorId}
-        onClick={() => onChange({ colorId: undefined })}
-        className={`wlp-swatch${item.colorId ? '' : ' wlp-swatch-on'}`}
-        style={{ backgroundColor: categoryColor }}
-      />
-      {EVENT_COLORS.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          title={c.name}
-          aria-label={c.name}
-          aria-pressed={item.colorId === c.id}
-          onClick={() => onChange({ colorId: c.id })}
-          className={`wlp-swatch${item.colorId === c.id ? ' wlp-swatch-on' : ''}`}
-          style={{ backgroundColor: c.hex }}
+  return (
+    <div className="wlp-item-details">
+      <div className="wlp-details-row">
+        <DetailsIcon path={ICON_LOCATION} />
+        <input
+          type="text"
+          placeholder="Add location"
+          aria-label={`Location for ${item.name}`}
+          value={item.location ?? ''}
+          onChange={(e) => onChange({ location: e.target.value })}
+          className="wlp-gfield"
         />
-      ))}
-    </div>
+      </div>
 
-    <div className="wlp-details-row">
-      <select
-        title="Reminder"
-        aria-label={`Reminder for ${item.name}`}
-        value={item.reminderMin === undefined ? '' : String(item.reminderMin)}
-        onChange={(e) =>
-          onChange({ reminderMin: e.target.value === '' ? undefined : Number(e.target.value) })
-        }
-        className="wlp-field wlp-details-select"
-      >
-        <option value="">Default reminder</option>
-        {REMINDER_PRESETS.map((min) => (
-          <option key={min} value={min}>{formatReminder(min)}</option>
-        ))}
-      </select>
-      <button type="button" onClick={onDuplicate} title="Duplicate item" className="wlp-dup-btn">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/>
-        </svg>
-        Duplicate
-      </button>
+      <NotificationRow item={item} onChange={onChange} />
+
+      {/* The editor's calendar and colour pair: the calendar is shown, not
+          chosen, since an item changes calendar by being dragged into
+          another section; the colour is the editor's "● ▾". No colorId means
+          "whatever colour the calendar uses", which is what every item did
+          before this panel existed, and a change repaints the chip at once. */}
+      <div className="wlp-details-row">
+        <DetailsIcon path={ICON_CALENDAR} />
+        <span className="wlp-details-calendar" title={categoryName}>{categoryName}</span>
+        <FieldSelect
+          value={item.colorId ?? ''}
+          label={`Colour for ${item.name}`}
+          title="Event colour"
+          dot={eventColorHex(item.colorId, categoryColor)}
+          dotOnly
+          onChange={(v) => onChange({ colorId: v === '' ? undefined : v })}
+          className="wlp-color-select"
+        >
+          <option value="">Calendar colour</option>
+          {!knownColor && <option value={item.colorId}>Colour {item.colorId}</option>}
+          {EVENT_COLORS.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </FieldSelect>
+      </div>
+
+      <div className="wlp-details-row wlp-details-row-top">
+        <DetailsIcon path={ICON_NOTES} />
+        <textarea
+          rows={3}
+          placeholder="Add description"
+          aria-label={`Description for ${item.name}`}
+          value={item.description ?? ''}
+          onChange={(e) => onChange({ description: e.target.value })}
+          className="wlp-gfield"
+        />
+      </div>
+
+      <div className="wlp-details-actions">
+        <button type="button" onClick={onDuplicate} title="Duplicate item" className="wlp-btn-text">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/>
+          </svg>
+          Duplicate
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Schedule form ────────────────────────────────────────────────────────────
 //
@@ -322,6 +474,13 @@ function dayLabel(d: Date, today: Date): string {
   return isSameDay(d, today)
     ? `Today, ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
     : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// The weekly option says which weekday the series falls on, as Google's
+// "Weekly on Sunday" does: a weekly RRULE repeats on the start's weekday.
+// Written in English, like every other label here.
+function repeatLabel(d: Date | undefined): string {
+  return d ? `Weekly on ${d.toLocaleDateString('en-US', { weekday: 'long' })}` : 'Weekly';
 }
 
 // The soonest quarter hour that has not started yet. Late in the evening that
@@ -364,7 +523,7 @@ const ScheduleForm: React.FC<{
       aria-label={`Schedule ${item.name}`}
       onSubmit={(e) => { e.preventDefault(); submit(); }}
       // Browsers only submit on Enter from a text field, and this form has
-      // none, so Enter on the selects or the checkbox schedules too. A button
+      // none, so Enter on any of its selects schedules too. A button
       // keeps its own Enter, so Cancel still cancels. A held Enter is ignored:
       // the press that picked the item would otherwise repeat into the day
       // choice it focused and schedule straight away.
@@ -375,42 +534,49 @@ const ScheduleForm: React.FC<{
       }}
       className="wlp-schedule"
     >
+      {/* The editor's date row: the day and the start time as grey fields,
+          then "Does not repeat ▾" under them. No captions over the fields, as
+          the editor has none; each select is still named Day and Start. */}
       <div className="wlp-schedule-row">
-        <label className="wlp-schedule-field">
-          <span className="wlp-schedule-label">Day</span>
-          <select
-            autoFocus
-            value={dayValue}
-            onFocus={refreshDays}
-            onChange={(e) => setDayValue(e.target.value)}
-            className="wlp-field"
-          >
-            {days.map((d) => (
-              <option key={dayKey(d)} value={dayKey(d)}>{dayLabel(d, now.date)}</option>
-            ))}
-          </select>
-        </label>
-        <label className="wlp-schedule-field wlp-schedule-time">
-          <span className="wlp-schedule-label">Start</span>
-          <select
-            value={startMin}
-            onChange={(e) => setStartMin(Number(e.target.value))}
-            className="wlp-field"
-          >
-            {QUARTER_HOURS.map((min) => (
-              <option key={min} value={min}>{formatTime(Math.floor(min / 60), min % 60)}</option>
-            ))}
-          </select>
-        </label>
+        <FieldSelect
+          autoFocus
+          value={dayValue}
+          label="Day"
+          onFocus={refreshDays}
+          onChange={setDayValue}
+          className="wlp-schedule-day"
+        >
+          {days.map((d) => (
+            <option key={dayKey(d)} value={dayKey(d)}>{dayLabel(d, now.date)}</option>
+          ))}
+        </FieldSelect>
+        <FieldSelect
+          value={startMin}
+          label="Start"
+          onChange={(v) => setStartMin(Number(v))}
+        >
+          {QUARTER_HOURS.map((min) => (
+            <option key={min} value={min}>{formatTime(Math.floor(min / 60), min % 60)}</option>
+          ))}
+        </FieldSelect>
       </div>
-      <label className="wlp-schedule-repeat">
-        <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
-        Repeat weekly
-      </label>
+      {/* It replaces the Repeat weekly box and creates the same series, an
+          RRULE with no end, which repeats on the chosen day's weekday; the
+          option says which, and follows the day choice. */}
+      <div className="wlp-schedule-row">
+        <FieldSelect
+          value={recurring ? 'weekly' : 'none'}
+          label="Repeat"
+          onChange={(v) => setRecurring(v === 'weekly')}
+        >
+          <option value="none">Does not repeat</option>
+          <option value="weekly">{repeatLabel(days.find((d) => dayKey(d) === dayValue))}</option>
+        </FieldSelect>
+      </div>
       <p className="wlp-schedule-hint">Or click a time in Day or Week view. Shift-click repeats weekly.</p>
       <div className="wlp-schedule-actions">
-        <button type="button" onClick={onCancel} className="wlp-schedule-btn">Cancel</button>
-        <button type="submit" className="wlp-schedule-btn wlp-schedule-btn-primary">Schedule</button>
+        <button type="button" onClick={onCancel} className="wlp-btn-text">Cancel</button>
+        <button type="submit" className="wlp-btn-filled">Schedule</button>
       </div>
     </form>
   );
@@ -1397,6 +1563,7 @@ const PoolSidebar: React.FC = () => {
                                 {expanded && (
                                   <ItemDetails
                                     item={item}
+                                    categoryName={category.name}
                                     categoryColor={category.color}
                                     onChange={(patch) => updateItem(item.id, patch)}
                                     onDuplicate={() => duplicateItem(item.id)}

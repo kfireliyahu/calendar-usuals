@@ -39,7 +39,7 @@ export function formatDuration(min: number): string {
 // ── Event colors ─────────────────────────────────────────────────────────────
 //
 // Google Calendar's eleven event colors. The API takes the id; the hex is what
-// the sidebar swatches, an item's chip and the drag preview draw with, so the
+// the sidebar's colour field, an item's chip and the drag preview draw with, so the
 // item and its preview match the event that is about to appear.
 
 export const EVENT_COLORS: { id: string; name: string; hex: string }[] = [
@@ -66,15 +66,37 @@ export function eventColorHex(colorId: string | undefined, fallback: string): st
 //
 // undefined => leave reminders on the calendar default. 0 is a real value ("at
 // start"), so every check here is against undefined, never falsy.
+//
+// The sidebar edits a reminder as Google's event editor writes a notification,
+// a count and a unit ("30 minutes", "1 days"), but stores it as it always has,
+// in minutes. A stored value is shown in the largest unit it is a whole number
+// of, so 60 reads "1 hours" and 90 reads "90 minutes", and count × unit gives
+// back exactly the minutes it came from.
 
-export const REMINDER_PRESETS = [0, 5, 10, 15, 30, 60, 120, 1440];
+export type ReminderUnit = 'minutes' | 'hours' | 'days' | 'weeks';
 
-export function formatReminder(min: number): string {
-  if (min === 0)    return 'At start';
-  if (min < 60)     return `${min} min before`;
-  if (min === 1440) return '1 day before';
-  const hours = min / 60;
-  return `${hours} hour${hours === 1 ? '' : 's'} before`;
+export const REMINDER_UNITS: { unit: ReminderUnit; min: number }[] = [
+  { unit: 'minutes', min: 1 },
+  { unit: 'hours',   min: 60 },
+  { unit: 'days',    min: 1440 },
+  { unit: 'weeks',   min: 10080 },
+];
+
+// The Calendar API refuses a popup reminder more than four weeks ahead.
+export const MAX_REMINDER_MIN = 40320;
+
+export const DEFAULT_REMINDER_MIN = 30;
+
+export function reminderUnitMin(unit: ReminderUnit): number {
+  return REMINDER_UNITS.find((u) => u.unit === unit)!.min;
+}
+
+export function splitReminder(min: number): { count: number; unit: ReminderUnit } {
+  for (let i = REMINDER_UNITS.length - 1; i > 0; i--) {
+    const u = REMINDER_UNITS[i];
+    if (min > 0 && min % u.min === 0) return { count: min / u.min, unit: u.unit };
+  }
+  return { count: min, unit: 'minutes' };
 }
 
 // Date.now() alone collides when two items are created inside the same
