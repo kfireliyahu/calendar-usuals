@@ -17,6 +17,9 @@ import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
 import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
 import { readableTextOn } from '../theme';
 
+// hidden is the stored name, kept so every synced pool reads as before: it
+// now means the calendar's section is folded to its title row, which is what
+// the old "Hide category" became when hiding moved into the section's chevron.
 interface PoolCategory {
   calendarId: string;
   name: string;
@@ -572,8 +575,9 @@ const PoolSidebar: React.FC = () => {
   };
 
   // Tells the content script what a click on the grid would place, with the
-  // calendar colour a drag would carry. Deleting the item or hiding its
-  // calendar ends the pick rather than leaving an invisible item armed.
+  // calendar colour a drag would carry. Deleting the item or folding its
+  // calendar's section ends the pick rather than leaving an invisible item
+  // armed.
   useEffect(() => {
     let payload: (PoolItem & { color: string }) | null = null;
     for (const cat of categories) {
@@ -705,6 +709,8 @@ const PoolSidebar: React.FC = () => {
 
   // ── Item management ──────────────────────────────────────────────────────────
 
+  // A calendar that receives an item, from the form or a drag, unfolds, so
+  // the item the user just placed is on screen rather than folded away.
   const addItem = () => {
     if (!newItemName.trim() || !newItemCategory) return;
     setCategories((prev) =>
@@ -712,6 +718,7 @@ const PoolSidebar: React.FC = () => {
         cat.calendarId === newItemCategory
           ? {
               ...cat,
+              hidden: false,
               items: [
                 ...cat.items,
                 {
@@ -786,18 +793,31 @@ const PoolSidebar: React.FC = () => {
         const at = Math.max(0, Math.min(insertAt, items.length));
         return {
           ...cat,
+          hidden: false,
           items: [...items.slice(0, at), { ...moved, calendarId: toCalendarId }, ...items.slice(at)],
         };
       });
     });
   };
 
-  const toggleCategoryHidden = (calendarId: string) => {
+  // Folds or unfolds a calendar's section. The flag syncs with the pool, as
+  // hiding a calendar did, so a section folded on one computer is folded on
+  // the others.
+  const toggleSection = (calendarId: string) => {
     setCategories((prev) =>
       prev.map((cat) =>
         cat.calendarId === calendarId ? { ...cat, hidden: !cat.hidden } : cat
       )
     );
+  };
+
+  // An empty calendar's row opens the form already set to that calendar, so
+  // adding the first item to it is one click and then typing, as it is from
+  // the form itself.
+  const startAddTo = (calendarId: string) => {
+    setNewItemCategory(calendarId);
+    setFormOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   // ── Rename ───────────────────────────────────────────────────────────────────
@@ -864,15 +884,6 @@ const PoolSidebar: React.FC = () => {
     setDropTarget(null);
   };
 
-  // If selected dropdown category gets hidden, reset to first visible
-  useEffect(() => {
-    const isHidden = categories.find((c) => c.calendarId === newItemCategory)?.hidden;
-    if (isHidden) {
-      const first = categories.find((c) => !c.hidden);
-      if (first) setNewItemCategory(first.calendarId);
-    }
-  }, [categories]);
-
   // ── Shared styles ────────────────────────────────────────────────────────────
 
   const sidebarCls = `wlp-sidebar fixed left-0 top-0 h-screen flex flex-col z-[1000] overflow-hidden transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] ${
@@ -905,9 +916,13 @@ const PoolSidebar: React.FC = () => {
     </div>
   );
 
-  const visibleCategories = categories.filter((c) => !c.hidden);
-  const hiddenCategories  = categories.filter((c) =>  c.hidden);
-  const selectedCategory  = visibleCategories.find((c) => c.calendarId === newItemCategory);
+  // Calendars with items get a section each, in Google's order; the empty
+  // ones are gathered at the end as one quiet group of rows, rather than each
+  // printing its own "No items yet" between the sections that have something.
+  // Every calendar stays a choice in the form, a folded one included.
+  const filledCategories = categories.filter((c) => c.items.length > 0);
+  const emptyCategories  = categories.filter((c) => c.items.length === 0);
+  const selectedCategory = categories.find((c) => c.calendarId === newItemCategory);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -1005,10 +1020,10 @@ const PoolSidebar: React.FC = () => {
               >
                 <div className="wlp-form">
 
-                  {/* Category chips — only when >1 visible calendar */}
-                  {visibleCategories.length > 1 && (
+                  {/* Category chips — only when there is more than one calendar */}
+                  {categories.length > 1 && (
                     <div className="wlp-cat-chips">
-                      {visibleCategories.map((cat) => {
+                      {categories.map((cat) => {
                         const sel = newItemCategory === cat.calendarId;
                         return (
                           <button
@@ -1038,7 +1053,7 @@ const PoolSidebar: React.FC = () => {
                   {/* Input row */}
                   <div className="wlp-input-row">
                     {/* Single-category color indicator */}
-                    {visibleCategories.length === 1 && selectedCategory && (
+                    {categories.length === 1 && selectedCategory && (
                       <span
                         className="wlp-input-color-dot"
                         style={{ backgroundColor: selectedCategory.color }}
@@ -1119,208 +1134,237 @@ const PoolSidebar: React.FC = () => {
                 onDragOver={(e) => { if (isReorderDrag(e) && !wasHandled(e)) setDropTarget(null); }}
                 onDrop={handleListDrop}
               >
-                {visibleCategories.map((category) => (
-                  <div key={category.calendarId} className="wlp-cat-group">
-                    <div
-                      className="wlp-cat-header flex items-center gap-[7px]"
-                      onDragOver={(e) => handleCategoryDragOver(e, category.calendarId)}
-                    >
-                      <span
-                        className="w-[10px] h-[10px] rounded-full shrink-0"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      <h3 className="wlp-cat-title flex-1 min-w-[0] m-[0] truncate">
-                        {category.name}
-                      </h3>
-                      <button
-                        onClick={() => toggleCategoryHidden(category.calendarId)}
-                        title="Hide category"
-                        aria-label={`Hide ${category.name}`}
-                        className="wlp-cat-hide shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[var(--wlp-text-muted)] transition-all duration-150 hover:text-[var(--wlp-text-secondary)]"
+                {filledCategories.map((category) => {
+                  const open = !category.hidden;
+                  const listId = `wlp-section-${category.calendarId}`;
+                  return (
+                    <div key={category.calendarId} className="wlp-cat-group">
+                      {/* The section's title row, like "My calendars" in Google's
+                          nav: the whole row is the disclosure button, inside the
+                          heading so a screen reader can still jump between
+                          calendars by heading. Its name is the calendar's name,
+                          and aria-expanded says whether its items are showing.
+                          It is also where a drag aims to put an item in this
+                          calendar, folded or not. */}
+                      <div
+                        className={`wlp-cat-header${
+                          !open && dropTarget?.calendarId === category.calendarId ? ' wlp-drop-into' : ''
+                        }`}
+                        onDragOver={(e) => handleCategoryDragOver(e, category.calendarId)}
                       >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
-                        </svg>
-                      </button>
-                    </div>
-                    <div className="wlp-items-list flex flex-col">
-                      {category.items.map((item, index) => {
-                        const editing  = editingId  === item.id;
-                        const expanded = expandedId === item.id;
-                        const picked   = pickedId   === item.id;
-                        const scheduleFormId = `wlp-schedule-${item.id}`;
-                        const aimedHere = dropTarget?.calendarId === category.calendarId;
-                        const dropBefore = aimedHere && dropTarget!.index === index;
-                        const dropAfter  = aimedHere &&
-                          dropTarget!.index === index + 1 &&
-                          index === category.items.length - 1;
-                        return (
-                          <div
-                            key={item.id}
-                            className={`wlp-item-wrap${dropBefore ? ' wlp-drop-before' : ''}${dropAfter ? ' wlp-drop-after' : ''}`}
-                            onDragOver={(e) => handleRowDragOver(e, category.calendarId, index)}
+                        <h3 className="wlp-cat-heading">
+                          <button
+                            type="button"
+                            onClick={() => toggleSection(category.calendarId)}
+                            aria-expanded={open}
+                            aria-controls={open ? listId : undefined}
+                            title={open ? 'Fold this calendar' : 'Show this calendar’s items'}
+                            className="wlp-cat-toggle"
                           >
-                            <div
-                              // A draggable ancestor swallows the caret and text
-                              // selection, so the row stops being draggable while
-                              // its name is being edited.
-                              draggable={!editing}
-                              onDragStart={(e) => {
-                                const payload = { ...item, color: category.color };
-                                e.dataTransfer?.setData('poolItem', JSON.stringify(payload));
-                                // Its own type: a calendar drop reads poolItem, a
-                                // sidebar drop reads this, and neither can pick up
-                                // the other's payload by accident.
-                                e.dataTransfer?.setData('poolReorder', JSON.stringify({ id: item.id }));
-                                setDraggingId(item.id);
-                                // A drag is its own way of scheduling, and a pick
-                                // left armed would place a second event on the
-                                // next click.
-                                setPickedId(null);
-                                document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item: payload } }));
-                              }}
-                              onDragEnd={() => {
-                                setDraggingId(null);
-                                setDropTarget(null);
-                                document.dispatchEvent(new CustomEvent('poolDragEnd'));
-                              }}
-                              className={`wlp-item group flex items-center justify-between bg-[var(--wlp-surface-raised)] border border-[var(--wlp-border-subtle)] rounded-[6px] text-[var(--wlp-text)] cursor-grab select-none transition-all duration-150 hover:border-[var(--wlp-border-hover)] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
-                                draggingId === item.id ? ' opacity-40' : ''
-                              }${picked ? ' wlp-item-picked' : ''}`}
-                              style={{ borderLeft: `3px solid ${eventColorHex(item.colorId, category.color)}` }}
-                            >
-                              {editing ? (
-                                <input
-                                  autoFocus
-                                  // Rename usually means replace, not append:
-                                  // without this the caret lands at the end and
-                                  // typing extends the old name.
-                                  onFocus={(e) => e.currentTarget.select()}
-                                  value={editingName}
-                                  aria-label={`Rename ${item.name}`}
-                                  onChange={(e) => setEditingName(e.target.value)}
-                                  onBlur={commitRename}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter')  commitRename();
-                                    if (e.key === 'Escape') cancelRename();
+                            <span
+                              aria-hidden="true"
+                              className="wlp-cat-marker"
+                              style={{ backgroundColor: category.color }}
+                            />
+                            <span className="wlp-cat-title">{category.name}</span>
+                            {/* Folded, the row still says how much is inside. */}
+                            {!open && (
+                              <span className="wlp-cat-count">
+                                <span className="sr-only">, </span>
+                                {category.items.length}
+                                <span className="sr-only">{category.items.length === 1 ? ' item' : ' items'}</span>
+                              </span>
+                            )}
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="wlp-cat-chevron">
+                              <path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/>
+                            </svg>
+                          </button>
+                        </h3>
+                      </div>
+                      {open && (
+                        <div id={listId} className="wlp-items-list flex flex-col">
+                          {category.items.map((item, index) => {
+                            const editing  = editingId  === item.id;
+                            const expanded = expandedId === item.id;
+                            const picked   = pickedId   === item.id;
+                            const scheduleFormId = `wlp-schedule-${item.id}`;
+                            const aimedHere = dropTarget?.calendarId === category.calendarId;
+                            const dropBefore = aimedHere && dropTarget!.index === index;
+                            const dropAfter  = aimedHere &&
+                              dropTarget!.index === index + 1 &&
+                              index === category.items.length - 1;
+                            return (
+                              <div
+                                key={item.id}
+                                className={`wlp-item-wrap${dropBefore ? ' wlp-drop-before' : ''}${dropAfter ? ' wlp-drop-after' : ''}`}
+                                onDragOver={(e) => handleRowDragOver(e, category.calendarId, index)}
+                              >
+                                <div
+                                  // A draggable ancestor swallows the caret and text
+                                  // selection, so the row stops being draggable while
+                                  // its name is being edited.
+                                  draggable={!editing}
+                                  onDragStart={(e) => {
+                                    const payload = { ...item, color: category.color };
+                                    e.dataTransfer?.setData('poolItem', JSON.stringify(payload));
+                                    // Its own type: a calendar drop reads poolItem, a
+                                    // sidebar drop reads this, and neither can pick up
+                                    // the other's payload by accident.
+                                    e.dataTransfer?.setData('poolReorder', JSON.stringify({ id: item.id }));
+                                    setDraggingId(item.id);
+                                    // A drag is its own way of scheduling, and a pick
+                                    // left armed would place a second event on the
+                                    // next click.
+                                    setPickedId(null);
+                                    document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item: payload } }));
                                   }}
-                                  className="wlp-item-rename"
-                                />
-                              ) : (
-                                <span
-                                  onDoubleClick={() => startRename(item)}
-                                  title={`${item.name} — drag onto the calendar (hold Shift to repeat weekly), double-click to rename`}
-                                  className="flex-1 truncate"
+                                  onDragEnd={() => {
+                                    setDraggingId(null);
+                                    setDropTarget(null);
+                                    document.dispatchEvent(new CustomEvent('poolDragEnd'));
+                                  }}
+                                  className={`wlp-item group flex items-center justify-between bg-[var(--wlp-surface-raised)] border border-[var(--wlp-border-subtle)] rounded-[6px] text-[var(--wlp-text)] cursor-grab select-none transition-all duration-150 hover:border-[var(--wlp-border-hover)] hover:shadow-[0_1px_4px_rgba(0,0,0,0.1)] active:cursor-grabbing${
+                                    draggingId === item.id ? ' opacity-40' : ''
+                                  }${picked ? ' wlp-item-picked' : ''}`}
+                                  style={{ borderLeft: `3px solid ${eventColorHex(item.colorId, category.color)}` }}
                                 >
-                                  {item.name}
-                                </span>
-                              )}
-                              <DurationSelect
-                                value={durationOf(item)}
-                                label={`Duration of ${item.name}`}
-                                onChange={(min) => updateItem(item.id, { durationMin: min })}
-                              />
-                              {/* The no-drag way to schedule. A real button, so
-                                  Tab reaches it and Enter or Space picks the item,
-                                  and a pointer user who cannot drag can click it
-                                  and then click a time on the grid. */}
-                              <button
-                                ref={(el) => {
-                                  if (el) scheduleButtons.current.set(item.id, el);
-                                  else    scheduleButtons.current.delete(item.id);
-                                }}
-                                type="button"
-                                onClick={() => setPickedId(picked ? null : item.id)}
-                                aria-label={`Schedule ${item.name}`}
-                                aria-expanded={picked}
-                                aria-controls={picked ? scheduleFormId : undefined}
-                                title={picked ? 'Cancel scheduling (Esc)' : 'Schedule without dragging (Enter)'}
-                                className={`wlp-item-schedule${picked ? ' wlp-item-schedule-on' : ''}`}
-                              >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => setExpandedId(expanded ? null : item.id)}
-                                title={expanded ? 'Hide details' : 'Edit details'}
-                                aria-label={`Details for ${item.name}`}
-                                aria-expanded={expanded}
-                                className={`wlp-item-expand${hasTemplate(item) ? ' wlp-item-expand-on' : ''}`}
-                                style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
-                              >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => deleteItem(item.id)}
-                                title="Delete"
-                                aria-label={`Delete ${item.name}`}
-                                className="wlp-item-delete opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[var(--wlp-icon-faint)] cursor-pointer p-[0] ml-[4px] transition-all duration-150 hover:text-[var(--wlp-danger)] hover:scale-110"
-                              >
-                                ×
-                              </button>
-                            </div>
-                            {picked && (
-                              <ScheduleForm
-                                id={scheduleFormId}
-                                item={item}
-                                onSchedule={(date, startMin, recurring) =>
-                                  scheduleItem(item, category.color, date, startMin, recurring)
-                                }
-                                onCancel={() => closePick(item.id)}
-                              />
-                            )}
-                            {expanded && (
-                              <ItemDetails
-                                item={item}
-                                categoryColor={category.color}
-                                onChange={(patch) => updateItem(item.id, patch)}
-                                onDuplicate={() => duplicateItem(item.id)}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                      {category.items.length === 0 && (
-                        <p
-                          onDragOver={(e) => handleCategoryDragOver(e, category.calendarId)}
-                          className={`wlp-empty px-[16px] py-[4px] text-[12px] text-[var(--wlp-text-muted)] italic${
-                            dropTarget?.calendarId === category.calendarId ? ' wlp-drop-empty' : ''
-                          }`}
-                        >
-                          No items yet
-                        </p>
+                                  {editing ? (
+                                    <input
+                                      autoFocus
+                                      // Rename usually means replace, not append:
+                                      // without this the caret lands at the end and
+                                      // typing extends the old name.
+                                      onFocus={(e) => e.currentTarget.select()}
+                                      value={editingName}
+                                      aria-label={`Rename ${item.name}`}
+                                      onChange={(e) => setEditingName(e.target.value)}
+                                      onBlur={commitRename}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter')  commitRename();
+                                        if (e.key === 'Escape') cancelRename();
+                                      }}
+                                      className="wlp-item-rename"
+                                    />
+                                  ) : (
+                                    <span
+                                      onDoubleClick={() => startRename(item)}
+                                      title={`${item.name} — drag onto the calendar (hold Shift to repeat weekly), double-click to rename`}
+                                      className="flex-1 truncate"
+                                    >
+                                      {item.name}
+                                    </span>
+                                  )}
+                                  <DurationSelect
+                                    value={durationOf(item)}
+                                    label={`Duration of ${item.name}`}
+                                    onChange={(min) => updateItem(item.id, { durationMin: min })}
+                                  />
+                                  {/* The no-drag way to schedule. A real button, so
+                                      Tab reaches it and Enter or Space picks the item,
+                                      and a pointer user who cannot drag can click it
+                                      and then click a time on the grid. */}
+                                  <button
+                                    ref={(el) => {
+                                      if (el) scheduleButtons.current.set(item.id, el);
+                                      else    scheduleButtons.current.delete(item.id);
+                                    }}
+                                    type="button"
+                                    onClick={() => setPickedId(picked ? null : item.id)}
+                                    aria-label={`Schedule ${item.name}`}
+                                    aria-expanded={picked}
+                                    aria-controls={picked ? scheduleFormId : undefined}
+                                    title={picked ? 'Cancel scheduling (Esc)' : 'Schedule without dragging (Enter)'}
+                                    className={`wlp-item-schedule${picked ? ' wlp-item-schedule-on' : ''}`}
+                                  >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => setExpandedId(expanded ? null : item.id)}
+                                    title={expanded ? 'Hide details' : 'Edit details'}
+                                    aria-label={`Details for ${item.name}`}
+                                    aria-expanded={expanded}
+                                    className={`wlp-item-expand${hasTemplate(item) ? ' wlp-item-expand-on' : ''}`}
+                                    style={{ transform: expanded ? 'rotate(180deg)' : undefined }}
+                                  >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => deleteItem(item.id)}
+                                    title="Delete"
+                                    aria-label={`Delete ${item.name}`}
+                                    className="wlp-item-delete opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0 bg-transparent border-none text-[17px] leading-none text-[var(--wlp-icon-faint)] cursor-pointer p-[0] ml-[4px] transition-all duration-150 hover:text-[var(--wlp-danger)] hover:scale-110"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                                {picked && (
+                                  <ScheduleForm
+                                    id={scheduleFormId}
+                                    item={item}
+                                    onSchedule={(date, startMin, recurring) =>
+                                      scheduleItem(item, category.color, date, startMin, recurring)
+                                    }
+                                    onCancel={() => closePick(item.id)}
+                                  />
+                                )}
+                                {expanded && (
+                                  <ItemDetails
+                                    item={item}
+                                    categoryColor={category.color}
+                                    onChange={(patch) => updateItem(item.id, patch)}
+                                    onDuplicate={() => duplicateItem(item.id)}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))}
-                {visibleCategories.length === 0 && hiddenCategories.length === 0 && (
+                  );
+                })}
+                {categories.length === 0 && (
                   <p className="px-[16px] pt-[20px] text-[13px] text-[var(--wlp-text-secondary)]">No calendars found.</p>
                 )}
 
-                {/* Hidden categories restore strip */}
-                {hiddenCategories.length > 0 && (
-                  <div className="wlp-hidden-strip border-t border-[var(--wlp-divider)]">
-                    <p className="text-[11px] font-[600] uppercase tracking-[0.6px] text-[var(--wlp-text-muted)] mb-[8px]">
-                      Hidden ({hiddenCategories.length})
+                {/* Calendars with nothing in them yet, under one quiet line
+                    instead of a "No items yet" each. A row is a button that
+                    opens the form set to that calendar, and a drop target
+                    that takes a dragged item into it, which unfolds it into
+                    a section of its own above. There is nothing in one to
+                    fold, so a row has no chevron; a calendar folded before it
+                    emptied comes back unfolded when it gets an item. */}
+                {emptyCategories.length > 0 && (
+                  <div role="group" aria-labelledby="wlp-empty-caption" className="wlp-empty-group">
+                    <p id="wlp-empty-caption" className="wlp-empty-caption">
+                      No items yet
                     </p>
-                    {hiddenCategories.map((cat) => (
-                      <div key={cat.calendarId} className="wlp-hidden-row flex items-center gap-[8px]">
-                        <span className="w-[8px] h-[8px] rounded-full shrink-0 opacity-40" style={{ backgroundColor: cat.color }} />
-                        <span className="flex-1 text-[12px] text-[var(--wlp-text-muted)] truncate">{cat.name}</span>
-                        <button
-                          onClick={() => toggleCategoryHidden(cat.calendarId)}
-                          title="Show category"
-                          aria-label={`Show ${cat.name}`}
-                          className="wlp-cat-show shrink-0 bg-transparent border-none cursor-pointer p-[0] text-[var(--wlp-text-muted)] hover:text-[var(--wlp-text-secondary)] transition-colors duration-150"
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                          </svg>
-                        </button>
-                      </div>
+                    {emptyCategories.map((cat) => (
+                      <button
+                        key={cat.calendarId}
+                        type="button"
+                        onClick={() => startAddTo(cat.calendarId)}
+                        onDragOver={(e) => handleCategoryDragOver(e, cat.calendarId)}
+                        aria-label={`Add an item to ${cat.name}`}
+                        title={`Add an item to ${cat.name}, or drag one here`}
+                        className={`wlp-empty-row${
+                          dropTarget?.calendarId === cat.calendarId ? ' wlp-drop-into' : ''
+                        }`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="wlp-cat-marker"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span className="wlp-empty-name">{cat.name}</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="wlp-empty-add">
+                          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                        </svg>
+                      </button>
                     ))}
                   </div>
                 )}

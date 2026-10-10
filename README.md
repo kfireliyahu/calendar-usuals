@@ -13,12 +13,12 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 - **Schedule without dragging** — each item has a calendar button: Tab to it and press Enter (or click it) to pick the item, then choose a day from the week on screen and a 15-minute start time, or click a time slot in Day or Week view to place it there; Shift-click and the form's Repeat weekly box work like Shift-drop, and Escape cancels
 - **Item templates** — give an item a description, location, event colour and reminder; dropping it creates the event fully configured
 - **Rename in place** — double-click an item's name; Enter or clicking away commits, Escape cancels
-- **Reorder and re-file** — drag an item within its list to reorder it, or onto another calendar's heading to move it there
+- **Reorder and re-file** — drag an item within its list to reorder it, or onto another calendar's heading (or an empty calendar's row) to move it there
 - **Duplicate** — clone a configured item and tweak the copy
 - **Time snapping** — drops snap to the nearest 15-minute slot with a live tooltip showing day + time while hovering
 - **Loading overlay** — a pulsing placeholder in the calendar's color appears at the drop location and fades out once Google Calendar renders the real event; tracks the column as you scroll
 - **Category chips** — quickly switch which calendar an item belongs to before adding it
-- **Hide categories** — collapse calendars you don't need to reduce sidebar noise; the choice syncs with your pool
+- **Calendar sections** — each calendar with items is a section like Google's "My calendars": its colour, its name and a chevron that folds its items away (the choice syncs with your pool); calendars with nothing in them yet are listed once at the end, and clicking one opens the form set to it, or drag an item onto it
 - **Collapsible sidebar** — collapse to a 40 px icon strip when you need the full screen
 - **Collapsible input form** — the "+ New item" button at the top of the sidebar, shaped like Google Calendar's own "Create", opens and closes the add-item form; preference is saved
 - **Follows Google Calendar's theme** — the sidebar, its forms and toasts, and the tooltip, drag preview and loading placeholder it draws on the calendar turn dark whenever Google Calendar is showing its dark theme and light when it is not, going by Google Calendar's own Appearance setting rather than the operating system's; changing it switches them over without a reload. The sidebar sits on the same page colour as Google Calendar's top bar and left nav, read off the page rather than assumed, in Google's typeface and with a thin scrollbar like Google's

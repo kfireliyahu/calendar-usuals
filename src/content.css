@@ -464,17 +464,103 @@
   margin-bottom: 8px !important;
 }
 
+/* The title row is inset by half the gutter and its button by the other half,
+   so the colour marker lines up with the item rows below while the button's
+   hover layer reaches nearly to the sidebar's edges, as Google's nav rows do. */
 .wlp-cat-header {
+  padding: 0 8px !important;
+  border-radius: 20px !important;
+  transition: background 0.15s !important;
+}
+
+.wlp-cat-heading {
+  margin: 0 !important;
+  padding: 0 !important;
+  font: inherit !important;
+}
+
+/* One button the width of the row: the calendar's colour, its name, and a
+   chevron at the end that points up while the items show and down once they
+   are folded, as "My calendars" does. Reset with !important because Google
+   Calendar styles bare buttons globally. */
+.wlp-cat-toggle {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
   min-height: 40px !important;
-  padding: 4px var(--wlp-gutter) !important;
   box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 4px 0 8px !important;
+  border: none !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  color: var(--wlp-text) !important;
+  text-align: start !important;
+  cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+
+.wlp-cat-toggle:hover {
+  background: var(--wlp-hover) !important;
+}
+
+.wlp-cat-toggle:focus-visible {
+  outline: 2px solid var(--wlp-focus) !important;
+  outline-offset: -2px !important;
+}
+
+/* The calendar's colour as Google's nav draws it, a small rounded square,
+   though not a checkbox: it does not show or hide the calendar's events. */
+.wlp-cat-marker {
+  display: inline-block !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 3px !important;
+  flex-shrink: 0 !important;
 }
 
 .wlp-cat-title {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
   font-size: var(--wlp-type-section) !important;
   font-weight: var(--wlp-weight-section) !important;
   line-height: 24px !important;
   color: var(--wlp-text) !important;
+}
+
+.wlp-cat-count {
+  flex-shrink: 0 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--wlp-text-secondary) !important;
+}
+
+.wlp-cat-chevron {
+  flex-shrink: 0 !important;
+  color: var(--wlp-text-secondary) !important;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.wlp-cat-toggle[aria-expanded="false"] .wlp-cat-chevron {
+  transform: rotate(180deg) !important;
+}
+
+/* A drag aimed at a folded section, or at an empty calendar's row, has no
+   item row to draw its line against, so the row it would land in lights up. */
+.wlp-drop-into,
+.wlp-drop-into:hover {
+  background: var(--wlp-accent-soft) !important;
+}
+
+.wlp-drop-into .wlp-cat-title,
+.wlp-drop-into .wlp-empty-name,
+.wlp-drop-into .wlp-empty-add {
+  color: var(--wlp-primary) !important;
 }
 
 .wlp-items-list {
@@ -490,14 +576,75 @@
   font-size: var(--wlp-type-name) !important;
 }
 
-.wlp-hidden-strip {
-  padding: 14px var(--wlp-gutter) 12px !important;
-  margin-top: 10px !important;
+/* ── Empty calendars ───────────────────────────────────────────────────────── */
+
+/* The calendars that have no items yet, after the sections that do: one quiet
+   caption, then a row each the size of a calendar in Google's list, in the
+   secondary text colour so they never compete with the sections above. */
+.wlp-empty-group {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 4px 8px 0 !important;
 }
 
-.wlp-hidden-row {
-  padding-top: 5px !important;
-  padding-bottom: 5px !important;
+.wlp-empty-caption {
+  margin: 0 !important;
+  padding: 8px 8px 4px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  color: var(--wlp-text-secondary) !important;
+}
+
+.wlp-empty-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-height: var(--wlp-row-height) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 4px 0 8px !important;
+  border: none !important;
+  border-radius: 16px !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: var(--wlp-type-name) !important;
+  color: var(--wlp-text-secondary) !important;
+  text-align: start !important;
+  cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+
+.wlp-empty-row:hover {
+  background: var(--wlp-hover) !important;
+}
+
+.wlp-empty-row:focus-visible {
+  outline: 2px solid var(--wlp-focus) !important;
+  outline-offset: -2px !important;
+}
+
+.wlp-empty-name {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+/* The plus says what a click does, and like Google's "+" beside "Other
+   calendars" it only shows on the row being pointed at or focused. */
+.wlp-empty-add {
+  flex-shrink: 0 !important;
+  opacity: 0 !important;
+  transition: opacity 0.15s !important;
+}
+
+.wlp-empty-row:hover .wlp-empty-add,
+.wlp-empty-row:focus-visible .wlp-empty-add,
+.wlp-drop-into .wlp-empty-add {
+  opacity: 1 !important;
 }
 
 /* ── Footer ────────────────────────────────────────────────────────────────── */
@@ -551,12 +698,6 @@
 
 .wlp-drop-before::before { top: -4px !important; }
 .wlp-drop-after::after   { bottom: -4px !important; }
-
-/* An empty category has no row to draw a line against. */
-.wlp-drop-empty {
-  color: var(--wlp-accent) !important;
-  font-style: normal !important;
-}
 
 /* Sits exactly where the name span was, so committing a rename does not
    reflow the row. */
@@ -642,8 +783,6 @@
 .wlp-item-schedule:focus-visible,
 .wlp-item-expand:focus-visible,
 .wlp-item-delete:focus-visible,
-.wlp-cat-hide:focus-visible,
-.wlp-cat-show:focus-visible,
 .wlp-toast-undo:focus-visible,
 .wlp-schedule-btn:focus-visible,
 .wlp-schedule-repeat input:focus-visible,
@@ -668,23 +807,8 @@
 
 .wlp-item-schedule:focus-visible,
 .wlp-item-expand:focus-visible,
-.wlp-item-delete:focus-visible,
-.wlp-cat-hide:focus-visible,
-.wlp-cat-show:focus-visible {
+.wlp-item-delete:focus-visible {
   border-radius: 3px !important;
-}
-
-/* The category's hide control only shows on hover, so it would be invisible
-   to a keyboard user tabbing onto it. Focus anywhere in the header reveals it
-   as hovering does, the way the row's delete button shows on focus. */
-.wlp-cat-hide {
-  opacity: 0 !important;
-}
-
-.wlp-cat-header:hover .wlp-cat-hide,
-.wlp-cat-header:focus-within .wlp-cat-hide,
-.wlp-cat-hide:focus-visible {
-  opacity: 1 !important;
 }
 
 /* ── Schedule form ─────────────────────────────────────────────────────────── */
