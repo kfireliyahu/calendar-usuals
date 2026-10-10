@@ -171,3 +171,5 @@ Weekly Life Pool is free and has no ads, accounts or tracking. If it saves you t
 ## License
 
 Weekly Life Pool is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (AGPL-3.0-only). You may use, study, change and share it, as long as what you change stays under the same licence.
+
+Bug reports and ideas are welcome as issues; pull requests are not accepted for now. See [CONTRIBUTING.md](CONTRIBUTING.md).
