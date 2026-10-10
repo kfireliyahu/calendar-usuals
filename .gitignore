@@ -20,3 +20,6 @@ Thumbs.db
 # Emerald development document. Private, never committed.
 *.emd
 *.emd.*.bak
+
+# Private design references (screenshots of the author's own calendar). Never committed.
+design-ref/
