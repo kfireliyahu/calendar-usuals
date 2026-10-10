@@ -35,7 +35,9 @@
   --wlp-hover:           color-mix(in srgb, var(--wlp-text) 8%, transparent);
   --wlp-text:            #202124;
   --wlp-text-secondary:  #5f6368;
-  --wlp-text-muted:      #9aa0a6;  /* hints, empty states, the footer */
+  /* Hints, empty states, the footer. Google's secondary grey, about 5.8:1 on
+     its light page; #9aa0a6 was 2.6:1 and failed AA (Q-6). */
+  --wlp-text-muted:      #5f6368;
   --wlp-divider:         rgba(218, 220, 224, 0.6);
   --wlp-accent:          #4285f4;
   --wlp-accent-soft:     #e8f0fe;  /* the row a drag would drop into */
@@ -53,8 +55,11 @@
   --wlp-error-bg:        #fce8e6;
   --wlp-error-text:      #c5221f;  /* 4.9:1 on --wlp-error-bg, so the toast meets AA */
   --wlp-error-border:    #f5c6c3;
-  --wlp-tooltip-bg:      #202124;
-  --wlp-tooltip-text:    #ffffff;
+  /* The drop tooltip is a raised box in the page's own theme, not an
+     inverted one: white with the text colour here, a dark grey in dark. */
+  --wlp-tooltip-bg:      #ffffff;
+  --wlp-tooltip-text:    var(--wlp-text);
+  --wlp-tooltip-border:  #dadce0;
   --wlp-swatch-outline:  rgba(0, 0, 0, 0.12);  /* around the event colour's dot */
   /* A thin scrollbar's thumb, as on Google's nav: the text colour, faint. */
   --wlp-scrollbar:       color-mix(in srgb, var(--wlp-text) 24%, transparent);
@@ -102,8 +107,12 @@
   --wlp-error-bg:        #3a1d1b;
   --wlp-error-text:      #f2b8b5;
   --wlp-error-border:    #5c2b29;
-  --wlp-tooltip-bg:      #e3e3e3;
-  --wlp-tooltip-text:    #1f1f1f;
+  /* A light box over the dark grid read as a leftover of the light theme, so
+     a raised dark surface instead, one step lighter than the page, with a
+     border to hold it off the grid. */
+  --wlp-tooltip-bg:      color-mix(in srgb, var(--wlp-text) 12%, var(--wlp-surface));
+  --wlp-tooltip-text:    var(--wlp-text);
+  --wlp-tooltip-border:  #5f6368;
   --wlp-swatch-outline:  rgba(255, 255, 255, 0.24);
   --wlp-scrollbar:       color-mix(in srgb, var(--wlp-text) 30%, transparent);
   /* In the dark theme Google draws its shadows in black. */
@@ -126,6 +135,7 @@
 #wlp-drop-tooltip {
   background: var(--wlp-tooltip-bg) !important;
   color: var(--wlp-tooltip-text) !important;
+  border: 1px solid var(--wlp-tooltip-border, transparent) !important;
 }
 
 /* ── Drag preview: weekly recurrence ───────────────────────────────────────── */
