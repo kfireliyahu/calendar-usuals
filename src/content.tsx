@@ -7,6 +7,7 @@ import { EventDateTime, eventTimes } from './calendarZone';
 import { PageLook, Theme, chipTextOn, watchTheme } from './theme';
 import { isolate } from './names';
 import { adjustLayout } from './layout';
+import { debugLog } from './debug';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
@@ -467,7 +468,7 @@ function createFromItem(
   // The grid's date and time are wall-clock time in Google Calendar's zone,
   // not the browser's, so the zone is worked out before they become instants.
   const { start, end, zone } = eventTimes(date, hours, minutes, durationOf(item), gridZoneLabels());
-  console.log('[WeeklyPool] Calendar time zone →', zone, start.dateTime);
+  debugLog('Calendar time zone →', zone, start.dateTime);
 
   // Show the pulsing placeholder at the chosen slot immediately
   if (anchor) showLoading(anchor, hours * 60 + minutes, item, recurring);
@@ -560,8 +561,8 @@ function clearPick(): void {
 function placePicked(cell: Element, e: MouseEvent): void {
   const item = pickedItem;
   const date = dateFromCell(cell);
-  if (!item || !date) { console.warn('[WeeklyPool] Could not resolve a date for cell', cell); return; }
-  console.log(`[WeeklyPool] Place → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
+  if (!item || !date) { console.warn('[WeeklyPool] Could not resolve a date for cell, datekey', findDatekey(cell)); return; }
+  debugLog(`Place → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
 
   const { hours, minutes } = timeFromDrop(cell, e.clientY);
   clearPick();
@@ -642,8 +643,8 @@ function setupListeners(): void {
     try { item = JSON.parse(raw); } catch { return; }
 
     const date = dateFromCell(cell);
-    if (!date) { console.warn('[WeeklyPool] Could not resolve a date for cell', cell); return; }
-    console.log(`[WeeklyPool] Drop → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
+    if (!date) { console.warn('[WeeklyPool] Could not resolve a date for cell, datekey', findDatekey(cell)); return; }
+    debugLog(`Drop → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
 
     const { hours, minutes } = timeFromDrop(cell, e.clientY);
     // Read from the drop itself rather than the last dragover, so what is
@@ -731,7 +732,7 @@ function injectSidebar(): void {
     // shifted once, to the right width, rather than to the stored one first.
     // Without storage it never reads one, so it is laid out open here.
     if (typeof chrome === 'undefined' || !chrome.storage) adjustLayout(false);
-    console.log('[WeeklyPool] Sidebar injected.');
+    debugLog('Sidebar injected.');
   } catch (err) {
     console.error('[WeeklyPool] Failed to render sidebar:', err);
   }

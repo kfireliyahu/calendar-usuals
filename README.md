@@ -95,6 +95,8 @@ npm run watch
 3. Click **Load unpacked** and select the `dist/` folder
 4. Open [Google Calendar](https://calendar.google.com) — the sidebar appears on the left
 
+The console stays quiet apart from real problems (a failed sync or save, a date the grid cannot be read for, a sidebar that fails to render). For testing, run `localStorage.setItem('wlpDebug', '1')` in DevTools on the Google Calendar tab to also see its traces (layout shifts, each event's time zone, where a drop or a click landed), and `localStorage.removeItem('wlpDebug')` to hide them; no rebuild is needed.
+
 ---
 
 ## Project structure
@@ -109,6 +111,7 @@ src/
 ├── theme.ts               # Reads whether Google Calendar is showing its light or dark theme
 ├── names.ts               # Calendar display names, the primary calendar's name off the page, text direction
 ├── layout.ts              # Makes room for the sidebar on the page; tells when Google's main menu is open
+├── debug.ts               # Testing traces, shown only when localStorage wlpDebug is '1'
 ├── content.css            # Sidebar styles (Tailwind utilities + wlp-* override classes)
 └── components/
     └── PoolSidebar.tsx    # React sidebar component

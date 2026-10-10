@@ -3,6 +3,8 @@
 // beside the grid. Like theme.ts and names.ts it uses no class name of
 // Google's, only [role="main"] and measured geometry.
 
+import { debugLog } from './debug';
+
 export const SIDEBAR_WIDTH   = 280;
 export const COLLAPSED_WIDTH = 40;
 
@@ -50,7 +52,7 @@ export function adjustLayout(collapsed: boolean): void {
   const root = getGcalRoot();
   if (!root) { console.warn('[WeeklyPool] adjustLayout: no root found'); return; }
   const shift = pageIsRtl() ? 0 : px;
-  console.log('[WeeklyPool] adjustLayout: shifting', root.tagName, root.id || root.className.slice(0, 60), 'by', shift, 'px, narrowing by', px, 'px');
+  debugLog('adjustLayout: shifting', root.tagName, root.id || root.className.slice(0, 60), 'by', shift, 'px, narrowing by', px, 'px');
   root.style.transform  = `translateX(${shift}px)`;
   root.style.width      = `calc(100% - ${px}px)`;
   root.style.overflowX  = 'clip';
