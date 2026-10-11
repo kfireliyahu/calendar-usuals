@@ -8,7 +8,7 @@ import { debugLog } from './debug';
 export const SIDEBAR_WIDTH   = 280;
 export const COLLAPSED_WIDTH = 40;
 
-const SIDEBAR_ID = 'weekly-life-pool-sidebar';
+const SIDEBAR_ID = 'usuals-sidebar';
 
 // ── Making room ───────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ function pageIsRtl(): boolean {
 export function adjustLayout(collapsed: boolean): void {
   const px = collapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH;
   const root = getGcalRoot();
-  if (!root) { console.warn('[WeeklyPool] adjustLayout: no root found'); return; }
+  if (!root) { console.warn('[Usuals] adjustLayout: no root found'); return; }
   const shift = pageIsRtl() ? 0 : px;
   debugLog('adjustLayout: shifting', root.tagName, root.id || root.className.slice(0, 60), 'by', shift, 'px, narrowing by', px, 'px');
   root.style.transform  = `translateX(${shift}px)`;

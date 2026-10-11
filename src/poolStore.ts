@@ -234,7 +234,7 @@ function writeMirror(): void {
   if (!extensionAlive()) return;
   const mirror: Mirror = { entries: desired, unsynced: unsyncedKeys() };
   chrome.storage.local.set({ [MIRROR_KEY]: mirror }).catch((err) => {
-    console.warn('[WeeklyPool] Could not save the pool on this device:', err);
+    console.warn('[Usuals] Could not save the pool on this device:', err);
   });
 }
 
@@ -307,7 +307,7 @@ async function flush(): Promise<void> {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.warn('[WeeklyPool] Could not sync the pool:', message);
+    console.warn('[Usuals] Could not sync the pool:', message);
     full = isSizeQuotaError(message);
     if (full) tellSyncFull();
     else      retryAt = Date.now() + RETRY_MS;

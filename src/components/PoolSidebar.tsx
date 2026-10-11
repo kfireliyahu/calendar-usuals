@@ -62,7 +62,7 @@ const TOAST_RESUME_MIN_MS = 2000;
 // Store users never see the README, so the sidebar's footer is how they find
 // the project page. manifest.json's homepage_url repeats it, because JSON
 // cannot import a constant; change both together.
-const HOMEPAGE_URL = 'https://kfireliyahu.com/weekly-life-pool';
+const HOMEPAGE_URL = 'https://kfireliyahu.com/calendar-usuals';
 
 // Where a reorder drag would land: the category the item would end up in and
 // the index it would be inserted at (items.length means "after the last one").
@@ -1275,8 +1275,8 @@ const PoolSidebar: React.FC = () => {
           <button
             ref={showButton}
             onClick={showSidebar}
-            title="Show Weekly Pool"
-            aria-label="Show Weekly Pool"
+            title="Show Usuals"
+            aria-label="Show Usuals"
             className={iconBtnCls}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

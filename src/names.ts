@@ -61,7 +61,7 @@ export function needsPageName(cal: CalendarListEntry): boolean {
 // Whether Google keeps the list in the page while its menu is closed is not
 // known, which is why watchPrimaryName looks again as the page changes.
 
-const SIDEBAR_ID = 'weekly-life-pool-sidebar';
+const SIDEBAR_ID = 'usuals-sidebar';
 
 function outsideSidebar(el: Element): boolean {
   return !el.closest(`#${SIDEBAR_ID}`);

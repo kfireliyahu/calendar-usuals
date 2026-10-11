@@ -33,7 +33,7 @@ const DATEKEY_EPOCH_YEAR = 1970;
 export function datekeyToDate(datekey: string): Date | null {
   const dk = parseInt(datekey, 10);
   if (!Number.isFinite(dk) || dk <= 0) {
-    console.warn('[WeeklyPool] Invalid datekey:', datekey);
+    console.warn('[Usuals] Invalid datekey:', datekey);
     return null;
   }
 
@@ -42,7 +42,7 @@ export function datekeyToDate(datekey: string): Date | null {
   const day   = dk & 0b11111;       // 1-31
 
   if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) {
-    console.warn('[WeeklyPool] Unresolvable datekey:', dk, { year, month, day });
+    console.warn('[Usuals] Unresolvable datekey:', dk, { year, month, day });
     return null;
   }
 
@@ -96,7 +96,7 @@ export function isSameDay(a: Date, b: Date): boolean {
 function timeGridCells(): { cell: Element; date: Date }[] {
   const found: { cell: Element; date: Date }[] = [];
   document.querySelectorAll('[role="gridcell"]').forEach((cell) => {
-    if (cell.closest('#weekly-life-pool-sidebar') || !isTimeGridCell(cell)) return;
+    if (cell.closest('#usuals-sidebar') || !isTimeGridCell(cell)) return;
     const date = dateFromCell(cell);
     if (date) found.push({ cell, date });
   });
@@ -200,7 +200,7 @@ export function gridZoneLabels(): number[] {
     if (text.length > 16) continue;
     const minutes = parseZoneLabel(text);
     const el = node.parentElement;
-    if (minutes === null || !el || el.closest('#weekly-life-pool-sidebar')) continue;
+    if (minutes === null || !el || el.closest('#usuals-sidebar')) continue;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0) continue;
     const distance = rtl ? rect.left - edge : edge - rect.right;

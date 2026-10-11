@@ -23,7 +23,7 @@
    preview that content.tsx appends to <body>, so none of them reaches Google
    Calendar's own elements. The sidebar's Tailwind classes read them as
    bracket values, bg-[var(--wlp-surface)] and so on. */
-:is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview) {
+:is(#usuals-sidebar, #wlp-drop-tooltip, #wlp-event-preview) {
   /* The sidebar and its collapsed strip sit on Google's page surface, the
      colour behind its top bar and left nav, which content.tsx reads off the
      page (theme.ts, detectSurface) and sets as --wlp-page. The constant is
@@ -83,7 +83,7 @@
    WCAG AA on the surfaces it is drawn on. color-scheme gives the
    native controls, the selects' open lists, the number field and the scrollbars,
    their dark look too. */
-:is(#weekly-life-pool-sidebar, #wlp-drop-tooltip, #wlp-event-preview)[data-wlp-theme="dark"] {
+:is(#usuals-sidebar, #wlp-drop-tooltip, #wlp-event-preview)[data-wlp-theme="dark"] {
   --wlp-surface:         var(--wlp-page, #1f1f1f);
   --wlp-input:           #1f1f1f;
   --wlp-hover:           color-mix(in srgb, var(--wlp-text) 8%, transparent);
@@ -123,7 +123,7 @@
 /* Chrome draws a select's open list from its options' own colours when they
    have them, so they are set here rather than left to Google Calendar's
    stylesheet or the browser default. */
-#weekly-life-pool-sidebar option {
+#usuals-sidebar option {
   background: var(--wlp-input) !important;
   color: var(--wlp-text) !important;
 }
@@ -170,7 +170,7 @@
    calendar's name at 14 px in rows 32 px apart, a section title such as "My
    calendars" at 16 px medium. Set on the sidebar's mount so every part of
    it, and anything later drawn in it, can size itself from the same values. */
-#weekly-life-pool-sidebar {
+#usuals-sidebar {
   --wlp-font:            'Google Sans', Roboto, Arial, sans-serif;
   --wlp-type-name:       14px;    /* an item's or a calendar's name */
   --wlp-type-section:    16px;    /* a section title */

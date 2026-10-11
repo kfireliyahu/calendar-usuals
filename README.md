@@ -1,12 +1,14 @@
-# Weekly Life Pool
+# Usuals
 
-A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool of recurring activities organized by calendar, then drag them onto any time slot to instantly create events.
+*Works with Google Calendar*
+
+Most of a week is made of things you already do: a workout, a call home, deep work, the groceries. Usuals is a Chrome extension that keeps those usual things in a sidebar beside Google Calendar's week and day, each under the calendar it belongs to, so planning is dragging one onto a time slot, where it becomes a real event.
 
 ---
 
 ## Features
 
-- **Activity pool** — store reusable items (tasks, routines, habits) grouped by your Google Calendars
+- **Your usuals** — keep reusable items (tasks, routines, habits) grouped by your Google Calendars
 - **Drag-and-drop creation** — drag any item onto the calendar grid; an event is created at the exact time and date you drop it
 - **Shift-drop for weekly** — hold Shift while dropping to create a weekly series with no end date; the tooltip and a dashed, ↻-marked preview show it live as Shift goes down or up
 - **Undo** — the toast after a drop offers Undo for 5 seconds, paused while the pointer or keyboard focus is on it; it deletes the event, or the whole series for a Shift-drop
@@ -19,13 +21,13 @@ A Chrome extension that adds a planning sidebar to Google Calendar. Keep a pool 
 - **Loading overlay** — a pulsing placeholder in the calendar's color appears at the drop location and fades out once Google Calendar renders the real event; tracks the column as you scroll
 - **A composer like Google's event editor** — the add-item form is always open at the top of the sidebar and reads like Google Calendar's own: a title on an underline with a filled Add button beside it, level with Google's top bar, then the calendar (its colour and name) and the duration as grey dropdowns; Enter adds the item and leaves the caret there for the next one. It never takes focus by itself when the page loads
 - **Items look like their events** — each item is drawn as the chip its event will be in the week view: filled with its event colour (or its calendar's), its name and duration in Google's chip type ("workout, 1h"), with text picked for at least 4.5:1 contrast on every colour; its schedule, details and delete buttons show on hover or keyboard focus, and the drag image and the preview on the grid are the same chip
-- **Calendar sections** — each calendar with items is a section like Google's "My calendars": its colour, its name and a chevron that folds its items away (the choice syncs with your pool); calendars with nothing in them yet are listed once at the end, and clicking one sets the composer to it with the caret in the title, or drag an item onto it
+- **Calendar sections** — each calendar with items is a section like Google's "My calendars": its colour, its name and a chevron that folds its items away (the choice syncs with your items); calendars with nothing in them yet are listed once at the end, and clicking one sets the composer to it with the caret in the title, or drag an item onto it
 - **Names as Google shows them** — every calendar goes by the name Google Calendar's own list gives it, your own name for a shared calendar included; the primary calendar shows your account's name, as Google's "My calendars" does, rather than your address (see *Primary calendar's name* below). Names in Hebrew or Arabic, of calendars and of items, run right to left wherever they appear: an item's chip starts at the right edge as Google's chip for it will, text fields follow what is typed, and a name quoted in a toast or the drop tooltip keeps its own order
 - **Week and Day view only** — the sidebar shows in Google Calendar's Week view, weekends shown or hidden, and in Day view. In Month, Year, Schedule or a custom view, and in Settings, it hides and gives Google Calendar back its own layout; anything half typed in it is still there when you come back
 - **Collapsible sidebar** — collapse to a 40 px icon strip when you need the full screen. While Google Calendar's own main menu (☰) is open, the sidebar steps aside to that strip by itself, so the week is never squeezed between two sidebars; open it from the strip and it stays beside the menu until the menu closes. Header, list and footer always fit the window, whatever its height
 - **Follows Google Calendar's theme** — the sidebar, its forms and toasts, and the tooltip, drag preview and loading placeholder it draws on the calendar turn dark whenever Google Calendar is showing its dark theme and light when it is not, going by Google Calendar's own Appearance setting rather than the operating system's; changing it switches them over without a reload. The sidebar sits on the same page colour as Google Calendar's top bar and left nav, read off the page rather than assumed, in Google's typeface and with a thin scrollbar like Google's
-- **Syncs across your Chrome profile** — pool items and hidden categories are saved with `chrome.storage.sync`, so every computer signed into the same Chrome profile sees the same pool, and an edit on one shows up on the others (and in other Calendar tabs) without a reload
-- **Persistent storage** — whether the sidebar is collapsed is saved per computer in Chrome local storage, and the pool keeps a copy there too, so an edit is never lost if it has not reached sync yet
+- **Syncs across your Chrome profile** — items and hidden categories are saved with `chrome.storage.sync`, so every computer signed into the same Chrome profile sees the same items, and an edit on one shows up on the others (and in other Calendar tabs) without a reload
+- **Persistent storage** — whether the sidebar is collapsed is saved per computer in Chrome local storage, and the items keep a copy there too, so an edit is never lost if it has not reached sync yet
 
 ---
 
@@ -96,7 +98,7 @@ npm run watch
 3. Click **Load unpacked** and select the `dist/` folder
 4. Open [Google Calendar](https://calendar.google.com) — the sidebar appears on the left
 
-The console stays quiet apart from real problems (a failed sync or save, a date the grid cannot be read for, a sidebar that fails to render). For testing, run `localStorage.setItem('wlpDebug', '1')` in DevTools on the Google Calendar tab to also see its traces (layout shifts, each event's time zone, where a drop or a click landed), and `localStorage.removeItem('wlpDebug')` to hide them; no rebuild is needed.
+The console stays quiet apart from real problems (a failed sync or save, a date the grid cannot be read for, a sidebar that fails to render). For testing, run `localStorage.setItem('usualsDebug', '1')` in DevTools on the Google Calendar tab to also see its traces (layout shifts, each event's time zone, where a drop or a click landed), and `localStorage.removeItem('usualsDebug')` to hide them; no rebuild is needed.
 
 ---
 
@@ -112,7 +114,7 @@ src/
 ├── theme.ts               # Reads whether Google Calendar is showing its light or dark theme
 ├── names.ts               # Calendar display names, the primary calendar's name off the page, text direction
 ├── layout.ts              # Makes room for the sidebar on the page; tells when Google's main menu is open
-├── debug.ts               # Testing traces, shown only when localStorage wlpDebug is '1'
+├── debug.ts               # Testing traces, shown only when localStorage usualsDebug is '1'
 ├── content.css            # Sidebar styles (Tailwind utilities + wlp-* override classes)
 └── components/
     └── PoolSidebar.tsx    # React sidebar component
@@ -147,11 +149,11 @@ vite.config.ts             # Vite build config (two entry points: content + back
 
 | Permission | Reason |
 |---|---|
-| `storage` | Sync pool items and hidden categories across the user's Chrome profile (`chrome.storage.sync`); keep per-device UI state and a local copy of the pool (`chrome.storage.local`) |
+| `storage` | Sync items and hidden categories across the user's Chrome profile (`chrome.storage.sync`); keep per-device UI state and a local copy of the pool (`chrome.storage.local`) |
 | `identity` | OAuth 2.0 token for Google Calendar API |
 | `https://calendar.google.com/*` | Inject the sidebar into Google Calendar |
 | `.../auth/calendar.events.owned` | Create events on calendars the user owns |
-| `.../auth/calendar.calendarlist.readonly` | Read the calendar list to group pool items |
+| `.../auth/calendar.calendarlist.readonly` | Read the calendar list to group items |
 
 The two Calendar scopes are deliberately narrower than the blanket `auth/calendar`
 scope. The extension only writes events and reads the calendar list, so it never
@@ -163,14 +165,16 @@ to under `calendar.events.owned`.
 
 ## Privacy
 
-The extension has no server of its own and collects nothing. Pool items (names, descriptions, locations, colours, reminders, durations) and the list of hidden calendars are stored with `chrome.storage.sync`, so when Chrome sync is turned on they travel through **Chrome Sync, which is operated by Google**, to the other computers signed into the same Chrome profile; with Chrome sync off they stay on the computer. Per-device settings, a local copy of the pool and the primary calendar's display name as read off the Google Calendar page stay in `chrome.storage.local`. Events are created and deleted directly with the Google Calendar API.
+The extension has no server of its own and collects nothing. Items (names, descriptions, locations, colours, reminders, durations) and the list of hidden calendars are stored with `chrome.storage.sync`, so when Chrome sync is turned on they travel through **Chrome Sync, which is operated by Google**, to the other computers signed into the same Chrome profile; with Chrome sync off they stay on the computer. Per-device settings, a local copy of the items and the primary calendar's display name as read off the Google Calendar page stay in `chrome.storage.local`. Events are created and deleted directly with the Google Calendar API.
 
 ## Support
 
-Weekly Life Pool is free and has no ads, accounts or tracking. If it saves you time, you can support it through the **Sponsor** button at the top of this repository.
+Usuals is free and has no ads, accounts or tracking. If it saves you time, you can support it through the **Sponsor** button at the top of this repository.
 
 ## License
 
-Weekly Life Pool is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (AGPL-3.0-only). You may use, study, change and share it, as long as what you change stays under the same licence.
+Usuals is licensed under the [GNU Affero General Public License v3.0 only](LICENSE) (AGPL-3.0-only). You may use, study, change and share it, as long as what you change stays under the same licence.
 
 Bug reports and ideas are welcome as issues; pull requests are not accepted for now. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Google Calendar is a trademark of Google LLC. Usuals is not made, endorsed or sponsored by Google.

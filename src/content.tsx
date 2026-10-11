@@ -36,7 +36,7 @@ let currentTheme: Theme = 'light';
 
 function applyTheme({ theme, surface }: PageLook): void {
   currentTheme = theme;
-  const sidebarEl = document.getElementById('weekly-life-pool-sidebar');
+  const sidebarEl = document.getElementById('usuals-sidebar');
   for (const el of [sidebarEl, tooltipEl, previewEl]) {
     el?.setAttribute('data-wlp-theme', theme);
   }
@@ -338,7 +338,7 @@ function waitForEvent(eventId: string | undefined, itemName: string): void {
       for (const node of nodes) {
         if (node.nodeType !== Node.ELEMENT_NODE) continue;
         const el = node as Element;
-        if (el.closest?.('#weekly-life-pool-sidebar')) continue;
+        if (el.closest?.('#usuals-sidebar')) continue;
         if (eventId && containsEventChip(el, eventId)) { resolvePlaceholder(); return; }
         if (mut.type === 'childList' && (el.textContent ?? '').includes(itemName)) nameSeen = true;
       }
@@ -561,7 +561,7 @@ function clearPick(): void {
 function placePicked(cell: Element, e: MouseEvent): void {
   const item = pickedItem;
   const date = dateFromCell(cell);
-  if (!item || !date) { console.warn('[WeeklyPool] Could not resolve a date for cell, datekey', findDatekey(cell)); return; }
+  if (!item || !date) { console.warn('[Usuals] Could not resolve a date for cell, datekey', findDatekey(cell)); return; }
   debugLog(`Place → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
 
   const { hours, minutes } = timeFromDrop(cell, e.clientY);
@@ -644,7 +644,7 @@ function setupListeners(): void {
     try { item = JSON.parse(raw); } catch { return; }
 
     const date = dateFromCell(cell);
-    if (!date) { console.warn('[WeeklyPool] Could not resolve a date for cell, datekey', findDatekey(cell)); return; }
+    if (!date) { console.warn('[Usuals] Could not resolve a date for cell, datekey', findDatekey(cell)); return; }
     debugLog(`Drop → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
 
     const { hours, minutes } = timeFromDrop(cell, e.clientY);
@@ -721,7 +721,7 @@ let sidebarCollapsed: boolean | null = null;
 
 function showInView(shown: boolean): void {
   inView = shown;
-  const sidebarEl = document.getElementById('weekly-life-pool-sidebar');
+  const sidebarEl = document.getElementById('usuals-sidebar');
   if (sidebarEl) sidebarEl.style.display = shown ? '' : 'none';
   if (shown) {
     if (sidebarCollapsed !== null) adjustLayout(sidebarCollapsed);
@@ -745,10 +745,10 @@ function showInView(shown: boolean): void {
 function injectSidebar(): void {
   const mainEl = document.querySelector<HTMLElement>('[role="main"]');
   if (!mainEl) { setTimeout(injectSidebar, 500); return; }
-  if (document.getElementById('weekly-life-pool-sidebar')) return;
+  if (document.getElementById('usuals-sidebar')) return;
 
   const sidebarEl = document.createElement('div');
-  sidebarEl.id = 'weekly-life-pool-sidebar';
+  sidebarEl.id = 'usuals-sidebar';
   // Its words are English, so it keeps its own left-to-right order when Google
   // Calendar is in a right-to-left language; names in it still take their own
   // direction (names.ts). layout.ts says where it sits on such a page.
@@ -770,7 +770,7 @@ function injectSidebar(): void {
     watchWeekOrDayView(showInView);
     debugLog('Sidebar injected.');
   } catch (err) {
-    console.error('[WeeklyPool] Failed to render sidebar:', err);
+    console.error('[Usuals] Failed to render sidebar:', err);
   }
 }
 

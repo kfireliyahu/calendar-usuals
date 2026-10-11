@@ -1,7 +1,7 @@
 {
-  "name": "weekly-life-pool",
+  "name": "calendar-usuals",
   "version": "0.1.0",
-  "description": "A planning sidebar for Google Calendar: drag reusable activities onto the week to create events.",
+  "description": "Usuals: the things you usually do, kept beside Google Calendar's week and day; drag one onto a time to make it an event.",
   "main": "index.js",
   "scripts": {
     "build": "vite build",
