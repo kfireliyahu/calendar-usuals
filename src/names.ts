@@ -153,6 +153,59 @@ export function watchPrimaryName(
   return stop;
 }
 
+// ── Changes to Google's list of calendars ─────────────────────────────────────
+//
+// The sidebar fetches the calendar list from the API, which says nothing when
+// a calendar is created, deleted, renamed or given a new colour. Google's
+// "My calendars" list on the page shows all four: each row carries a data-id
+// and the calendar's colour as --checkbox-color, and holds a checkbox named
+// after the calendar. A reading of those rows is taken whenever the page
+// changes, at most once a second, and a reading that differs from the last
+// calls back. A list that is not on the page, as while Google's menu is
+// closed, reads as nothing and is skipped, so closing the menu changes
+// nothing, and the change shows the next time the list is drawn.
+
+function calendarListReading(): string {
+  const rows: string[] = [];
+  for (const box of Array.from(document.querySelectorAll('input[type="checkbox"], [role="checkbox"]'))) {
+    const row = box.closest('[data-id]');
+    if (!row || !outsideSidebar(box)) continue;
+    const color = getComputedStyle(row).getPropertyValue('--checkbox-color').trim()
+      || getComputedStyle(box).getPropertyValue('--checkbox-color').trim();
+    rows.push(`${row.getAttribute('data-id')} ${checkboxName(box)} ${color}`);
+  }
+  return rows.join('\n');
+}
+
+export function watchCalendarList(onChange: () => void): () => void {
+  let last = calendarListReading();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const read = () => {
+    timer = null;
+    const now = calendarListReading();
+    if (!now || now === last) return;
+    const first = !last;
+    last = now;
+    // The first time the list is drawn is not a change: the sidebar's own
+    // fetch already has what it shows.
+    if (!first) onChange();
+  };
+
+  const observer = new MutationObserver(() => {
+    if (!timer) timer = setTimeout(read, LOOK_AGAIN_MS);
+  });
+  observer.observe(document.body, {
+    childList: true, subtree: true,
+    attributes: true, attributeFilter: ['style', 'aria-label', 'data-id'],
+  });
+
+  return () => {
+    observer.disconnect();
+    if (timer) clearTimeout(timer);
+  };
+}
+
 // ── Text direction ────────────────────────────────────────────────────────────
 //
 // A name can be in Hebrew or Arabic while the sidebar's own words are English.

@@ -19,7 +19,7 @@ import { formatTime, gridZoneLabels, isSameDay, visibleTimeGridDays } from '../c
 import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
 import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
 import { chipTextOn } from '../theme';
-import { CalendarListEntry, displayName, isolate, needsPageName, textDirection, watchPrimaryName } from '../names';
+import { CalendarListEntry, displayName, isolate, needsPageName, textDirection, watchCalendarList, watchPrimaryName } from '../names';
 import { watchGoogleNav } from '../layout';
 
 // hidden is the stored name, kept so every synced pool reads as before: it
@@ -52,6 +52,9 @@ interface Toast {
 }
 
 const UNDO_WINDOW_MS = 5000;
+
+// Coming back to the tab fetches the calendar list again, no more often than this.
+const VISIBLE_REFETCH_MS = 60 * 1000;
 
 // A toast does not count down while the pointer is over it or focus is inside
 // it: five seconds is short for someone tabbing to Undo or listening to a
@@ -902,31 +905,40 @@ const PoolSidebar: React.FC = () => {
   }, []);
 
   // ── Calendar fetch ───────────────────────────────────────────────────────────
+  //
+  // The list is fetched when the sidebar mounts and again whenever Google's own
+  // list changes (below). The first fetch shows the loading and error states.
+  // A later one is quiet: if it fails the list stays as it was, and a calendar
+  // still in the list keeps its items, its fold and the composer's choice of
+  // it, so a refresh never disturbs what is being done in the sidebar.
 
-  const fetchCalendars = () => {
-    setLoading(true);
-    setFetchError(null);
+  const fetchCalendars = (quiet = false) => {
+    if (!quiet) {
+      setLoading(true);
+      setFetchError(null);
+    }
+    const fail = (message: string) => {
+      if (quiet) { console.warn('[Usuals] Could not refresh the calendar list:', message); return; }
+      setFetchError(message);
+      setLoading(false);
+    };
 
     if (typeof chrome === 'undefined' || !chrome.runtime) {
-      setFetchError('Chrome extension API not available');
-      setLoading(false);
+      fail('Chrome extension API not available');
       return;
     }
     if (!extensionAlive()) {
-      setFetchError('Extension reloaded - refresh the page');
-      setLoading(false);
+      fail('Extension reloaded - refresh the page');
       return;
     }
 
     chrome.runtime.sendMessage({ type: 'LIST_CALENDARS' }, (response) => {
       if (chrome.runtime.lastError) {
-        setFetchError(chrome.runtime.lastError.message ?? 'Failed to connect');
-        setLoading(false);
+        fail(chrome.runtime.lastError.message ?? 'Failed to connect');
         return;
       }
       if (!response?.success) {
-        setFetchError(response?.error ?? 'Failed to fetch calendars');
-        setLoading(false);
+        fail(response?.error ?? 'Failed to fetch calendars');
         return;
       }
 
@@ -948,38 +960,65 @@ const PoolSidebar: React.FC = () => {
       const primary = entries.find(needsPageName);
       const nameOf = (cal: CalendarListEntry) =>
         primaryName.current?.calendarId === cal.id ? primaryName.current.name : displayName(cal);
-      setPrimaryLookup(primary ? {
+      const lookup = primary ? {
         calendarId: primary.id,
         otherNames: items.filter((cal) => cal !== primary && !cal.hidden).map(displayName),
-      } : null);
+      } : null;
+      // An unchanged lookup keeps the watcher it already started.
+      setPrimaryLookup((prev) =>
+        prev && lookup && prev.calendarId === lookup.calendarId
+          && prev.otherNames.join('\n') === lookup.otherNames.join('\n') ? prev : lookup
+      );
 
       // Items stored under a calendar that is not in this list, say one from
       // the Google account another machine is signed into, are not shown but
       // stay in storage: poolStore only replaces the calendars passed to it.
       loadPool().then(
         (pool) => {
-          const newCategories: PoolCategory[] = entries.map((cal) => ({
-            calendarId: cal.id,
-            name: nameOf(cal),
-            color: cal.backgroundColor ?? '#4285f4',
-            items: pool.items[cal.id] ?? [],
-            hidden: pool.hidden.includes(cal.id),
-          }));
-          setCategories(newCategories);
-          const firstVisible = newCategories.find((c) => !c.hidden);
-          setNewItemCategory((firstVisible ?? newCategories[0])?.calendarId ?? '');
+          setCategories((prev) => {
+            const kept = new Map(prev.map((cat) => [cat.calendarId, cat]));
+            return entries.map((cal): PoolCategory => {
+              const old = quiet ? kept.get(cal.id) : undefined;
+              return {
+                calendarId: cal.id,
+                name: nameOf(cal),
+                color: cal.backgroundColor ?? '#4285f4',
+                items: old ? old.items : pool.items[cal.id] ?? [],
+                hidden: old ? old.hidden : pool.hidden.includes(cal.id),
+              };
+            });
+          });
+          setNewItemCategory((current) => {
+            if (quiet && entries.some((cal) => cal.id === current)) return current;
+            const firstVisible = entries.find((cal) => !pool.hidden.includes(cal.id));
+            return (firstVisible ?? entries[0])?.id ?? '';
+          });
           setLoaded(true);
           setLoading(false);
+          setFetchError(null);
         },
-        (err) => {
-          setFetchError(`Could not read the pool: ${err instanceof Error ? err.message : String(err)}`);
-          setLoading(false);
-        }
+        (err) => fail(`Could not read the pool: ${err instanceof Error ? err.message : String(err)}`)
       );
     });
   };
 
   useEffect(() => { fetchCalendars(); }, []);
+
+  // A calendar created, deleted, renamed or recoloured in Google Calendar shows
+  // in Google's own list, which names.ts watches. Coming back to the tab also
+  // fetches again, at most once a minute, for a change made in another tab or
+  // on a phone while this one was in the background.
+  useEffect(() => {
+    let lastVisibleFetch = Date.now();
+    const stop = watchCalendarList(() => fetchCalendars(true));
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastVisibleFetch < VISIBLE_REFETCH_MS) return;
+      lastVisibleFetch = Date.now();
+      fetchCalendars(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisible); };
+  }, []);
 
   // The primary calendar's name, from this device's last reading and then
   // from the page (names.ts, watchPrimaryName), which keeps looking until
@@ -1364,7 +1403,7 @@ const PoolSidebar: React.FC = () => {
             <div className="p-[16px] flex flex-col gap-[12px]">
               <p className="text-[13px] text-[var(--wlp-danger)]">{fetchError}</p>
               <button
-                onClick={fetchCalendars}
+                onClick={() => fetchCalendars()}
                 className="px-[12px] py-[8px] bg-[var(--wlp-primary)] text-[var(--wlp-on-primary)] border-none rounded-[6px] text-[13px] font-[500] cursor-pointer hover:bg-[var(--wlp-primary-hover)] transition-colors duration-150"
               >
                 Retry
