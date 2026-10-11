@@ -59,6 +59,17 @@ export function adjustLayout(collapsed: boolean): void {
   root.style.transition = 'transform 0.2s ease-in-out, width 0.2s ease-in-out';
 }
 
+// Gives Google Calendar back its own layout, for a view the sidebar does not
+// show in.
+export function resetLayout(): void {
+  const root = getGcalRoot();
+  if (!root) return;
+  root.style.transform  = '';
+  root.style.width      = '';
+  root.style.overflowX  = '';
+  root.style.transition = '';
+}
+
 // ── Google's main menu ────────────────────────────────────────────────────────
 //
 // The ☰ in Google's top bar opens and closes its left nav: the mini month,

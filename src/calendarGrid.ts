@@ -119,6 +119,58 @@ export function timeGridCellFor(date: Date): Element | null {
   return timeGridCells().find((c) => isSameDay(c.date, date))?.cell ?? null;
 }
 
+// ── Which view is showing ─────────────────────────────────────────────────────
+//
+// The extension works in Week and Day view alone. Google Calendar names the
+// view in the path, after /r/: /r/week/2026/10/11, /r/day/2026/10/11, and
+// /r/month, /r/year, /r/agenda and /r/customday for the others; its settings
+// and full event editor are /r/settings and /r/eventedit. Weekends hidden or
+// not, Week view is /r/week. A bare /r opens whichever view the user chose as
+// the default in Google's settings, which the path does not name, so there
+// the grid itself is read: one day column, seven, or Monday to Friday. A
+// custom view of five or seven days that starts where a week would is the one
+// thing that reads as a week there and is not.
+export function isWeekOrDayView(): boolean {
+  const parts = location.pathname.split('/');
+  const r = parts.indexOf('r');
+  const view = r === -1 ? undefined : parts[r + 1];
+  if (view === 'week' || view === 'day') return true;
+  if (view && !/^\d/.test(view)) return false;
+  return gridShowsWeekOrDay();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function gridShowsWeekOrDay(): boolean {
+  const days = visibleTimeGridDays();
+  if (days.length === 1 || days.length === 7) return true;
+  // Rounded, as a DST change inside the week makes one day 23 or 25 hours.
+  return days.length === 5
+    && days[0].getDay() === 1
+    && Math.round((days[4].getTime() - days[0].getTime()) / DAY_MS) === 4;
+}
+
+// Calls back with whether Week or Day view is showing, now and whenever that
+// changes.
+// Google Calendar changes view without loading a page, through the History
+// API, which a content script cannot hook. Chrome's Navigation API reports
+// those changes as they happen, and a check twice a second catches the rest,
+// such as a bare /r whose grid is drawn only after the path has changed.
+const VIEW_CHECK_MS = 500;
+
+export function watchWeekOrDayView(onChange: (shown: boolean) => void): void {
+  let last: boolean | null = null;
+  const check = () => {
+    const shown = isWeekOrDayView();
+    if (shown === last) return;
+    last = shown;
+    onChange(shown);
+  };
+  window.navigation?.addEventListener('currententrychange', check);
+  setInterval(check, VIEW_CHECK_MS);
+  check();
+}
+
 // ── The grid's time zone label ────────────────────────────────────────────────
 //
 // Week and Day view print the zone the grid is drawn in at the top of the

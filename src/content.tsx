@@ -2,11 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import PoolSidebar from './components/PoolSidebar';
 import { PoolItem, durationOf, eventColorHex } from './poolItem';
-import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, timeGridCellFor } from './calendarGrid';
+import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, timeGridCellFor, watchWeekOrDayView } from './calendarGrid';
 import { EventDateTime, eventTimes } from './calendarZone';
 import { PageLook, Theme, chipTextOn, watchTheme } from './theme';
 import { isolate } from './names';
-import { adjustLayout } from './layout';
+import { adjustLayout, resetLayout } from './layout';
 import { debugLog } from './debug';
 import './content.css';
 
@@ -545,7 +545,7 @@ function refreshPickedHint(): void {
   if (!cell) { hideTooltip(); hidePreview(); return; }
   if (!isTimeGridCell(cell)) {
     hidePreview();
-    showTooltip(x, y, 'Switch to Day or Week view to place here');
+    showTooltip(x, y, 'Click a time slot to place here');
     return;
   }
   showPlacementHint(cell, x, y, pickedItem, shift);
@@ -600,7 +600,8 @@ function setupListeners(): void {
     draggingItem = null; hideTooltip(); hidePreview();
   });
   document.addEventListener('poolSidebarToggle', (e: Event) => {
-    adjustLayout((e as CustomEvent).detail.collapsed as boolean);
+    sidebarCollapsed = (e as CustomEvent).detail.collapsed as boolean;
+    if (inView) adjustLayout(sidebarCollapsed);
   });
   // An Undo inside the window can delete the event before Google Calendar ever
   // renders it, and then nothing would resolve the placeholder until timeout.
@@ -620,7 +621,7 @@ function setupListeners(): void {
     // tooltip below explains where to aim instead.
     if (!isTimeGridCell(cell)) {
       hidePreview();
-      if (draggingItem) showTooltip(e.clientX, e.clientY, 'Switch to Day or Week view to drop here');
+      if (draggingItem) showTooltip(e.clientX, e.clientY, 'Drop on a time slot');
       return;
     }
     e.preventDefault();
@@ -707,6 +708,38 @@ function setupListeners(): void {
   });
 }
 
+// ── Week and Day view only ────────────────────────────────────────────────────
+//
+// The sidebar shows in Google Calendar's Week and Day views and nowhere else.
+// On any other view it is hidden, not unmounted, so a half-typed item is still
+// there when the user comes back, and Google's layout is handed back untouched.
+
+let inView = false;
+// How wide the sidebar last said it is (poolSidebarToggle), or null until it
+// has read the stored choice, before which the page is not shifted at all.
+let sidebarCollapsed: boolean | null = null;
+
+function showInView(shown: boolean): void {
+  inView = shown;
+  const sidebarEl = document.getElementById('weekly-life-pool-sidebar');
+  if (sidebarEl) sidebarEl.style.display = shown ? '' : 'none';
+  if (shown) {
+    if (sidebarCollapsed !== null) adjustLayout(sidebarCollapsed);
+    return;
+  }
+  resetLayout();
+  // Nothing the extension drew stays behind on a view it does not work in: a
+  // picked item is put back, and a placeholder still pulsing is cleared, as
+  // the column it marked is gone. The event itself is still created.
+  if (pickedItem) {
+    clearPick();
+    document.dispatchEvent(new CustomEvent('poolPickDone'));
+  }
+  draggingItem = null;
+  hideTooltip();
+  if (isLoading) { stopWaiting(); hideLoading(); }
+}
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 function injectSidebar(): void {
@@ -720,6 +753,8 @@ function injectSidebar(): void {
   // Calendar is in a right-to-left language; names in it still take their own
   // direction (names.ts). layout.ts says where it sits on such a page.
   sidebarEl.dir = 'ltr';
+  // Hidden until watchWeekOrDayView has said Week or Day view is showing.
+  sidebarEl.style.display = 'none';
   document.body.insertBefore(sidebarEl, document.body.firstChild);
   // Before the first render, so the sidebar never flashes light on a dark page.
   watchTheme(applyTheme);
@@ -731,7 +766,8 @@ function injectSidebar(): void {
     // whether Google's main menu is open (poolSidebarToggle), so the page is
     // shifted once, to the right width, rather than to the stored one first.
     // Without storage it never reads one, so it is laid out open here.
-    if (typeof chrome === 'undefined' || !chrome.storage) adjustLayout(false);
+    if (typeof chrome === 'undefined' || !chrome.storage) sidebarCollapsed = false;
+    watchWeekOrDayView(showInView);
     debugLog('Sidebar injected.');
   } catch (err) {
     console.error('[WeeklyPool] Failed to render sidebar:', err);

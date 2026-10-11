@@ -586,7 +586,7 @@ const ScheduleForm: React.FC<{
           <option value="weekly">{repeatLabel(days.find((d) => dayKey(d) === dayValue))}</option>
         </FieldSelect>
       </div>
-      <p className="wlp-schedule-hint">Or click a time in Day or Week view. Shift-click repeats weekly.</p>
+      <p className="wlp-schedule-hint">Or click a time slot. Shift-click repeats weekly.</p>
       <div className="wlp-schedule-actions">
         <button type="button" onClick={onCancel} className="wlp-btn-text">Cancel</button>
         <button type="submit" className="wlp-btn-filled">Schedule</button>
@@ -894,7 +894,7 @@ const PoolSidebar: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [pickedId]);
 
-  // A click on the grid used the pick up.
+  // A click on the grid used the pick up, or the view left Week and Day view.
   useEffect(() => {
     const done = () => setPickedId(null);
     document.addEventListener('poolPickDone', done);
