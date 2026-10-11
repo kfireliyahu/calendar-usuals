@@ -17,9 +17,10 @@ dist/
 Thumbs.db
 *.log
 
-# Emerald development document. Private, never committed.
-*.emd
+# Emerald development document: pool.emd is committed (D-30), in Emerald's
+# text storage. Its rolling backups and the copies kept before big edits are not.
 *.emd.*.bak
+*.before-*.emd
 
 # Private design references (screenshots of the author's own calendar). Never committed.
 design-ref/

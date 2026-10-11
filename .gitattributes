@@ -1,0 +1,2 @@
+# Emerald writes its text documents with LF; keep them byte for byte on Windows too.
+*.emd text eol=lf
