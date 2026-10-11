@@ -193,7 +193,7 @@ const DurationSelect: React.FC<{
 // ── Event-editor fields ──────────────────────────────────────────────────────
 //
 // A select drawn as one of the grey fields in Google's event editor, such as
-// its calendar choice ("Kfir Raphael Eliyahu ▾") or "Does not repeat ▾": the
+// its calendar choice ("Pat Doe ▾") or "Does not repeat ▾": the
 // browser's arrow gives way to Google's ▾, and an optional dot in front shows
 // a colour. It stays a native <select>, so arrow keys, type-to-find, Escape
 // and the accessible name all come from the browser, and its open list is

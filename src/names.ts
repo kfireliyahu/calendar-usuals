@@ -27,7 +27,7 @@ export function displayName(cal: CalendarListEntry): string {
 
 // The primary calendar's summary is the account's address until the user
 // renames it, and Google's own list shows the account's name in its place
-// ("Kfir Raphael Eliyahu", not "pat@example.com"). The API has that name
+// ("Pat Doe", not "pat@example.com"). The API has that name
 // only behind a profile scope this extension does not ask for, so it is read
 // off the page instead (findPrimaryName). A primary calendar the user did
 // rename shows that name, as Google does, and needs nothing from the page.
@@ -41,8 +41,8 @@ export function needsPageName(cal: CalendarListEntry): boolean {
 // Google's "My calendars" list is a checkbox per calendar, each named for
 // assistive technology with the calendar's name, and it lists the primary
 // calendar first. Separately, the account button in Google's top bar is named
-// with the account's name and its address ("Google Account: Kfir Raphael
-// Eliyahu (pat@example.com)", in the page's language). The name is taken
+// with the account's name and its address ("Google Account: Pat Doe
+// (pat@example.com)", in the page's language). The name is taken
 // only when the two agree:
 //
 // - The list is found by the other calendars the API returned: the checkboxes
@@ -111,8 +111,8 @@ export function findPrimaryName(address: string, otherNames: readonly string[]):
   }
   if (!listFound) return null;
 
-  // A short name inside the account's, a "Kfir" beside "Kfir Raphael
-  // Eliyahu", is a part of it rather than a rival.
+  // A short name inside the account's, a "Pat" beside "Pat Doe",
+  // is a part of it rather than a rival.
   const distinct = Array.from(new Set(candidates));
   const whole = distinct.filter((name) => !distinct.some((other) => other !== name && other.includes(name)));
   return whole.length === 1 ? whole[0] : null;
