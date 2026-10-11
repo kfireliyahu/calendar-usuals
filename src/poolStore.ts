@@ -366,7 +366,10 @@ function onSyncChanged(changes: { [key: string]: chrome.storage.StorageChange })
 //      an older local one: the first machine to update has already moved its
 //      pool up, and the two are not merged.
 //   3. Otherwise the pool from before sync, which becomes the first write.
+//
+// Once read, it answers with the pool as it is now, edits since included.
 export function loadPool(): Promise<PoolData> {
+  if (loaded) return Promise.resolve(toPoolData(desired));
   loading ??= readPool().catch((err) => {
     loading = null;
     throw err;
@@ -418,8 +421,46 @@ export function savePool(shown: PoolData): void {
   scheduleFlush();
 }
 
+// Adds the items of an imported file (poolTransfer.ts) to the pool. An item
+// whose id the pool already has is left as it is, so importing a file twice,
+// or into the pool it came from, adds nothing and changes nothing. New items
+// go at the end of their calendar's list, a calendar folded in the file is
+// folded here too, and the sidebar hears of it as it would of an edit from
+// another machine. Returns the items that were added.
+export function mergePool(incoming: PoolData): PoolItem[] {
+  if (!loaded) throw new Error('The pool has not loaded yet');
+  const current = toPoolData(desired);
+  const next: Entries = { ...desired };
+  const present = new Set(
+    Object.keys(desired).filter((key) => key.startsWith(ITEM_PREFIX)).map((key) => key.slice(ITEM_PREFIX.length))
+  );
+
+  const added: PoolItem[] = [];
+  for (const [calendarId, items] of Object.entries(incoming.items)) {
+    const fresh = items.filter((item) => !present.has(item.id));
+    if (fresh.length === 0) continue;
+    for (const item of fresh) {
+      next[ITEM_PREFIX + item.id] = item;
+      present.add(item.id);
+    }
+    next[ORDER_PREFIX + calendarId] = [...(current.items[calendarId] ?? []).map((item) => item.id), ...fresh.map((item) => item.id)];
+    added.push(...fresh);
+  }
+  const hidden = [...new Set([...current.hidden, ...incoming.hidden])];
+  setEntry(next, HIDDEN_KEY, hidden.length > 0 ? hidden : undefined);
+
+  if (same(next, desired)) return added;
+  next[SCHEMA_KEY] = SCHEMA_VERSION;
+  desired = next;
+  writeMirror();
+  scheduleFlush();
+  const pool = toPoolData(desired);
+  changeListeners.forEach((listener) => listener(pool));
+  return added;
+}
+
 // Called with the whole pool after an edit made on another machine or in
-// another tab.
+// another tab, or an import.
 export function subscribePool(listener: (pool: PoolData) => void): () => void {
   changeListeners.add(listener);
   return () => { changeListeners.delete(listener); };

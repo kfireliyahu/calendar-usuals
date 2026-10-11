@@ -845,6 +845,31 @@ select.wlp-gfield:focus-visible {
   margin-top: auto !important;
   padding: 10px var(--wlp-gutter) 12px !important;
   border-top: 1px solid var(--wlp-divider) !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+}
+
+/* Export and Import, at the start of the footer in the same quiet grey as its
+   link: tools used once in a while, never in the way of the pool. */
+.wlp-footer-actions {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 6px !important;
+}
+
+button.wlp-footer-link {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  font-family: inherit !important;
+  cursor: pointer !important;
+}
+
+.wlp-footer-dot {
+  font-size: 11px !important;
+  color: var(--wlp-text-muted) !important;
 }
 
 .wlp-footer-link {

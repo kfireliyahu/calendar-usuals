@@ -59,6 +59,7 @@ Information received from Google APIs is used only to provide the features descr
 
 - **Delete an item** in the sidebar, and it is removed from storage, including Chrome sync.
 - **Remove Usuals' access to your calendars** at any time in your Google Account, under [Third-party apps and services](https://myaccount.google.com/connections). Usuals then stops working until you allow it again.
+- **Export your items** to a file with Export in the sidebar's footer, and add them back with Import. The file is saved where you choose on your computer and goes nowhere else.
 - **Uninstall Usuals** from `chrome://extensions`. Chrome then removes the data the extension keeps on that computer. To be sure the synced copy of your items is gone too, delete them in the sidebar first, or clear your Chrome sync data in your Google Account.
 - **Events Usuals created** are ordinary events in your Google Calendar. They stay until you delete them, and uninstalling Usuals does not delete them.
 

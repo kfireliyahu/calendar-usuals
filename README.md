@@ -27,6 +27,7 @@ Most of a week is made of things you already do: a workout, a call home, deep wo
 - **Collapsible sidebar** — collapse to a 40 px icon strip when you need the full screen. While Google Calendar's own main menu (☰) is open, the sidebar steps aside to that strip by itself, so the week is never squeezed between two sidebars; open it from the strip and it stays beside the menu until the menu closes. Header, list and footer always fit the window, whatever its height
 - **Follows Google Calendar's theme** — the sidebar, its forms and toasts, and the tooltip, drag preview and loading placeholder it draws on the calendar turn dark whenever Google Calendar is showing its dark theme and light when it is not, going by Google Calendar's own Appearance setting rather than the operating system's; changing it switches them over without a reload. The sidebar sits on the same page colour as Google Calendar's top bar and left nav, read off the page rather than assumed, in Google's typeface and with a thin scrollbar like Google's
 - **Syncs across your Chrome profile** — items and hidden categories are saved with `chrome.storage.sync`, so every computer signed into the same Chrome profile sees the same items, and an edit on one shows up on the others (and in other Calendar tabs) without a reload
+- **Export and import** — Export in the sidebar's footer saves every usual, with its calendar, its template fields and the folded sections, to a `usuals-<date>.json` file; Import adds a file's usuals back. An import only adds: a usual already in the sidebar is left as it is, so importing the same file twice changes nothing. Usuals for calendars this Google account does not have are kept but not shown, and the toast says how many
 - **Persistent storage** — whether the sidebar is collapsed is saved per computer in Chrome local storage, and the items keep a copy there too, so an edit is never lost if it has not reached sync yet
 
 ---
@@ -111,6 +112,7 @@ src/
 ├── calendarGrid.ts        # Reads Google Calendar's grid — datekeys, day columns, visible days
 ├── poolItem.ts            # The pool item type and its helpers
 ├── poolStore.ts           # Loads, saves and live-updates the pool in chrome.storage.sync
+├── poolTransfer.ts        # The export file: writing it, and reading and checking one to import
 ├── theme.ts               # Reads whether Google Calendar is showing its light or dark theme
 ├── names.ts               # Calendar display names, the primary calendar's name off the page, text direction
 ├── layout.ts              # Makes room for the sidebar on the page; tells when Google's main menu is open

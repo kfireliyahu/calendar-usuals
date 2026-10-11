@@ -17,7 +17,8 @@ import {
 } from '../poolItem';
 import { formatTime, gridZoneLabels, isSameDay, visibleTimeGridDays } from '../calendarGrid';
 import { calendarNow, setPrimaryTimeZone } from '../calendarZone';
-import { loadPool, onSyncFull, savePool, subscribePool } from '../poolStore';
+import { loadPool, mergePool, onSyncFull, savePool, subscribePool } from '../poolStore';
+import { ImportError, buildExport, exportFileName, parseExport } from '../poolTransfer';
 import { chipTextOn } from '../theme';
 import { CalendarListEntry, displayName, isolate, needsPageName, textDirection, watchCalendarList, watchPrimaryName } from '../names';
 import { watchGoogleNav } from '../layout';
@@ -631,6 +632,7 @@ const PoolSidebar: React.FC = () => {
   const toastArea = useRef<HTMLDivElement>(null);
   const cancelledRename = useRef(false);
   const scheduleButtons = useRef(new Map<string, HTMLButtonElement>());
+  const importInput = useRef<HTMLInputElement>(null);
 
   // Hover and focus are read from the DOM when needed rather than tracked from
   // enter and leave events: the toast's content is swapped out from under the
@@ -1083,6 +1085,47 @@ const PoolSidebar: React.FC = () => {
     const stopSyncFull = onSyncFull(() => showToast(SYNC_FULL_MESSAGE, 'info', SYNC_FULL_HOLD_MS));
     return () => { stopChanges(); stopSyncFull(); };
   }, []);
+
+  // ── Export and import ────────────────────────────────────────────────────────
+  //
+  // The whole pool to a JSON file, and a file's usuals back in (poolTransfer.ts).
+  // An import only adds: usuals already here, by id, are left as they are.
+
+  const exportUsuals = () => {
+    loadPool().then(
+      (pool) => {
+        const names = Object.fromEntries(categories.map((cat) => [cat.calendarId, cat.name]));
+        const { text, count } = buildExport(pool, names);
+        const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = exportFileName();
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+        showToast(`Exported ${count} usual${count === 1 ? '' : 's'}`, 'success');
+      },
+      (err) => showToast(`Could not export: ${err instanceof Error ? err.message : String(err)}`, 'error', 5000)
+    );
+  };
+
+  const importUsuals = async (file: File) => {
+    try {
+      const { pool, skipped } = parseExport(await file.text());
+      const added = mergePool(pool);
+      const shown = new Set(categories.map((cat) => cat.calendarId));
+      const elsewhere = added.filter((item) => !shown.has(item.calendarId)).length;
+      const parts = [
+        added.length === 0 ? 'Nothing new to import' : `Imported ${added.length} usual${added.length === 1 ? '' : 's'}`,
+      ];
+      if (elsewhere > 0) parts.push(`${elsewhere} for calendars this account doesn't have, kept but not shown`);
+      if (skipped > 0) parts.push(`${skipped} unreadable, skipped`);
+      showToast(parts.join(' · '), added.length > 0 ? 'success' : 'info', 6000);
+    } catch (err) {
+      const message = err instanceof ImportError ? err.message
+        : `Could not import: ${err instanceof Error ? err.message : String(err)}`;
+      showToast(message, 'error', 6000);
+    }
+  };
 
   // ── Item management ──────────────────────────────────────────────────────────
 
@@ -1770,6 +1813,29 @@ const PoolSidebar: React.FC = () => {
               list is replaced by the loading or error state. The collapsed
               strip has no room for it and does not get one. */}
           <footer className="wlp-footer">
+            {loaded && (
+              <span className="wlp-footer-actions">
+                <button type="button" onClick={exportUsuals} className="wlp-footer-link" title="Save all your usuals to a file">
+                  Export
+                </button>
+                <span aria-hidden="true" className="wlp-footer-dot">·</span>
+                <button type="button" onClick={() => importInput.current?.click()} className="wlp-footer-link" title="Add the usuals from an exported file">
+                  Import
+                </button>
+                <input
+                  ref={importInput}
+                  type="file"
+                  accept=".json,application/json"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    // Cleared so choosing the same file again still fires.
+                    e.target.value = '';
+                    if (file) importUsuals(file);
+                  }}
+                />
+              </span>
+            )}
             <a
               href={HOMEPAGE_URL}
               target="_blank"
