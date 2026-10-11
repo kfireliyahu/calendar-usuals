@@ -167,6 +167,8 @@ to under `calendar.events.owned`.
 
 The extension has no server of its own and collects nothing. Items (names, descriptions, locations, colours, reminders, durations) and the list of hidden calendars are stored with `chrome.storage.sync`, so when Chrome sync is turned on they travel through **Chrome Sync, which is operated by Google**, to the other computers signed into the same Chrome profile; with Chrome sync off they stay on the computer. Per-device settings, a local copy of the items and the primary calendar's display name as read off the Google Calendar page stay in `chrome.storage.local`. Events are created and deleted directly with the Google Calendar API.
 
+The full policy is in [PRIVACY.md](PRIVACY.md).
+
 ## Support
 
 Usuals is free and has no ads, accounts or tracking. If it saves you time, you can support it through the **Sponsor** button at the top of this repository.
