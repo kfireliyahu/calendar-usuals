@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <title>Usuals (16 px, hand-tuned)</title>
+  <!-- Pixel-aligned: no shadows or facets, only the hero chip keeps its label and bottom shade -->
+  <!-- banana -->
+  <rect x="1" y="1" width="9" height="4" rx="1.5" fill="#F6BF26"/>
+  <!-- sage -->
+  <rect x="1" y="12" width="8" height="4" rx="1.5" fill="#33B679"/>
+  <!-- peacock (pulled out) -->
+  <clipPath id="p"><rect x="4" y="6" width="11" height="5" rx="1.5"/></clipPath>
+  <g clip-path="url(#p)">
+    <rect x="4" y="6" width="11" height="5" fill="#039BE5"/>
+    <rect x="4" y="10" width="11" height="1" fill="#000" fill-opacity=".16"/>
+  </g>
+  <rect x="6" y="8" width="5" height="1" fill="#FFFFFF"/>
+</svg>
