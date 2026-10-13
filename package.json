@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vite build",
     "watch": "vite build --watch",
-    "dev": "vite build --watch"
+    "dev": "vite build --watch",
+    "package": "vite build && node scripts/package.mjs"
   },
   "keywords": [],
   "author": "Kfir Raphael Eliyahu <me@kfireliyahu.com>",

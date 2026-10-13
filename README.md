@@ -92,6 +92,14 @@ For development with automatic rebuilds on save:
 npm run watch
 ```
 
+To build the Chrome Web Store package:
+
+```bash
+npm run package      # outputs release/usuals-<version>.zip
+```
+
+`manifest.json` pins the store's public key as `key`, so an unpacked build has the store's extension id (`hkihoifbohighgoackpcinobeabpjnbp`) and signs in with the OAuth client registered against it. The packaged manifest leaves `key` out, since the store supplies its own.
+
 ### Load the extension in Chrome
 
 1. Navigate to `chrome://extensions`
