@@ -24,3 +24,6 @@ Thumbs.db
 
 # Private design references (screenshots of the author's own calendar). Never committed.
 design-ref/
+
+# Store packages, built from dist/
+release/
