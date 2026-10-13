@@ -1,7 +1,7 @@
 {
   "name": "calendar-usuals",
   "version": "0.1.0",
-  "description": "Usuals: the things you usually do, kept beside Google Calendar's week and day; drag one onto a time to make it an event.",
+  "description": "Usuals: your usual events, kept beside Google Calendar's week and day; drag one onto a time to schedule it.",
   "main": "index.js",
   "scripts": {
     "build": "vite build",

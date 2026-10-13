@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Usuals",
   "version": "0.1.0",
-  "description": "Keep the things you usually do beside Google Calendar's week and day, and drag one onto a time to make it an event.",
+  "description": "Keep your usual events beside Google Calendar's week and day, and drag one onto a time to schedule it.",
   "homepage_url": "https://kfireliyahu.com/calendar-usuals",
   "icons": {
     "16": "icons/icon16.png",

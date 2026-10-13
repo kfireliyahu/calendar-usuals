@@ -2,7 +2,7 @@
 
 *Works with Google Calendar*
 
-Most of a week is made of things you already do: a workout, a call home, deep work, the groceries. Usuals is a Chrome extension that keeps those usual things in a sidebar beside Google Calendar's week and day, each under the calendar it belongs to, so planning is dragging one onto a time slot, where it becomes a real event.
+Most weeks are built from the same few events: a workout, a call home, deep work, the groceries. Usuals is a Chrome extension that keeps your usual events in a sidebar beside Google Calendar's week and day, each under the calendar it belongs to, so planning is dragging one onto a time slot, where it becomes a real event.
 
 ---
 
