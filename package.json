@@ -1,6 +1,6 @@
 {
   "name": "calendar-usuals",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Usuals: your usual events, kept beside Google Calendar's week and day; drag one onto a time to schedule it.",
   "main": "index.js",
   "scripts": {
