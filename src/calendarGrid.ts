@@ -70,15 +70,23 @@ export function dateFromCell(cell: Element): Date | null {
 
 // ── Time grid ─────────────────────────────────────────────────────────────────
 
-export const PIXELS_PER_HOUR = 60; // 1 px = 1 minute
+// In the week/day time grid a gridcell is one whole day column, midnight to
+// midnight, so its height over the minutes in a day is how many pixels Google
+// draws a minute. That is often 1 (an hour 60 px tall), but Google draws hours
+// shorter for some accounts and screens, so it is measured, never assumed: a
+// drop's offset, the preview's height and the placeholder's all go through it.
+const MINUTES_PER_DAY = 24 * 60;
 
-// A drop or click offset reads as "minutes since midnight", which only holds
-// in the week/day time grid, where a gridcell is one whole day column at
-// PIXELS_PER_HOUR (24 h => ~1440 px). Month-view cells and the all-day row are
-// also [role="gridcell"] with a datekey, but they are a fraction of that height,
-// so the same arithmetic there yields an arbitrary time. Require most of a full
-// day's height before trusting the offset.
-const TIME_GRID_MIN_HEIGHT = 20 * PIXELS_PER_HOUR;
+export function pixelsPerMinute(cell: Element): number {
+  return cell.getBoundingClientRect().height / MINUTES_PER_DAY;
+}
+
+// Month-view cells and the all-day row are also [role="gridcell"] with a
+// datekey, but they are a fraction of a day column's height, so the same
+// arithmetic there yields an arbitrary time. The floor is well under the
+// shortest hours Google draws and well over those cells, so a short time grid
+// still counts and they still do not.
+const TIME_GRID_MIN_HEIGHT = 24 * 16;
 
 export function isTimeGridCell(cell: Element): boolean {
   return cell.getBoundingClientRect().height >= TIME_GRID_MIN_HEIGHT;

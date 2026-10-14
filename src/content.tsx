@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import PoolSidebar from './components/PoolSidebar';
 import { PoolItem, durationOf, eventColorHex } from './poolItem';
-import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, timeGridCellFor, watchWeekOrDayView } from './calendarGrid';
+import { dateFromCell, findDatekey, formatTime, gridZoneLabels, isTimeGridCell, pixelsPerMinute, timeGridCellFor, watchWeekOrDayView } from './calendarGrid';
 import { EventDateTime, eventTimes } from './calendarZone';
 import { PageLook, Theme, chipTextOn, watchTheme } from './theme';
 import { isolate } from './names';
@@ -46,8 +46,8 @@ function applyTheme({ theme, surface }: PageLook): void {
 
 // ── Time helper ───────────────────────────────────────────────────────────────
 
-// Only meaningful on a time-grid cell (see isTimeGridCell), where 1 px below
-// the cell's top is one minute past midnight. A drop and a click-to-place both
+// Only meaningful on a time-grid cell (see isTimeGridCell), whose top is
+// midnight and whose scale pixelsPerMinute measures. A drop and a click-to-place both
 // read their time through here, so they snap identically. The time is the
 // grid's wall clock, in Google Calendar's time zone, and the tooltip shows it
 // as read; eventTimes() is what turns it into an instant.
@@ -59,8 +59,8 @@ function applyTheme({ theme, surface }: PageLook): void {
 const LAST_SLOT_MIN = 24 * 60 - 15;
 
 function timeFromDrop(cell: Element, clientY: number): { hours: number; minutes: number; snapped: number } {
-  const pixelY = clientY - cell.getBoundingClientRect().top;
-  const snapped = Math.max(0, Math.min(LAST_SLOT_MIN, Math.round(pixelY / 15) * 15));
+  const minuteY = (clientY - cell.getBoundingClientRect().top) / pixelsPerMinute(cell);
+  const snapped = Math.max(0, Math.min(LAST_SLOT_MIN, Math.round(minuteY / 15) * 15));
   return {
     hours:   Math.floor(snapped / 60),
     minutes: snapped % 60,
@@ -153,10 +153,10 @@ function showPreview(cell: Element, clientY: number, item: DropPoolItem, recurri
   const { snapped } = timeFromDrop(cell, clientY);
   const rect = cell.getBoundingClientRect();
   const color = previewColor(item);
-  // 1 px = 1 min in the time grid, so the block's pixel height is its duration.
+  const ppm = pixelsPerMinute(cell);
   Object.assign(el.style, {
-    top: `${rect.top + snapped}px`, left: `${rect.left + 2}px`,
-    width: `${rect.width - 4}px`,  height: `${durationOf(item)}px`,
+    top: `${rect.top + snapped * ppm}px`, left: `${rect.left + 2}px`,
+    width: `${rect.width - 4}px`,  height: `${durationOf(item) * ppm}px`,
     display: 'block', opacity: '1', animation: 'none',
     background: color,
     border: `1px solid ${color}`,
@@ -182,7 +182,7 @@ let eventTimeout:      ReturnType<typeof setTimeout> | null = null;
 function applyLoadingPosition(): void {
   if (!previewEl || !loadingCell) return;
   const rect = loadingCell.getBoundingClientRect();
-  previewEl.style.top   = `${rect.top  + loadingSnapped}px`;
+  previewEl.style.top   = `${rect.top  + loadingSnapped * pixelsPerMinute(loadingCell)}px`;
   previewEl.style.left  = `${rect.left + 2}px`;
   previewEl.style.width = `${rect.width - 4}px`;
 }
@@ -200,10 +200,11 @@ function showLoading(cell: Element, startMin: number, item: DropPoolItem, recurr
 
   loadingCell    = cell;
   loadingSnapped = startMin;
+  const ppm      = pixelsPerMinute(cell);
 
   Object.assign(el.style, {
-    top: `${rect.top + startMin}px`, left: `${rect.left + 2}px`,
-    width: `${rect.width - 4}px`,  height: `${durationOf(item)}px`,
+    top: `${rect.top + startMin * ppm}px`, left: `${rect.left + 2}px`,
+    width: `${rect.width - 4}px`,  height: `${durationOf(item) * ppm}px`,
     display: 'block', opacity: '1',
     background: calColor, border: 'none', borderRadius: '4px', boxShadow: 'none',
     padding: '4px 8px', fontSize: '12px', fontWeight: '500',
