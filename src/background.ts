@@ -94,11 +94,11 @@ async function deleteCalendarEvent(calendarId: string, eventId: string) {
 // getAuthToken fails there, and the token comes instead from Google's own sign-in
 // page through chrome.identity.launchWebAuthFlow, with a Web application client.
 
-// TODO(M8 U21): paste the client ID of the "Web application" OAuth client created
-// in the same Google Cloud project as manifest.json's oauth2.client_id, with
+// The "Web application" OAuth client in the same Google Cloud project as
+// manifest.json's oauth2.client_id, with
 // https://hkihoifbohighgoackpcinobeabpjnbp.chromiumapp.org/ as its authorized
-// redirect URI. While this is empty, getAuthToken stays the only way to sign in.
-const WEB_AUTH_CLIENT_ID = '';
+// redirect URI. Emptied, getAuthToken would be the only way to sign in again.
+const WEB_AUTH_CLIENT_ID = '85811622726-2esbahpq7nt1tnpbjc1u1guaioua3i82.apps.googleusercontent.com';
 
 // The web sign-in asks for exactly what Chrome's does, so both read the scopes
 // from the manifest rather than keeping a second list that could drift.
