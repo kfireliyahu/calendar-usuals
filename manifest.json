@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Usuals",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Keep your usual events beside Google Calendar's week and day, and drag one onto a time to schedule it.",
   "homepage_url": "https://kfireliyahu.com/calendar-usuals",
   "icons": {
