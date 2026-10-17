@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import {
   PoolItem,
   DEFAULT_DURATION_MIN,
@@ -12,6 +12,7 @@ import {
   eventColorHex,
   formatDuration,
   newItemId,
+  parseDuration,
   reminderUnitMin,
   splitReminder,
 } from '../poolItem';
@@ -161,6 +162,118 @@ function durationOptions(value: number): number[] {
     : [...DURATION_PRESETS, value].sort((a, b) => a - b);
 }
 
+// The last choice in both duration selects, which swaps the select for a field
+// to type any duration in. It is not a number, so no select's onChange can
+// mistake it for one.
+const CUSTOM_DURATION = 'custom';
+
+const durationChoices = (value: number) => (
+  <>
+    {durationOptions(value).map((min) => (
+      <option key={min} value={min}>{formatDuration(min)}</option>
+    ))}
+    <option value={CUSTOM_DURATION}>Custom…</option>
+  </>
+);
+
+// What the two duration controls share. Choosing "Custom…" shows a
+// CustomDuration field in the select's place; when it closes, the select comes
+// back, and after Enter or Escape focus goes back to it, so a keyboard user is
+// where they started. wrap holds whichever of the two is showing.
+function useCustomDuration(onChange: (min: number) => void) {
+  const [typing, setTyping] = useState(false);
+  const refocus = useRef(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (typing || !refocus.current) return;
+    refocus.current = false;
+    wrap.current?.querySelector('select')?.focus();
+  }, [typing]);
+
+  const choose = (v: string) => (v === CUSTOM_DURATION ? setTyping(true) : onChange(Number(v)));
+  const close = (min: number | null, returnFocus: boolean) => {
+    if (min !== null) onChange(min);
+    refocus.current = returnFocus;
+    setTyping(false);
+  };
+  return { typing, choose, close, wrap };
+}
+
+// The field "Custom…" opens: the current duration, selected so typing
+// replaces it, read by parseDuration. Enter sets a duration that reads and
+// otherwise marks the field and stays; Escape leaves the duration as it was;
+// clicking away keeps one that reads and drops one that does not, as renaming
+// keeps a name only when there is one.
+const CustomDuration: React.FC<{
+  value: number;
+  label: string;
+  className: string;
+  onClose: (min: number | null, returnFocus: boolean) => void;
+}> = ({ value, label, className, onClose }) => {
+  const [text, setText] = useState(formatDuration(value));
+  const [invalid, setInvalid] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const hintId = useId();
+  // Enter and Escape close the field, and its blur must not close it again
+  // with the text from the render before.
+  const closed = useRef(false);
+
+  // A draggable ancestor swallows the caret and text selection, so an item's
+  // row stops being draggable while its duration is typed, as it does while
+  // its name is. Set here rather than through the row's draggable prop, which
+  // React leaves alone while it does not change.
+  useEffect(() => {
+    const row = input.current?.closest<HTMLElement>('[draggable="true"]');
+    if (!row) return;
+    row.draggable = false;
+    return () => { row.draggable = true; };
+  }, []);
+
+  const close = (min: number | null, returnFocus: boolean) => {
+    if (closed.current) return;
+    closed.current = true;
+    onClose(min, returnFocus);
+  };
+
+  return (
+    <>
+      <input
+        ref={input}
+        autoFocus
+        onFocus={(e) => e.currentTarget.select()}
+        type="text"
+        value={text}
+        placeholder="1h 20m"
+        spellCheck={false}
+        autoComplete="off"
+        aria-label={label}
+        aria-invalid={invalid || undefined}
+        aria-describedby={hintId}
+        title="A duration such as 20m, 1h20, 1:20 or 2.5h · Enter to set, Escape to cancel"
+        onChange={(e) => { setText(e.target.value); setInvalid(false); }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== 'Escape') return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.key === 'Escape') { close(null, true); return; }
+          const min = parseDuration(text);
+          if (min === null) setInvalid(true);
+          else close(min, true);
+        }}
+        onBlur={() => close(parseDuration(text), false)}
+        onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        className={className}
+      />
+      {/* Polite and always present, so the change to "Not a duration" after
+          Enter is announced, not only the hint read on focus. */}
+      <span id={hintId} aria-live="polite" className="sr-only">
+        {invalid ? 'Not a duration. ' : ''}5 minutes to 24 hours, such as 20m, 1h20 or 2.5h
+      </span>
+    </>
+  );
+};
+
 // Compact duration control. A native <select> so it stays keyboard accessible
 // without a custom dropdown; content.css strips the arrow to fit the 280px rail.
 // title is only a tooltip for the pointer; label is the select's accessible
@@ -170,23 +283,27 @@ const DurationSelect: React.FC<{
   label: string;
   onChange: (min: number) => void;
 }> = ({ value, label, onChange }) => {
-  const options = durationOptions(value);
+  const { typing, choose, close, wrap } = useCustomDuration(onChange);
 
   return (
-    <select
-      value={value}
-      title="Duration"
-      aria-label={label}
-      onChange={(e) => onChange(Number(e.target.value))}
-      // Pool item rows are draggable: without this, pressing the select would
-      // start a drag instead of opening the menu.
-      onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      className="wlp-duration"
-    >
-      {options.map((min) => (
-        <option key={min} value={min}>{formatDuration(min)}</option>
-      ))}
-    </select>
+    <span ref={wrap} className="wlp-duration-wrap">
+      {typing ? (
+        <CustomDuration value={value} label={label} onClose={close} className="wlp-item-duration-input" />
+      ) : (
+        <select
+          value={value}
+          title="Duration"
+          aria-label={label}
+          onChange={(e) => choose(e.target.value)}
+          // Pool item rows are draggable: without this, pressing the select would
+          // start a drag instead of opening the menu.
+          onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          className="wlp-duration"
+        >
+          {durationChoices(value)}
+        </select>
+      )}
+    </span>
   );
 };
 
@@ -238,6 +355,28 @@ const FieldSelect: React.FC<{
     </svg>
   </span>
 );
+
+// The composer's duration: a grey field like the calendar beside it, which
+// "Custom…" turns into a grey text field of the same height.
+const DurationField: React.FC<{
+  value: number;
+  label: string;
+  onChange: (min: number) => void;
+}> = ({ value, label, onChange }) => {
+  const { typing, choose, close, wrap } = useCustomDuration(onChange);
+
+  return (
+    <span ref={wrap} className="wlp-duration-wrap">
+      {typing ? (
+        <CustomDuration value={value} label={label} onClose={close} className="wlp-gfield wlp-duration-input" />
+      ) : (
+        <FieldSelect value={value} label={label} title="Duration" onChange={choose}>
+          {durationChoices(value)}
+        </FieldSelect>
+      )}
+    </span>
+  );
+};
 
 // ── Item template panel ──────────────────────────────────────────────────────
 //
@@ -1484,16 +1623,11 @@ const PoolSidebar: React.FC = () => {
                       ))}
                     </FieldSelect>
                   )}
-                  <FieldSelect
+                  <DurationField
                     value={newItemDuration}
                     label="Duration of new item"
-                    title="Duration"
-                    onChange={(v) => setNewItemDuration(Number(v))}
-                  >
-                    {durationOptions(newItemDuration).map((min) => (
-                      <option key={min} value={min}>{formatDuration(min)}</option>
-                    ))}
-                  </FieldSelect>
+                    onChange={setNewItemDuration}
+                  />
                 </div>
 
                 {/* The two modifiers nothing else on screen mentions, kept
