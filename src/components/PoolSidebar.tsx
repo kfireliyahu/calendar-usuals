@@ -1689,6 +1689,22 @@ const PoolSidebar: React.FC = () => {
                                     setDropTarget(null);
                                     document.dispatchEvent(new CustomEvent('poolDragEnd'));
                                   }}
+                                  // Chrome starts no drag from a press made with
+                                  // Shift down, so holding Shift first and then
+                                  // dragging did nothing. Such a press is handed
+                                  // to content.tsx, which follows the pointer
+                                  // itself and places on release as a drop would;
+                                  // the poolDragEnd it sends undims the row. The
+                                  // row's own controls keep their Shift-click.
+                                  onMouseDown={(e) => {
+                                    if (e.button !== 0 || !e.shiftKey || editing) return;
+                                    if ((e.target as Element).closest('button, select, input, a')) return;
+                                    e.preventDefault();
+                                    const payload = { ...item, color: category.color };
+                                    setDraggingId(item.id);
+                                    setPickedId(null);
+                                    document.dispatchEvent(new CustomEvent('poolDragStart', { detail: { item: payload, pointer: true } }));
+                                  }}
                                   // The chip runs in its name's direction, as
                                   // Google's does: a Hebrew name starts at the
                                   // right edge with ", 1h" to its left, and the

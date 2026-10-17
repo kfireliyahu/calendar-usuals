@@ -104,9 +104,16 @@ function getTooltip(): HTMLElement {
   }
   return tooltipEl;
 }
-function showTooltip(x: number, y: number, text: string): void {
+// The note goes on a line of its own under the text, where it is read rather
+// than lost at the end of a long line.
+function showTooltip(x: number, y: number, text: string, note?: string): void {
   const el = getTooltip();
   el.textContent = text;
+  if (note) {
+    const line = document.createElement('div');
+    line.textContent = note;
+    el.appendChild(line);
+  }
   el.style.left = `${x + 18}px`;
   el.style.top  = `${y - 14}px`;
   el.style.display = 'block';
@@ -509,14 +516,21 @@ function createFromItem(
 // drop at the same spot would. The preview element doubles as the loading
 // placeholder, so while one is pulsing only the tooltip follows the pointer:
 // redrawing the element would move the placeholder off its event.
-function showPlacementHint(cell: Element, clientX: number, clientY: number, item: DropPoolItem, recurring: boolean): void {
+//
+// Until Shift is down the tooltip says how to make the event weekly, in the
+// words for a drag or for a click: a tester who never noticed the sidebar's
+// footnote did not know Shift does anything. Once it is down, it says the
+// event will repeat.
+function showPlacementHint(cell: Element, clientX: number, clientY: number, item: DropPoolItem, recurring: boolean, by: 'drag' | 'click'): void {
   const date = dateFromCell(cell);
   if (!date) return;
   const { hours, minutes } = timeFromDrop(cell, clientY);
   const day = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const repeats = recurring ? '  ·  ↻ repeats weekly' : '';
+  const repeats = recurring     ? '↻ Repeats weekly'
+                : by === 'drag' ? 'Hold Shift to repeat weekly'
+                :                 'Shift-click to repeat weekly';
   // The name is isolated so a Hebrew one does not reorder the day and time.
-  showTooltip(clientX, clientY, `${isolate(item.name)}  ·  ${day}, ${formatRange(hours, minutes, durationOf(item))}${repeats}`);
+  showTooltip(clientX, clientY, `${isolate(item.name)}  ·  ${day}, ${formatRange(hours, minutes, durationOf(item))}`, repeats);
   if (!isLoading) showPreview(cell, clientY, item, recurring);
 }
 
@@ -552,7 +566,7 @@ function refreshPickedHint(): void {
     showTooltip(x, y, 'Click a time slot to place here');
     return;
   }
-  showPlacementHint(cell, x, y, pickedItem, shift);
+  showPlacementHint(cell, x, y, pickedItem, shift, 'click');
 }
 
 function clearPick(): void {
@@ -591,6 +605,108 @@ interface ScheduleRequest {
 
 let draggingItem: DropPoolItem | null = null;
 
+// What a drag over target at (x, y) shows, for a browser drag and for one
+// followed with mouse events alike. Returns the time grid cell under the
+// pointer, the only place a drop is taken, or null anywhere else.
+function showDragHint(target: EventTarget | null, x: number, y: number, shift: boolean): Element | null {
+  const cell = closestFrom(target, '[role="gridcell"]');
+  if (!cell) { hideTooltip(); hidePreview(); return null; }
+  if (!isTimeGridCell(cell)) {
+    hidePreview();
+    if (draggingItem) showTooltip(x, y, 'Drop on a time slot');
+    return null;
+  }
+  if (draggingItem) showPlacementHint(cell, x, y, draggingItem, shift, 'drag');
+  return cell;
+}
+
+// ── Drag begun with Shift held ────────────────────────────────────────────────
+//
+// Chrome starts no drag from a press made with Shift down: to Blink a
+// Shift-press extends the selection, and only links and images are exempt
+// (MouseEventManager::HandleMousePressEvent), so the row's user-select: none
+// does not help. A user who held Shift first and then dragged an item got no
+// dragstart at all. The sidebar row reports such a press instead, as a
+// poolDragStart with pointer set, and this follows the pointer with mouse
+// events until the button comes up: the same hint as a drag shows, and on
+// release over a time slot the event a drop there would create. Shift pressed
+// or released on the way is read from each event, as dragover reads it.
+
+// Where the pointer last was, so a Shift key change, which fires no mousemove,
+// can redraw the hint where it is. Null when no such drag is under way.
+let pointerDrag: { target: EventTarget | null; x: number; y: number; shift: boolean } | null = null;
+
+// Google Calendar never saw the press, but it would see the release over its
+// grid, so the release and its pointerup are swallowed there, as the press
+// that places a picked item is.
+const POINTER_DRAG_RELEASE_EVENTS = ['pointerup', 'mouseup'];
+
+function startPointerDrag(): void {
+  if (pointerDrag) return;
+  pointerDrag = { target: null, x: 0, y: 0, shift: true };
+  // The grabbing cursor stays with the pointer everywhere, as a drag's does.
+  document.documentElement.classList.add('wlp-pointer-dragging');
+  window.addEventListener('mousemove', onPointerDragMove, true);
+  for (const type of POINTER_DRAG_RELEASE_EVENTS) window.addEventListener(type, onPointerDragRelease as EventListener, true);
+  window.addEventListener('keydown', onPointerDragKey, true);
+  window.addEventListener('keyup',   onPointerDragKey, true);
+  window.addEventListener('blur', endPointerDrag);
+}
+
+function endPointerDrag(): void {
+  if (!pointerDrag) return;
+  pointerDrag = null;
+  document.documentElement.classList.remove('wlp-pointer-dragging');
+  window.removeEventListener('mousemove', onPointerDragMove, true);
+  for (const type of POINTER_DRAG_RELEASE_EVENTS) window.removeEventListener(type, onPointerDragRelease as EventListener, true);
+  window.removeEventListener('keydown', onPointerDragKey, true);
+  window.removeEventListener('keyup',   onPointerDragKey, true);
+  window.removeEventListener('blur', endPointerDrag);
+  // The end a browser drag announces too: the sidebar undims the row, and
+  // this script clears draggingItem, the tooltip and the preview.
+  document.dispatchEvent(new CustomEvent('poolDragEnd'));
+}
+
+function onPointerDragMove(e: MouseEvent): void {
+  if (!pointerDrag) return;
+  // A release outside the window never reaches the page; the next move back
+  // in comes with no button down, and that ends the drag.
+  if ((e.buttons & 1) === 0) { endPointerDrag(); return; }
+  pointerDrag = { target: e.target, x: e.clientX, y: e.clientY, shift: e.shiftKey };
+  showDragHint(e.target, e.clientX, e.clientY, e.shiftKey);
+}
+
+function onPointerDragKey(e: KeyboardEvent): void {
+  if (!pointerDrag) return;
+  if (e.key === 'Escape') { endPointerDrag(); return; }
+  if (e.key !== 'Shift' || !pointerDrag.target) return;
+  pointerDrag.shift = e.type === 'keydown';
+  const { target, x, y, shift } = pointerDrag;
+  showDragHint(target, x, y, shift);
+}
+
+function onPointerDragRelease(e: MouseEvent): void {
+  if (!pointerDrag || e.button !== 0) return;
+  const cell = closestFrom(e.target, '[role="gridcell"]');
+  const onGrid = cell !== null && isTimeGridCell(cell);
+  if (onGrid) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+  if (e.type !== 'mouseup') return;
+  const item = draggingItem;
+  endPointerDrag();
+  if (!cell || !onGrid || !item) return;
+
+  const date = dateFromCell(cell);
+  if (!date) { console.warn('[Usuals] Could not resolve a date for cell, datekey', findDatekey(cell)); return; }
+  debugLog(`Drop (Shift held from the press) → datekey=${findDatekey(cell)} → ${date.toDateString()}`);
+  const { hours, minutes } = timeFromDrop(cell, e.clientY);
+  // Read from the release, as a drop reads it, so letting go of Shift on the
+  // way makes a single event.
+  createFromItem(item, date, hours, minutes, e.shiftKey, cell);
+}
+
 // Every event of a press on the time grid, not just the click: Google Calendar
 // begins its own click-to-create (and drag-to-create) on the press, so letting
 // that through would open its quick-create dialog over our event.
@@ -598,7 +714,9 @@ const GRID_PRESS_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', '
 
 function setupListeners(): void {
   document.addEventListener('poolDragStart', (e: Event) => {
-    draggingItem = (e as CustomEvent).detail.item as DropPoolItem;
+    const { item, pointer } = (e as CustomEvent).detail as { item: DropPoolItem; pointer?: boolean };
+    draggingItem = item;
+    if (pointer) startPointerDrag();
   });
   document.addEventListener('poolDragEnd', () => {
     draggingItem = null; hideTooltip(); hidePreview();
@@ -618,20 +736,12 @@ function setupListeners(): void {
 
   document.addEventListener('dragover', (e: DragEvent) => {
     if (!isPoolDrag(e)) return;
-    const cell = closestFrom(e.target, '[role="gridcell"]');
-    if (!cell) { hideTooltip(); hidePreview(); return; }
     // Deliberately no preventDefault() outside the time grid: without it the
     // browser refuses the drop, so the user gets a "no drop" cursor and the
-    // tooltip below explains where to aim instead.
-    if (!isTimeGridCell(cell)) {
-      hidePreview();
-      if (draggingItem) showTooltip(e.clientX, e.clientY, 'Drop on a time slot');
-      return;
-    }
-    e.preventDefault();
-    // dragover keeps firing while the pointer is still, so pressing or
-    // releasing Shift mid-drag updates this without a mouse move.
-    if (draggingItem) showPlacementHint(cell, e.clientX, e.clientY, draggingItem, e.shiftKey);
+    // tooltip explains where to aim instead. dragover keeps firing while the
+    // pointer is still, so pressing or releasing Shift mid-drag updates the
+    // hint without a mouse move.
+    if (showDragHint(e.target, e.clientX, e.clientY, e.shiftKey)) e.preventDefault();
   });
 
   document.addEventListener('drop', (e: DragEvent) => {

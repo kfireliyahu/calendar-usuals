@@ -200,6 +200,21 @@
   outline-offset: 2px;
 }
 
+/* The tooltip's second line, "Hold Shift to repeat weekly" until Shift is down
+   and "↻ Repeats weekly" after. Bold so it reads as an instruction and not as
+   more of the time line above it. */
+#wlp-drop-tooltip > div {
+  margin-top: 2px !important;
+  font-weight: 500 !important;
+}
+
+/* A drag begun with Shift held is followed with mouse events (content.tsx,
+   startPointerDrag), which draw no drag cursor of their own. */
+html.wlp-pointer-dragging,
+html.wlp-pointer-dragging * {
+  cursor: grabbing !important;
+}
+
 /* ── Drag preview: weekly recurrence ───────────────────────────────────────── */
 
 /* content.tsx positions and colours the preview with inline styles, so these
