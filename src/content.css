@@ -610,6 +610,25 @@ select.wlp-gfield:focus-visible {
   border-radius: 3px !important;
 }
 
+/* Either duration control and the field its "Custom…" opens in its place
+   (PoolSidebar, useCustomDuration). The wrapper only gives focus a way back to
+   the select, so it adds no box of its own to the row it sits in. */
+.wlp-duration-wrap {
+  display: contents !important;
+}
+
+/* The composer's typed duration: a grey field the width of the select it
+   stands in for, with Google's error colour along its edge for text that is
+   not a duration. */
+.wlp-gfield.wlp-duration-input {
+  flex: none !important;
+  width: 96px !important;
+}
+
+.wlp-gfield.wlp-duration-input[aria-invalid="true"] {
+  box-shadow: inset 0 -2px 0 var(--wlp-danger) !important;
+}
+
 /* ── Category list ─────────────────────────────────────────────────────────── */
 
 /* Spaced like Google's "My calendars": a section title on a row of its own
@@ -815,6 +834,46 @@ select.wlp-gfield:focus-visible {
   outline: 2px solid currentColor !important;
   outline-offset: 1px !important;
   border-radius: 2px !important;
+}
+
+/* An item's typed duration, drawn in the chip like its rename field: the
+   chip's own text on an underline, as wide as what is typed. The chip can be
+   any of eleven colours, so text that is not a duration is marked with a wavy
+   underline in that same colour rather than with a red that one of them would
+   swallow. */
+.wlp-item-duration-input {
+  flex-shrink: 0 !important;
+  field-sizing: content !important;
+  min-width: 4ch !important;
+  max-width: 10ch !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-bottom: 1px solid currentColor !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+  color: inherit !important;
+  text-align: start !important;
+  box-shadow: none !important;
+}
+
+.wlp-item-duration-input::placeholder {
+  color: inherit !important;
+  opacity: 0.6 !important;
+}
+
+.wlp-item-duration-input::selection {
+  background: color-mix(in srgb, currentColor 30%, transparent) !important;
+}
+
+.wlp-item-duration-input[aria-invalid="true"] {
+  text-decoration: underline wavy currentColor !important;
+  text-underline-offset: 3px !important;
 }
 
 /* The schedule icon, the details chevron and delete, folded to no width at

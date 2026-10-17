@@ -23,7 +23,14 @@ export interface PoolItem {
 }
 
 export const DEFAULT_DURATION_MIN = 60;
-export const DURATION_PRESETS = [15, 30, 45, 60, 90, 120];
+export const DURATION_PRESETS = [15, 30, 45, 60, 90, 120, 180, 240];
+
+// A typed duration (the selects' "Custom…") is kept to the grid's own 5-minute
+// marks and to one day: the week grid cannot draw an event longer than its
+// column, and a 3-minute block would be a sliver nobody could grab.
+export const MIN_DURATION_MIN  = 5;
+export const MAX_DURATION_MIN  = 24 * 60;
+export const DURATION_STEP_MIN = 5;
 
 export function durationOf(item: { durationMin?: number }): number {
   return item.durationMin ?? DEFAULT_DURATION_MIN;
@@ -34,6 +41,36 @@ export function formatDuration(min: number): string {
   const hours = Math.floor(min / 60);
   const mins  = min % 60;
   return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+}
+
+// Reads what someone types for a duration: a bare number is minutes ("20"),
+// and hours can be written "1h20", "1h 20m", "1:20" or "2.5h", with "hr",
+// "hours", "min" and a decimal comma also understood. The result is rounded to
+// the nearest DURATION_STEP_MIN, so "1h22" is 1h 20m, and null means the text
+// is not a duration or falls outside MIN_DURATION_MIN to MAX_DURATION_MIN.
+export function parseDuration(text: string): number | null {
+  const s = text
+    .trim()
+    .toLowerCase()
+    .replace(/,/g, '.')
+    .replace(/\s+/g, '')
+    .replace(/hours?|hrs?/g, 'h')
+    .replace(/minutes?|mins?/g, 'm');
+  const num = /(\d+(?:\.\d+)?|\.\d+)/.source;
+
+  let total: number | null = null;
+  let m: RegExpMatchArray | null;
+  if ((m = s.match(new RegExp(`^${num}m?$`)))) {
+    total = Number(m[1]);
+  } else if ((m = s.match(new RegExp(`^${num}h(?:(\\d+)m?)?$`)))) {
+    total = Number(m[1]) * 60 + Number(m[2] ?? 0);
+  } else if ((m = s.match(/^(\d+):(\d\d?)$/)) && Number(m[2]) < 60) {
+    total = Number(m[1]) * 60 + Number(m[2]);
+  }
+  if (total === null || !Number.isFinite(total)) return null;
+
+  const rounded = Math.round(total / DURATION_STEP_MIN) * DURATION_STEP_MIN;
+  return rounded >= MIN_DURATION_MIN && rounded <= MAX_DURATION_MIN ? rounded : null;
 }
 
 // ── Event colors ─────────────────────────────────────────────────────────────

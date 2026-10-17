@@ -9,7 +9,7 @@
 // name the sidebar showed for it. Only calendarId decides where an item goes;
 // the name is never trusted for that.
 
-import { EVENT_COLORS, MAX_REMINDER_MIN, PoolItem } from './poolItem';
+import { EVENT_COLORS, MAX_DURATION_MIN, MAX_REMINDER_MIN, PoolItem } from './poolItem';
 import type { PoolData } from './poolStore';
 
 const FORMAT  = 'usuals-export';
@@ -67,7 +67,6 @@ export function exportFileName(now = new Date()): string {
 // PoolItem has, each checked for its type and range; anything else in it is
 // dropped. An item that cannot be rebuilt is counted and skipped, not fatal.
 const COLOR_IDS = new Set(EVENT_COLORS.map((c) => c.id));
-const MAX_DURATION_MIN = 24 * 60;
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
