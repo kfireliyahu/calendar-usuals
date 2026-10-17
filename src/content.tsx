@@ -8,6 +8,7 @@ import { PageLook, Theme, chipTextOn, watchTheme } from './theme';
 import { isolate } from './names';
 import { adjustLayout, resetLayout } from './layout';
 import { debugLog } from './debug';
+import { setWeekNudgeTheme, watchWeekNudge } from './weekNudge';
 import './content.css';
 
 // What crosses the drag: the stored item plus the colour of the calendar it
@@ -24,10 +25,11 @@ function previewColor(item: DropPoolItem): string {
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 
-// The sidebar's mount and the tooltip and preview below are the only elements
-// the extension adds to the page, and content.css keys every colour off this
-// attribute on them. The tooltip and preview are created lazily, so each picks
-// up the current theme when it is made.
+// The sidebar's mount, the tooltip and preview below and the Week view pill
+// (weekNudge.ts) are the only elements the extension adds to the page, and
+// content.css keys every colour off this attribute on them. The tooltip,
+// preview and pill are created lazily, so each picks up the current theme when
+// it is made.
 //
 // The page surface goes on the sidebar's mount alone, as --wlp-page, which
 // content.css paints the sidebar with in place of its own constant. The
@@ -40,6 +42,7 @@ function applyTheme({ theme, surface }: PageLook): void {
   for (const el of [sidebarEl, tooltipEl, previewEl]) {
     el?.setAttribute('data-wlp-theme', theme);
   }
+  setWeekNudgeTheme(theme);
   if (surface) sidebarEl?.style.setProperty('--wlp-page', surface);
   else sidebarEl?.style.removeProperty('--wlp-page');
 }
@@ -714,6 +717,8 @@ function setupListeners(): void {
 // The sidebar shows in Google Calendar's Week and Day views and nowhere else.
 // On any other view it is hidden, not unmounted, so a half-typed item is still
 // there when the user comes back, and Google's layout is handed back untouched.
+// In Month, Year, Schedule and custom views a small pill points to Week view
+// instead (weekNudge.ts), so the sidebar is never missing without a word.
 
 let inView = false;
 // How wide the sidebar last said it is (poolSidebarToggle), or null until it
@@ -769,6 +774,7 @@ function injectSidebar(): void {
     // Without storage it never reads one, so it is laid out open here.
     if (typeof chrome === 'undefined' || !chrome.storage) sidebarCollapsed = false;
     watchWeekOrDayView(showInView);
+    watchWeekNudge(() => currentTheme);
     debugLog('Sidebar injected.');
   } catch (err) {
     console.error('[Usuals] Failed to render sidebar:', err);

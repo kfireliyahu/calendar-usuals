@@ -1,5 +1,15 @@
 // Background service worker - handles API calls and long-running tasks
 
+// The sidebar shows only in Week and Day view, so someone whose Calendar opens
+// in Month view would install Usuals and never see it. A first install opens
+// Calendar in Week view, once; an update or a Chrome update does not, and
+// normal visits are never redirected (the content script's Week view pill,
+// weekNudge.ts, covers those).
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason !== chrome.runtime.OnInstalledReason.INSTALL) return;
+  chrome.tabs.create({ url: 'https://calendar.google.com/calendar/r/week' });
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'LIST_CALENDARS') {
     listCalendars()
