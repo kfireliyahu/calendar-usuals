@@ -18,12 +18,12 @@
 /* ── Colours ───────────────────────────────────────────────────────────────── */
 
 /* Every colour the extension draws with, apart from the calendar and event
-   colours that come from the user's data. They are set on the three elements
-   the extension adds to the page, the sidebar's mount and the tooltip and
-   preview that content.tsx appends to <body>, so none of them reaches Google
+   colours that come from the user's data. They are set on the elements the
+   extension adds to the page, the sidebar's mount and the tooltip, preview and
+   Week view pill appended to <body>, so none of them reaches Google
    Calendar's own elements. The sidebar's Tailwind classes read them as
    bracket values, bg-[var(--wlp-surface)] and so on. */
-:is(#usuals-sidebar, #wlp-drop-tooltip, #wlp-event-preview) {
+:is(#usuals-sidebar, #wlp-drop-tooltip, #wlp-event-preview, #wlp-week-nudge) {
   /* The sidebar and its collapsed strip sit on Google's page surface, the
      colour behind its top bar and left nav, which content.tsx reads off the
      page (theme.ts, detectSurface) and sets as --wlp-page. The constant is
@@ -77,13 +77,13 @@
   color-scheme: light;
 }
 
-/* content.tsx sets data-wlp-theme="dark" on the same three elements whenever
+/* content.tsx sets data-wlp-theme="dark" on the same elements whenever
    Google Calendar is showing its dark theme (see theme.ts). The palette follows
    Google's own dark greys and its light blue accent. Every text colour here meets
    WCAG AA on the surfaces it is drawn on. color-scheme gives the
    native controls, the selects' open lists, the number field and the scrollbars,
    their dark look too. */
-:is(#usuals-sidebar, #wlp-drop-tooltip, #wlp-event-preview)[data-wlp-theme="dark"] {
+:is(#usuals-sidebar, #wlp-drop-tooltip, #wlp-event-preview, #wlp-week-nudge)[data-wlp-theme="dark"] {
   --wlp-surface:         var(--wlp-page, #1f1f1f);
   --wlp-input:           #1f1f1f;
   --wlp-hover:           color-mix(in srgb, var(--wlp-text) 8%, transparent);
@@ -136,6 +136,68 @@
   background: var(--wlp-tooltip-bg) !important;
   color: var(--wlp-tooltip-text) !important;
   border: 1px solid var(--wlp-tooltip-border, transparent) !important;
+}
+
+/* ── Week view pill ────────────────────────────────────────────────────────── */
+
+/* weekNudge.ts shows this in Month, Year, Schedule and custom views, where the
+   sidebar hides. It is fixed to the bottom left of the window, where the
+   sidebar would be, so it takes no room in Google's layout, and it is drawn as
+   the drop tooltip is: a raised box in the page's own theme. Its buttons
+   unset what Google's stylesheet might give a button or a link. */
+#wlp-week-nudge {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 20px;
+  background: var(--wlp-tooltip-bg);
+  color: var(--wlp-tooltip-text);
+  border: 1px solid var(--wlp-tooltip-border);
+  box-shadow: var(--wlp-shadow);
+  font: 400 13px/18px 'Google Sans', Roboto, Arial, sans-serif;
+  animation: wlp-fadein 0.2s ease-out;
+}
+
+#wlp-week-nudge .wlp-nudge-go,
+#wlp-week-nudge .wlp-nudge-close {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  font: 500 13px/18px 'Google Sans', Roboto, Arial, sans-serif;
+  border-radius: 14px;
+}
+
+#wlp-week-nudge .wlp-nudge-go {
+  padding: 5px 12px;
+  background: var(--wlp-primary);
+  color: var(--wlp-on-primary);
+}
+
+#wlp-week-nudge .wlp-nudge-go:hover {
+  background: var(--wlp-primary-hover);
+}
+
+#wlp-week-nudge .wlp-nudge-close {
+  width: 28px;
+  height: 28px;
+  text-align: center;
+  font-size: 18px;
+  line-height: 28px;
+  color: var(--wlp-text-secondary);
+}
+
+#wlp-week-nudge .wlp-nudge-close:hover {
+  background: var(--wlp-hover);
+}
+
+#wlp-week-nudge :is(.wlp-nudge-go, .wlp-nudge-close):focus-visible {
+  outline: 2px solid var(--wlp-focus);
+  outline-offset: 2px;
 }
 
 /* ── Drag preview: weekly recurrence ───────────────────────────────────────── */

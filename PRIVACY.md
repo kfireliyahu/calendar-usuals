@@ -36,6 +36,7 @@ All of this happens in your browser. Of it, only your account's display name is 
 | --- | --- | --- |
 | Your items and folded sections | Chrome's extension sync storage (`chrome.storage.sync`), and a copy on your computer (`chrome.storage.local`) | Until you delete them or uninstall Usuals |
 | Whether the sidebar is collapsed | Your computer (`chrome.storage.local`) | Until you uninstall Usuals |
+| Whether you dismissed the pill that points to Week view | Your computer (`chrome.storage.local`) | Until you uninstall Usuals |
 | Your account's display name and your main calendar's ID (your email address) | Your computer (`chrome.storage.local`) | Until you uninstall Usuals |
 | The events Usuals creates | Your Google Calendar | Until you delete them; they are your events |
 
