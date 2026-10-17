@@ -44,7 +44,8 @@ Google Calendar page
     └── Sends CREATE_EVENT for a drop, a click-to-place or the schedule form
 
 Background service worker (background.ts)
-├── Authenticates with Google via chrome.identity (OAuth 2.0)
+├── Authenticates with Google via chrome.identity: getAuthToken in Chrome,
+│   launchWebAuthFlow in Brave, Edge, Opera and Arc (OAuth 2.0)
 ├── Fetches the user's calendar list  →  LIST_CALENDARS
 ├── Creates events via Google Calendar API v3 and returns the id  →  CREATE_EVENT
 └── Deletes an event (the whole series if recurring)  →  DELETE_EVENT
@@ -77,7 +78,7 @@ Undo in the toast sends `DELETE_EVENT` with that id, and clears the placeholder 
 ### Prerequisites
 
 - Node.js 18+
-- A Google Cloud project with the **Google Calendar API** enabled and an OAuth 2.0 client ID configured for a Chrome extension
+- A Google Cloud project with the **Google Calendar API** enabled and an OAuth 2.0 client ID configured for a Chrome extension, plus a Web application client for browsers without Chrome's Google account (see [Sign-in outside Chrome](#sign-in-outside-chrome))
 
 ### Install and build
 
@@ -99,6 +100,10 @@ npm run package      # outputs release/usuals-<version>.zip
 ```
 
 `manifest.json` pins the store's public key as `key`, so an unpacked build has the store's extension id (`hkihoifbohighgoackpcinobeabpjnbp`) and signs in with the OAuth client registered against it. The packaged manifest leaves `key` out, since the store supplies its own.
+
+### Sign-in outside Chrome
+
+In Chrome, `background.ts` signs in with `chrome.identity.getAuthToken`, which uses the Google account the browser is signed in to and the Chrome-extension client in `manifest.json`'s `oauth2`. Brave, Edge, Opera and Arc have no such account, so when `getAuthToken` fails the worker opens Google's own sign-in page with `chrome.identity.launchWebAuthFlow` instead, using the Web application client in `WEB_AUTH_CLIENT_ID` and the redirect URI `https://hkihoifbohighgoackpcinobeabpjnbp.chromiumapp.org/`. That token is kept with its expiry in `chrome.storage.session` and renewed silently (`prompt=none`) before a window is shown, and `authPath` in `chrome.storage.local` remembers that this browser needs the web sign-in so `getAuthToken` is not tried on every call. While `WEB_AUTH_CLIENT_ID` is empty, `getAuthToken` is the only path.
 
 ### Load the extension in Chrome
 
@@ -160,7 +165,7 @@ vite.config.ts             # Vite build config (two entry points: content + back
 | Permission | Reason |
 |---|---|
 | `storage` | Sync items and hidden categories across the user's Chrome profile (`chrome.storage.sync`); keep per-device UI state and a local copy of the pool (`chrome.storage.local`) |
-| `identity` | OAuth 2.0 token for Google Calendar API |
+| `identity` | OAuth 2.0 token for Google Calendar API, from `getAuthToken` or `launchWebAuthFlow` |
 | `https://calendar.google.com/*` | Inject the sidebar into Google Calendar |
 | `.../auth/calendar.events.owned` | Create events on calendars the user owns |
 | `.../auth/calendar.calendarlist.readonly` | Read the calendar list to group items |

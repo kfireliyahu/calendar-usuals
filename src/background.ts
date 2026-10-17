@@ -77,19 +77,55 @@ async function deleteCalendarEvent(calendarId: string, eventId: string) {
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
+//
+// There are two ways to a token. In Chrome, chrome.identity.getAuthToken uses the
+// Google account the browser is signed in to, with the Chrome-extension client in
+// manifest.json's oauth2. Brave, Edge, Opera and Arc have no such account, so
+// getAuthToken fails there, and the token comes instead from Google's own sign-in
+// page through chrome.identity.launchWebAuthFlow, with a Web application client.
+
+// TODO(M8 U21): paste the client ID of the "Web application" OAuth client created
+// in the same Google Cloud project as manifest.json's oauth2.client_id, with
+// https://hkihoifbohighgoackpcinobeabpjnbp.chromiumapp.org/ as its authorized
+// redirect URI. While this is empty, getAuthToken stays the only way to sign in.
+const WEB_AUTH_CLIENT_ID = '';
+
+// The web sign-in asks for exactly what Chrome's does, so both read the scopes
+// from the manifest rather than keeping a second list that could drift.
+const AUTH_SCOPES = chrome.runtime.getManifest().oauth2?.scopes ?? [];
+
+type AuthPath = 'chrome' | 'web';
+
+// Which cache a token came from travels with it, so a 401 clears that one.
+type AccessToken = { token: string; path: AuthPath };
+
+// Kept in chrome.storage.local once the web sign-in has worked after getAuthToken
+// failed, so Brave does not ask getAuthToken first on every API call, or after
+// every browser restart, only to fail again.
+const AUTH_PATH_KEY = 'authPath';
+
+// launchWebAuthFlow has no token cache of its own. The session area keeps the
+// token out of disk storage and lets it outlive the service worker, which Chrome
+// stops after half a minute idle, without outliving the browser.
+const WEB_TOKEN_KEY = 'webAuthToken';
+type WebToken = { token: string; expiresAt: number };
+
+// A token this close to expiry could lapse mid-request, so it is renewed early.
+const WEB_TOKEN_MARGIN_MS = 60_000;
 
 // chrome.identity caches access tokens, and it hands back a cached token even
 // after Google has expired or revoked it. Without this retry, one stale token
 // makes every call fail until the user reloads the extension: drop the bad token
-// from the cache, ask for a fresh one, and replay the request exactly once.
+// from whichever cache gave it, ask for a fresh one, and replay the request
+// exactly once. The web sign-in's cached token can be revoked the same way.
 async function authedFetch(url: string, init: RequestInit = {}): Promise<Response> {
   let token = await getAccessToken();
-  let response = await fetch(url, withAuth(init, token));
+  let response = await fetch(url, withAuth(init, token.token));
 
   if (response.status === 401) {
-    await removeCachedAuthToken(token);
+    await forgetAccessToken(token);
     token = await getAccessToken();
-    response = await fetch(url, withAuth(init, token));
+    response = await fetch(url, withAuth(init, token.token));
   }
 
   return response;
@@ -114,7 +150,115 @@ async function describeError(response: Response): Promise<string> {
   return response.statusText || `HTTP ${response.status}`;
 }
 
-async function getAccessToken(): Promise<string> {
+async function getAccessToken(): Promise<AccessToken> {
+  const { [AUTH_PATH_KEY]: remembered } = await chrome.storage.local.get<{ [AUTH_PATH_KEY]?: AuthPath }>(AUTH_PATH_KEY);
+  if (remembered === 'web' && WEB_AUTH_CLIENT_ID) {
+    return { token: await getWebAuthToken(), path: 'web' };
+  }
+
+  try {
+    return { token: await getChromeAuthToken(), path: 'chrome' };
+  } catch (chromeError) {
+    if (!WEB_AUTH_CLIENT_ID || !shouldTryWebSignIn(chromeError)) throw chromeError;
+    const token = await getWebAuthToken();
+    await chrome.storage.local.set({ [AUTH_PATH_KEY]: 'web' });
+    return { token, path: 'web' };
+  }
+}
+
+// In Google Chrome, a getAuthToken failure that says the user closed the consent
+// window is the user's answer, and Chrome behaves as it always has: no second
+// sign-in page opens behind it. Anywhere else the same message can follow a
+// window that never worked, such as Brave's error page, so every failure there
+// moves on to the web sign-in.
+function shouldTryWebSignIn(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String((error as { message?: unknown })?.message ?? error);
+  return !(isGoogleChrome() && /did not approve/i.test(message));
+}
+
+// Chrome reports a "Google Chrome" brand; Brave, Edge and Opera report their own
+// alongside "Chromium". Should Arc report Chrome's brand, its getAuthToken fails
+// for want of a signed-in account rather than a closed window, so it still falls back.
+function isGoogleChrome(): boolean {
+  const nav = navigator as Navigator & { userAgentData?: { brands: { brand: string }[] } };
+  return nav.userAgentData?.brands.some((b) => b.brand === 'Google Chrome') ?? false;
+}
+
+async function forgetAccessToken({ token, path }: AccessToken): Promise<void> {
+  if (path === 'chrome') {
+    await removeCachedAuthToken(token);
+  } else {
+    await chrome.storage.session.remove(WEB_TOKEN_KEY);
+  }
+}
+
+// LIST_CALENDARS and CREATE_EVENT can arrive together, and two interactive
+// launchWebAuthFlow calls would open two sign-in windows. They share one request.
+let webTokenRequest: Promise<string> | null = null;
+
+function getWebAuthToken(): Promise<string> {
+  webTokenRequest ??= requestWebAuthToken().finally(() => {
+    webTokenRequest = null;
+  });
+  return webTokenRequest;
+}
+
+// The cached token first, then a silent renewal, which succeeds whenever the
+// user is still signed in to Google and has already granted the scopes. Only
+// when Google needs the user does a sign-in window open.
+async function requestWebAuthToken(): Promise<string> {
+  const { [WEB_TOKEN_KEY]: cached } = await chrome.storage.session.get<{ [WEB_TOKEN_KEY]?: WebToken }>(WEB_TOKEN_KEY);
+  if (cached && cached.expiresAt - Date.now() > WEB_TOKEN_MARGIN_MS) return cached.token;
+
+  try {
+    return await launchWebSignIn(false);
+  } catch {
+    return await launchWebSignIn(true);
+  }
+}
+
+// Implicit grant: Google redirects to the extension's chromiumapp.org URL with
+// the token in the fragment, and launchWebAuthFlow hands that URL back. The
+// random state proves the answer belongs to this request.
+async function launchWebSignIn(interactive: boolean): Promise<string> {
+  const state = crypto.randomUUID();
+  const params = new URLSearchParams({
+    client_id: WEB_AUTH_CLIENT_ID,
+    response_type: 'token',
+    redirect_uri: chrome.identity.getRedirectURL(),
+    scope: AUTH_SCOPES.join(' '),
+    state,
+  });
+  // prompt=none makes Google redirect with an error rather than show a page,
+  // which is what a silent renewal needs.
+  if (!interactive) params.set('prompt', 'none');
+
+  const responseUrl = await chrome.identity.launchWebAuthFlow({
+    url: `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
+    interactive,
+  });
+  if (!responseUrl) throw new Error('Google sign-in did not return');
+
+  // Google puts the answer in the fragment, but some errors come back in the query.
+  const url = new URL(responseUrl);
+  const answer = new URLSearchParams(url.hash.slice(1));
+  url.searchParams.forEach((value, key) => {
+    if (!answer.has(key)) answer.set(key, value);
+  });
+
+  const error = answer.get('error');
+  if (error) throw new Error(`Google sign-in failed: ${error}`);
+  if (answer.get('state') !== state) throw new Error('Google sign-in answered a different request');
+  const token = answer.get('access_token');
+  if (!token) throw new Error('Google sign-in returned no token');
+
+  const expiresIn = Number(answer.get('expires_in')) || 3600;
+  const webToken: WebToken = { token, expiresAt: Date.now() + expiresIn * 1000 };
+  await chrome.storage.session.set({ [WEB_TOKEN_KEY]: webToken });
+  return token;
+}
+
+async function getChromeAuthToken(): Promise<string> {
   return new Promise((resolve, reject) => {
     chrome.identity.getAuthToken({ interactive: true }, (token: any) => {
       if (chrome.runtime.lastError) {
