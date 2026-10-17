@@ -1030,14 +1030,6 @@ button.wlp-footer-link {
   outline-offset: -2px !important;
 }
 
-.wlp-item-expand svg {
-  transition: transform 0.15s !important;
-}
-
-.wlp-item-expand.wlp-item-btn-on svg {
-  transform: rotate(180deg) !important;
-}
-
 /* A picked item waits for a day and time, from the form or a click on the
    grid, so it has to stand out from every other row until then. A ring rather
    than a change of fill, so the chip keeps the colour its event will have,
@@ -1116,6 +1108,40 @@ button.wlp-footer-link {
   justify-content: flex-end !important;
   align-items: center !important;
   gap: 8px !important;
+}
+
+/* "✓ Saved" at the start of the details panel's last row, across from
+   Duplicate, in the secondary grey of Google's own "Saved" notes: quiet
+   enough to pass unread, there for whoever looks. The status region keeps
+   its place empty, so nothing moves when it fills. The mark fades in, holds
+   and fades out over the 1.5 s the panel keeps it (SAVED_SHOW_MS). */
+.wlp-details-saved {
+  margin-inline-end: auto !important;
+  min-width: 0 !important;
+}
+
+.wlp-details-saved-mark {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  color: var(--wlp-text-secondary) !important;
+  animation: wlp-saved-fade 1.5s ease forwards !important;
+}
+
+@keyframes wlp-saved-fade {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  75%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Without the motion it simply shows, and goes when the panel removes it. */
+@media (prefers-reduced-motion: reduce) {
+  .wlp-details-saved-mark {
+    animation: none !important;
+  }
 }
 
 /* A row of the details panel: an icon in a column of its own, as the

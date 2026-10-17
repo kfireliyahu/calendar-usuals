@@ -248,7 +248,9 @@ const FieldSelect: React.FC<{
 // Laid out as the "Event details" of Google's event editor: an icon column on
 // the left, then location, the notification, the event colour beside the
 // calendar, and the description, each a grey field. Every change is saved as
-// it is made, as before, so there is no Save button.
+// it is made, as before, so there is no Save button. A quiet "Saved" by the
+// Duplicate button says so, since a panel with no Save button otherwise gives
+// no sign that anything was kept (M8 U23).
 
 const DetailsIcon: React.FC<{ path: string }> = ({ path }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="wlp-details-icon">
@@ -273,9 +275,12 @@ const ICON_NOTES = 'M14 17H4v2h10v-2zm6-8H4v2h16V9zM4 15h16v-2H4v2zM4 5v2h16V5H4
 // are read again from the item when its reminder changes elsewhere, another
 // machine or tab, and when the field is left holding something that was not
 // stored, empty or past the four weeks the Calendar API allows.
+//
+// onChange is told when a change came from typing in the count, so the panel
+// can wait for a pause before it says "Saved".
 const NotificationRow: React.FC<{
   item: PoolItem;
-  onChange: (patch: Partial<PoolItem>) => void;
+  onChange: (patch: Partial<PoolItem>, typing?: boolean) => void;
 }> = ({ item, onChange }) => {
   const min = item.reminderMin;
   const [count, setCount] = useState(() => String(min === undefined ? DEFAULT_REMINDER_MIN : splitReminder(min).count));
@@ -305,10 +310,10 @@ const NotificationRow: React.FC<{
     focusNext.current = null;
   });
 
-  const store = (c: string, u: ReminderUnit) => {
+  const store = (c: string, u: ReminderUnit, typing = false) => {
     const n = Number(c);
     if (c.trim() === '' || !Number.isInteger(n) || n < 0) return;
-    onChange({ reminderMin: Math.min(n * reminderUnitMin(u), MAX_REMINDER_MIN) });
+    onChange({ reminderMin: Math.min(n * reminderUnitMin(u), MAX_REMINDER_MIN) }, typing);
   };
 
   const add = () => {
@@ -349,7 +354,7 @@ const NotificationRow: React.FC<{
             value={count}
             aria-label={`Notification for ${item.name}`}
             title="How long before the event"
-            onChange={(e) => { setCount(e.target.value); store(e.target.value, unit); }}
+            onChange={(e) => { setCount(e.target.value); store(e.target.value, unit, true); }}
             onBlur={() => { if (!shows(count, unit)) showStored(); }}
             className="wlp-gfield wlp-notify-count"
           />
@@ -379,6 +384,11 @@ const NotificationRow: React.FC<{
   );
 };
 
+// How long "Saved" stays, fade included, and how long typing in a text field
+// has to pause before it shows.
+const SAVED_SHOW_MS         = 1500;
+const SAVED_TYPING_PAUSE_MS = 800;
+
 const ItemDetails: React.FC<{
   item: PoolItem;
   categoryName: string;
@@ -390,8 +400,46 @@ const ItemDetails: React.FC<{
   // select would show "Calendar colour" for an item that sends another.
   const knownColor = !item.colorId || EVENT_COLORS.some((c) => c.id === item.colorId);
 
+  // "Saved" shows as soon as updateItem has the change: the effect that runs
+  // on the same render writes it to this device's copy of the pool, and sync
+  // follows within seconds (poolStore.ts), so there is no later moment that
+  // would be truer to wait for. A pick from a select, or adding or removing
+  // the notification, says it at once. A text field, the notification's count
+  // among them, stores on every key, so it waits for typing to pause, or for
+  // focus to leave the field, rather than flickering with each letter. Only
+  // changes made here say it, not an edit that arrives from another machine.
+  // savedKey restarts the fade when a second change comes while the first
+  // "Saved" is still showing.
+  const [saved, setSaved] = useState(false);
+  const [savedKey, setSavedKey] = useState(0);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSaved = () => {
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = null;
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    setSaved(true);
+    setSavedKey((k) => k + 1);
+    hideTimer.current = setTimeout(() => setSaved(false), SAVED_SHOW_MS);
+  };
+
+  const change = (patch: Partial<PoolItem>, typing = false) => {
+    onChange(patch);
+    if (!typing) { showSaved(); return; }
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(showSaved, SAVED_TYPING_PAUSE_MS);
+  };
+
+  useEffect(() => () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+  }, []);
+
   return (
-    <div className="wlp-item-details">
+    // Focus leaving any field brings forward a "Saved" that typing was
+    // waiting on; React's onBlur bubbles, so one handler covers them all.
+    <div className="wlp-item-details" onBlur={() => { if (typingTimer.current) showSaved(); }}>
       <div className="wlp-details-row">
         <DetailsIcon path={ICON_LOCATION} />
         <input
@@ -400,12 +448,12 @@ const ItemDetails: React.FC<{
           placeholder="Add location"
           aria-label={`Location for ${item.name}`}
           value={item.location ?? ''}
-          onChange={(e) => onChange({ location: e.target.value })}
+          onChange={(e) => change({ location: e.target.value }, true)}
           className="wlp-gfield"
         />
       </div>
 
-      <NotificationRow item={item} onChange={onChange} />
+      <NotificationRow item={item} onChange={change} />
 
       {/* The editor's calendar and colour pair: the calendar is shown, not
           chosen, since an item changes calendar by being dragged into
@@ -421,7 +469,7 @@ const ItemDetails: React.FC<{
           title="Event colour"
           dot={eventColorHex(item.colorId, categoryColor)}
           dotOnly
-          onChange={(v) => onChange({ colorId: v === '' ? undefined : v })}
+          onChange={(v) => change({ colorId: v === '' ? undefined : v })}
           className="wlp-color-select"
         >
           <option value="">Calendar colour</option>
@@ -440,12 +488,25 @@ const ItemDetails: React.FC<{
           placeholder="Add description"
           aria-label={`Description for ${item.name}`}
           value={item.description ?? ''}
-          onChange={(e) => onChange({ description: e.target.value })}
+          onChange={(e) => change({ description: e.target.value }, true)}
           className="wlp-gfield"
         />
       </div>
 
       <div className="wlp-details-actions">
+        {/* Always in the panel, empty at rest, so a screen reader is already
+            watching it when "Saved" is put in, and says it without moving
+            focus. Removing the text after the fade is not announced. */}
+        <span role="status" aria-live="polite" className="wlp-details-saved">
+          {saved && (
+            <span key={savedKey} className="wlp-details-saved-mark">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+              Saved
+            </span>
+          )}
+        </span>
         <button type="button" onClick={onDuplicate} title="Duplicate item" className="wlp-btn-text">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/>
@@ -1713,15 +1774,22 @@ const PoolSidebar: React.FC = () => {
                                         <path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1h-2zm3 18H5V8h14v11z"/>
                                       </svg>
                                     </button>
+                                    {/* A pencil, Google's edit icon, rather than
+                                        the chevron it was: a chevron read as
+                                        "more" and not as the way to change the
+                                        item's location, notification, colour and
+                                        description (M8 U23). Its filled state
+                                        says the panel is open. */}
                                     <button
+                                      type="button"
                                       onClick={() => setExpandedId(expanded ? null : item.id)}
-                                      title={expanded ? 'Hide details' : 'Edit details'}
-                                      aria-label={`Details for ${item.name}`}
+                                      title={expanded ? 'Close details' : 'Edit details'}
+                                      aria-label={`Edit details of ${item.name}`}
                                       aria-expanded={expanded}
                                       className={`wlp-item-btn wlp-item-expand${expanded ? ' wlp-item-btn-on' : ''}`}
                                     >
-                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                                       </svg>
                                     </button>
                                     <button
