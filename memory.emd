@@ -1,0 +1,1627 @@
+<!-- emerald document, schema 62 -->
+<!-- emerald: decision.format.md -->
+---
+format: decision
+title: Decision
+language: 13
+claims: none
+---
+
+One entry of docs/09-decision-log.md, which is 2,770 lines of markdown and which CLAUDE.md tells every session not to read end to end. That instruction is the admission this format exists to answer: prose does not scale as memory.
+
+The log's own laws are kept rather than replaced. A past entry is never edited — a decision that stops being true is superseded by a later one, which is what `supersedes` and `state` are for, and why there is no `amended_at` and nothing to overwrite. `question` and `answer` are the two halves an entry always had in its prose; here they are columns, so a session can be handed the answer without reading the argument, and can go and read the argument when the answer is not enough.
+
+`ref` is the decision's own number and is not the row's `id`, because `id` is the column every declared table already has and a declaration may not name it. That is the first thing this migration found (M22 U1): the name a person uses for a row and the identity a link resolves through are two different columns, and every `supersedes` here was written in a second pass once the first pass had handed back its ids.
+
+A decision makes no claim. That is said on purpose and it is the first of the four gaps D-238 predicted: claims are arithmetic, and a note's invariants are "not empty" and "this link resolves", which the declaration already enforces.
+
+| column | type | points at | unit | per | required | unique | values | min | max | note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ref | text |  |  |  | yes | yes |  |  |  | The decision's own number, as the log writes it — `D-227`. Not the row id: `id` is the column every declared table already has. |
+| date | date |  |  |  | yes | no |  |  |  | The day it was decided, which is the day the entry was written. |
+| milestone | text |  |  |  | yes | no |  |  |  | The milestone it belongs to — `M20`. Text rather than an enum: milestones are still being added. |
+| scope | text |  |  |  | yes | no |  |  |  | Whose decision this is: `engine`, or the name of the pack whose rule it is — `ledger`. Text rather than an enum because packs are still being added. Split by what the decision governs, not by the milestone that produced it (D-218): the reading traps were decided during finance milestones and are `engine`. Filter on it so pack work and engine work never read each other's rows. |
+| title | text |  |  |  | yes | no |  |  |  | The headline, verbatim from the entry's own heading. It is a sentence on purpose. |
+| question | text |  |  |  | yes | no |  |  |  | What was undecided before this — the thing a later session would otherwise decide differently by accident. |
+| answer | text |  |  |  | yes | no |  |  |  | What was decided. Enough on its own that a session need not read the argument to act correctly. |
+| supersedes | link | decision |  |  | no | no |  |  |  | The earlier decision this one replaces or amends. A chain of these is the case D-224's one-hop rule cannot follow, and that is a question rather than a licence to change the rule. |
+| state | enum |  |  |  | yes | no | live, amended, superseded |  |  | Whether this is still the decision of record. `amended` means a later entry changed part of it and the rest still stands; `superseded` means it does not. A past entry is never edited, so this column is the only way to ask. |
+
+## rows
+
+### D-1
+date: 2026-09-05
+milestone: M1
+scope: extension
+title: Every PoolItem field after name and calendarId is optional, and undefined means today's behaviour
+question: How do new item fields reach items already in chrome.storage.local without a migration step?
+answer: `PoolItem` (src/poolItem.ts) is stored under `poolItems` keyed by `calendarId`, array order is display order. Every new field is optional and every reader treats `undefined` as the old behaviour (`durationMin` undefined => 60). Items already in storage keep working with no migration. Never add a required field to `PoolItem`.
+state: live
+
+### D-10
+date: 2026-09-06
+milestone: M7
+scope: publishing
+title: The keyboard path is a launch blocker
+question: Can the extension go public drag-only?
+answer: No. Drag-only is unusable for some people; a keyboard path (select an item, then click or pick a slot) ships before any public launch.
+state: live
+
+### D-11
+date: 2026-09-06
+milestone: M7
+scope: publishing
+title: Store id first, then key, then OAuth client
+question: In what order are the store listing, the manifest key and the OAuth client set up?
+answer: Upload a draft ZIP to get the permanent item id; copy the public key off the dashboard into `manifest.json` as `key` so the unpacked build keeps that id; only then create the Chrome-Extension OAuth client against it. The current `client_id` is bound to the local unpacked id and will not survive publication.
+state: live
+
+### D-12
+date: 2026-10-09
+milestone: M7
+scope: repo
+title: Plans and decisions live in pool.emd, which is private and never committed
+question: Where does the project's plan live once the repo is public?
+answer: In `pool.emd` (development pack) beside the repo, gitignored with its backups, as kfireliyahu.com does with site.emd. PLAN.md, agent.md and the overview .docx were migrated into it. README.md stays in the repo as the public description.
+state: superseded
+
+### D-13
+date: 2026-10-09
+milestone: M7
+scope: repo
+title: History is rewritten with git filter-repo, not squashed
+question: Rewrite the history before publication, and how: filter or squash?
+answer: Filter with `git filter-repo`, keeping the commits: drop `node_modules/`, `dist/`, `.claude/`, `agent.md` and `Weekly_Life_Pool_Overview (1).docx` from every commit. Done before the first push, while no copy exists elsewhere. A mirror backup is taken first.
+state: live
+
+### D-14
+date: 2026-10-09
+milestone: M7
+scope: repo
+title: Public commits carry the public account's GitHub noreply address
+question: Which author identity do public commits carry?
+answer: The public GitHub account's `ID+username@users.noreply.github.com`, rewritten over every existing commit with filter-repo's mailmap, and set as this repo's local `user.email` for future commits. Waits on the account name arriving in the inbox.
+state: superseded
+
+### D-15
+date: 2026-10-09
+milestone: M7
+scope: repo
+title: Donations go through GitHub Sponsors on kfireliyahu plus Ko-fi, shared with the author's other projects
+question: Which donation channel?
+answer: One donation path for the author: GitHub Sponsors on the `kfireliyahu` account and a Ko-fi page of the same name. No Patreon, Open Collective or Buy Me a Coffee. `.github/FUNDING.yml` is two lines (`github: kfireliyahu`, `ko_fi: kfireliyahu`), committed in 8215e46. The README's donation line points at the Sponsor button only. GitHub shows the button only once the author's Sponsors profile is approved; until then it shows none.
+state: live
+
+### D-16
+date: 2026-10-09
+milestone: M7
+scope: publishing
+title: Homepage and privacy policy live on kfireliyahu.com; the extension gets no domain of its own
+question: Which domain hosts the homepage and privacy policy?
+answer: The author's site, kfireliyahu.com (Cloudflare, Astro on GitHub Pages, repo kfireliyahu/kfireliyahu.github.io): a Weekly Life Pool entry page and a privacy policy at a stable route, proposed `/weekly-life-pool/privacy`, reserved in site.emd's inbox. The domain is verified in Search Console from the same Google account that owns the OAuth client. `homepage_url` and the sidebar footer link point at the entry page. An extension is found in the store, so it gets no domain of its own. The policy's text is the author's to write.
+state: live
+
+### D-17
+date: 2026-10-09
+milestone: M7
+scope: repo
+title: The rewritten history is pushed to a fresh repository under github.com/kfireliyahu, not transferred
+question: Transfer the repository to the public account, or push it fresh?
+answer: Push to a fresh, empty repository under github.com/kfireliyahu. A transfer carries the pre-rewrite objects and the old account's association. Every pre-rewrite copy — including `F:\projects\google-calendar-pool.pre-rewrite.bundle` — is deleted or moved offline before the repository is public, because those copies carry the old private address. The author performs the push; a session drafts the commands.
+state: live
+
+### D-18
+date: 2026-10-09
+milestone: M7
+scope: publishing
+title: Launch on its own day, store registration under the Workspace account, non-trader
+question: How and when is the extension published to the Chrome Web Store?
+answer: Weekly Life Pool publishes on its own day. OAuth verification starts as soon as the privacy page exists, since Google's review takes days to weeks. The one-time 5 USD developer registration is under the Workspace account me@kfireliyahu.com, the publisher; the listing's contact email is me@ until a support@ alias exists. Trader declaration: a free extension from an individual with no revenue is a non-trader, so no name and address on the listing; charging ever would flip that.
+state: superseded
+
+### D-19
+date: 2026-10-09
+milestone: M7
+scope: repo
+title: Public commits carry Kfir Raphael Eliyahu <me@kfireliyahu.com>, not a noreply address
+question: D-14 chose the GitHub noreply address; the author's site and Emerald use me@kfireliyahu.com. Which?
+answer: me@kfireliyahu.com, chosen by the author on 2026-10-09 after the inbox row. The address is a Workspace mailbox on the author's domain and public by design (site, Emerald, store listing), so a noreply address would hide nothing. Set as this repo's local `user.name` / `user.email`; every existing commit rewritten with a filter-repo mailmap (the old private address → it). The old private address appears in no object of the rewritten repo. A second pass on 2026-10-11 (D-30) removed it from code comments added after the first.
+supersedes: D-14
+state: live
+
+### D-2
+date: 2026-09-05
+milestone: M4
+scope: extension
+title: The event / task switch is dropped and the phase numbers stay as they were
+question: Build phase 4 (an item that creates a Google Task instead of an event), and renumber if not?
+answer: Dropped, not built. The numbering is kept as-is so the other phases keep the names they were discussed under.
+state: live
+
+### D-20
+date: 2026-10-09
+milestone: M7
+scope: repo
+title: Weekly Life Pool is licensed AGPL-3.0-only
+question: Which licence?
+answer: AGPL-3.0-only, the same as Emerald's code, chosen by the author on 2026-10-09. `LICENSE` is the unmodified AGPL text copied from Emerald's repo; `package.json` and the lockfile root say `AGPL-3.0-only`; the README has a License section and a Support line pointing at the Sponsor button. No separate prose or CC licence split, unlike Emerald's LICENSING.md.
+state: live
+
+### D-21
+date: 2026-10-10
+milestone: M9
+scope: extension
+title: The sidebar adopts Google Calendar's own visual language and drops its title
+question: Should the sidebar keep its own look (white card, "Weekly Pool" title, uppercase section labels, chip cloud), or match Google Calendar?
+answer: Match Google, asked by the author on 2026-10-10 with three reference screenshots in `design-ref/`. Remove the "Weekly Pool" title. Borrow from Google's left nav (02) its surfaces, type and "My calendars"-style collapsible sections; from Google's event editor (03) its field vocabulary (grey pill fields, calendar dropdown with a colour dot, Notification row, "Does not repeat" select, filled blue pill buttons); and from the week view (01) the event chip, so a pool item looks like the event it creates. Prefer reading Google's live computed colours over hardcoding them, so both themes match exactly. Never depend on Google's class names; keep theme.ts's approach.
+state: amended
+
+### D-22
+date: 2026-10-10
+milestone: M9
+scope: extension
+title: Docking the pool into Google's left nav is an experiment, behind a flag
+question: Q-8: stay a separate sidebar, or become a section inside Google's own left nav?
+answer: Try it as an experiment if it is feasible (the author, 2026-10-10). The separate sidebar stays the default and keeps getting M9's work; the docked mode is built behind a per-device flag in `chrome.storage.local`, off by default, so it can be tried and thrown away without touching the main path. Q-8 is answered by the experiment's result, not by this decision.
+state: superseded
+
+### D-23
+date: 2026-10-10
+milestone: M9
+scope: extension
+title: The pool stays a separate sidebar; docking into Google's menu is not approved
+question: Q-8: after the M9 U10 experiment, does the pool stay a separate sidebar or become part of Google's left nav?
+answer: Separate sidebar (the author, 2026-10-10). Evidence from the real page: Google's "My calendars" is a div[role=list] of fixed height whose rows are each a div[role=presentation] pinned with transform: translateY(n×32px), so nothing inserted between rows gets room; nesting items under a calendar would mean rewriting Google's layout on every redraw. One section after the list would work but repeats the calendar names under Google's own. Hiding Google's list and drawing a copy was rejected: its failure mode breaks Google's own features (calendar toggles, the ⋮ menu). The dock code (aa690a0, e1c31d4) is removed in d303769; all three commits were dropped from history on 2026-10-13 (D-32), so those ids no longer resolve. Kept for later: each row carries data-id = base64 of the calendar id and --checkbox-color = its colour, a sturdier way than names to match Google's rows (e.g. for M9 U7's primary-calendar name).
+supersedes: D-22
+state: live
+
+### D-24
+date: 2026-10-10
+milestone: M9
+scope: extension
+title: The add-item composer is always open; the "+ New item" button goes
+question: Should adding an item go through a "+ New item" button that opens the composer (M9 U1), or should the composer stay open?
+answer: Always open (the author, 2026-10-10). Remove the "+ New item" pill and the formOpen toggle; the composer from M9 U5 is always shown under the header. Amends D-21, whose pill this was; the rest of D-21 stands.
+supersedes: D-21
+state: live
+
+### D-25
+date: 2026-10-10
+milestone: M7
+scope: repo
+title: Issues are welcome; pull requests are not accepted for now
+question: On what terms do outside contributions come in, given AGPL-3.0-only (D-20)?
+answer: Issues only (the author, 2026-10-10). CONTRIBUTING.md welcomes bug reports and ideas and says pull requests are closed without merging, so every line stays the author's and every licensing option stays open. Rejected: PRs under AGPL with inbound = outbound, which would need each contributor's consent to ever relicense; and a CLA-style grant, which deters contributors and wants a lawyer's wording. Loosening this later means a new decision and a new CONTRIBUTING.md.
+state: live
+
+### D-26
+date: 2026-10-11
+milestone: M8
+scope: extension
+title: The sidebar shows in Week and Day view only; every other view gets Google's layout back
+question: The sidebar showed on every view, though placing worked only in Day and Week view. Which views should it work in?
+answer: Week and Day view (the author, 2026-10-11; first week only, then Day added the same day because it cost nothing and a user whose default is Day would otherwise see nothing). Week counts with weekends shown or hidden; Month, Year, Schedule, the custom N-day view, Settings and the full event editor do not. Outside them the sidebar's mount is hidden, not unmounted, so a half-typed item survives, and Google's root loses the transform and width the sidebar gave it. The view is read from the path (/r/week, /r/day vs /r/month, …); a bare /r, which shows the user's default view, is read from the grid: 1 or 7 day columns, or Monday to Friday. Built in 4f93103.
+state: live
+
+### D-27
+date: 2026-10-11
+milestone: M7
+scope: publishing
+title: The extension is named Usuals; its slug is calendar-usuals
+question: "\"Weekly Life Pool\" is disliked (\"pool\" says nothing). What is the product called, and may Google's name be part of it?"
+answer: **Usuals** (the author, 2026-10-11), after "The Usuals" was dropped as sounding like a band. The premise it names: people have a set of usual actions, templates of what they do, kept under their calendars. Shown with the line "Works with Google Calendar" beneath it, never in the name: Google's brand guidance forbids its product names in a product name, OAuth brand verification rejects them, and "works with" is the phrasing Google itself permits; a line that Google Calendar is a trademark of Google LLC goes on the homepage and listing. The slug is **calendar-usuals**: the GitHub repository (github.com/kfireliyahu/calendar-usuals, M7 U5) and the homepage, kfireliyahu.com/calendar-usuals with /calendar-usuals/privacy (M7 U6). The OAuth consent screen's app name, the store listing's name and the homepage's title and heading all read exactly "Usuals", since verification compares them. Rejected after a clash check (web search only, no trademark register): Weekfill (weekfill.com, same idea), Slotted (slotted.com), Tray (Tray.ai), Regulars (Regularly planner app), Go-tos (GoTo), Stencils (Eventual Calendar's feature name). Nearest to Usuals: the iOS app Usual (household reminders) and usuals.app (contacts tool); a trademark search is still to do before launch.
+state: live
+
+### D-28
+date: 2026-10-11
+milestone: M10
+scope: extension
+title: Month view placing comes after launch, as all-day events that Shift repeats monthly
+question: Should a usual be placeable in Month view, and when?
+answer: Yes, after launch (the author, 2026-10-11). In Month view a drop, a click with an item picked, or the schedule form creates an all-day event on that date: no hour, no duration (the item's durationMin is ignored). Shift makes it repeat monthly. Month view is then added to the views the sidebar shows in (amends D-26); Year and Schedule stay hidden. Estimated at about a day: all-day event bodies and a monthly RRULE, a cell highlight and tooltip in place of the time-grid preview and placeholder, a month mode for click-to-place and the schedule form, and keeping drops off the mini month in Google's left nav. Not before launch because everything blocking launch is outside the code; it may be built while OAuth verification is pending. Left open: Q-9 (what monthly means), Q-10 (reminders on all-day events), Q-11 (Week view's all-day row).
+state: live
+
+### D-29
+date: 2026-10-11
+milestone: M7
+scope: publishing
+title: Sign-in goes through the Google Cloud project calendar-usuals, owned by me@kfireliyahu.com
+question: Which Google Cloud project holds Usuals' OAuth client and consent screen, and when is the client made?
+answer: A new project, ID `calendar-usuals`, created by the author on 2026-10-11 while signed in as me@kfireliyahu.com, under the kfireliyahu.com organization, so its owner matches the store publisher (D-18) and the domain verified in Search Console (D-16). Its Chrome Extension OAuth client `85811622726-j101id0isu5lk7rh3g6rn70nd68rcpmu.apps.googleusercontent.com` was made now, against the unpacked build's id, so the demo could run as me@ (in manifest.json since ee203aa); at launch its Item ID moves to the store's id, or the store key is pinned so the dev build shares it, instead of making a second client (amends D-11's order). Consent screen: External, in Testing, test user me@kfireliyahu.com, scopes calendar.events.owned and calendar.calendarlist.readonly, Calendar API enabled. Branding (homepage, privacy URL, authorized domain kfireliyahu.com) is filled in once the site is up; verification is submitted after both pages are live. The old project (number 495067373971, client in the manifest since a6faebf) is no longer used; its owner is probably the author's old personal Google account, unconfirmed. A Chrome profile signed in as any other account must be added as a test user before it can sign in.
+state: live
+
+### D-3
+date: 2026-09-06
+milestone: M2
+scope: extension
+title: A pool drag carries two dataTransfer types, poolItem for the calendar and poolReorder for the sidebar
+question: How can a sidebar drag reorder items without the document-level drop listener creating a calendar event, and vice versa?
+answer: One drag sets both `poolItem` (read only by the document-level drop listener, which creates an event) and `poolReorder` (read only by the sidebar). Neither handler can pick up the other's payload, so one drag serves both targets. The document listener also only acts on `closest('[role="gridcell"]')`.
+state: live
+
+### D-30
+date: 2026-10-11
+milestone: M7
+scope: repo
+title: pool.emd is committed, in Emerald's text storage, once scrubbed; history rewritten a second time
+question: D-12 kept pool.emd private and out of the repo. Should the project's plans and decisions travel with the code, and what has to go first?
+answer: Committed (the author, 2026-10-11), so the project's memory is versioned with the code, the repository starting private (M7 U5). Before that: (1) a scan of pool.emd and the whole git history found the author's old personal address in src/names.ts comments (16 commits, added after D-19's rewrite) and, in pool.emd, that address, a private note and the old GitHub account's name. The comments now use made-up examples (pat@example.com, Pat Doe; c20424e); `git filter-repo --replace-text` removed the address from every commit, and the same run reworded the first two commit messages; no object in the repo holds it now. A backup bundle of the pre-rewrite history is at F:\projects\google-calendar-pool.before-usuals-rewrite.bundle, to be deleted once the new repository is checked. (2) The pool.emd rows were rewritten without those details, and every commit id they cite was mapped to the rewritten history (50 ids in 40 rows). (3) The file was stored as SQLite, whose free pages still held the deleted text; the author switched it to Emerald's text storage in the app, a scan of the text file came back clean, and only then was it committed. Backups (*.emd.*.bak, *.before-*.emd) stay ignored. Kept in it on purpose: me@kfireliyahu.com, the public name, the OAuth client ids and project number (public by nature), references to site.emd and Emerald.
+supersedes: D-12
+state: live
+
+### D-31
+date: 2026-10-13
+milestone: M7
+scope: publishing
+title: Usuals publishes as soon as the store approves it; the repository was public briefly on 2026-10-13 and is private again for now
+question: D-18 gave Usuals its own launch day, never Emerald's, which meant deferring publication after store approval and keeping the repository private until then. Still wanted?
+answer: "Publishing: the author decided on 2026-10-13 that the store item publishes automatically on approval, whatever the day; the website's \"Coming soon\" button follows whenever site.emd gets the listing URL. Kept from D-18: registration under me@kfireliyahu.com, non-trader, contact me@. The author believes the OAuth consent screen is already verified; not checked here.\n\nRepository: github.com/kfireliyahu/calendar-usuals was made public on 2026-10-13, after a scan of all 75 commits found the old personal address in no blob and no message and every author and committer is me@kfireliyahu.com; description and topics were set with it. About an hour later the author made it private again \"for now\" (0 forks, stars or watchers at the time); when it goes public again is open. While it is private, the store description's \"free and open source\" line and the README's Sponsor-button line point at a repository nobody else can see. The pre-rewrite bundle F:\\projects\\google-calendar-pool.before-usuals-rewrite.bundle is still on disk (local only, never pushed): the session's attempt to recycle it was blocked, so the author deletes it. GitHub Sponsors is not enabled on kfireliyahu yet (D-15)."
+supersedes: D-18
+state: amended
+
+### D-32
+date: 2026-10-13
+milestone: M7
+scope: repo
+title: History tidied once more: an accidental file, a reverted experiment and four follow-up commits
+question: Are there commits better grouped, or not worth anyone reading, before the repository is public for good?
+answer: Yes, the author chose all three on 2026-10-13: (1) `src/components/PoolSidebar.tsx.bak`, added by accident in 9f6f65b and removed in 647dd9c, is filtered out of every commit, so 647dd9c is gone; (2) the menu-dock experiment (aa690a0, e1c31d4, and its removal d303769) is dropped, after checking the three net to no change; (3) four follow-ups are folded into the commit before them: e6a474b into 0d5ab2e (synced pool), e8bfce9 into 307e70a (export and import), ea9c6a9 into 6599107 (the icon), 4d50531 into e946f6f ("usual events" wording, its message reworded to cover both). 76 commits became 68 with a byte-identical final tree; author dates kept, committer dates restored to the originals; every author and committer still me@kfireliyahu.com. A session did the rebase and `git filter-repo` in a scratch clone, since rewriting in place was blocked by the permission classifier, and remapped the 48 surviving commit ids pool.emd cites by author date and subject (83ecd65); the passages citing the dropped ones say so. The author swapped local main for the clean history and force-pushes it to the (private) repository. Left alone: the add-then-remove event-capture arc (5bf3582 to 779beda), which does not net to zero, and c20424e, which only swaps the author's public name for Pat Doe in comments.
+state: live
+
+### D-33
+date: 2026-10-13
+milestone: M7
+scope: repo
+title: The project's memory is memory.emd at the repository root, and the folder becomes F:\projects\calendar-usuals
+question: pool.emd is named after Weekly Life Pool, and the folder is still google-calendar-pool. Rename them to fit Usuals?
+answer: Yes, asked by the author on 2026-10-13. `pool.emd` is renamed `memory.emd` (git mv, so its history follows), after Emerald's own `docs/memory.emd`, but at the root as the author asked. Rows written before today keep saying pool.emd; this row is where the name changed. The local folder becomes `F:\projects\calendar-usuals`, matching the repository and the slug (D-27); the author renames it with every program that holds it closed, and the next session opens there. Inbox rows other documents already hold keep `from: F:/projects/google-calendar-pool/pool.emd`; site.emd and the author's other documents were sent the new path the same day, so new rows to this document go to `F:/projects/calendar-usuals/memory.emd`. Its Emerald backups (`*.emd.*.bak`, `*.before-*.emd`) stay gitignored.
+state: live
+
+### D-34
+date: 2026-10-14
+milestone: M7
+scope: publishing
+title: Usuals is live without OAuth verification; verification is submitted next, with scope justifications and a silent demo video
+question: D-31 recorded that the author believed the OAuth consent screen was already verified. Is it, and what does the store listing being live mean for sign-in?
+answer: "Not verified (found 2026-10-14). The Chrome Web Store review and Google's OAuth verification are separate: the store approved and published the item, but signing in with a fresh account shows Google's unverified-app warning, and Google Auth Platform → Data Access reports \"Missing the following fields for one or more requested scopes: scope justification, demo video\". Both requested scopes (`calendar.events.owned`, `calendar.calendarlist.readonly`) are sensitive, so until verification passes every new user sees the warning and the app is capped at 100 users. me@kfireliyahu.com is not a fair test of what a user sees: it had already granted access, and it belongs to the project's own organization.\n\nWhat goes in, as M7 U11: (1) a justification per scope, drafted from what src/background.ts calls: calendarList.list only, to show the user's calendars as groups and to choose one; events.insert for each drop or Schedule, into the calendar the user chose, and events.delete only for Undo of that same event; nothing else is read, changed or deleted. (2) A demo video, YouTube Unlisted (not Private), silent with one caption per shot (narration is not required), recorded with a new Gmail account made for it in a fresh Chrome profile signed in to Chrome as that account (getAuthToken uses the profile's account), with the demo .ics files imported and the account's language English. It shows the client ID (chrome-extension://hkihoifbohighgoackpcinobeabpjnbp/manifest.json and the Credentials page), the full consent flow with the app name Usuals, the calendar list in use, a drop creating an event and Undo deleting it. Whether getAuthToken's popup shows the URL with client_id is not known; if not, the submission notes say so and point at the timestamp where the ID is shown."
+supersedes: D-31
+state: amended
+
+### D-35
+date: 2026-10-17
+milestone: M7
+scope: publishing
+title: Google approved Usuals' OAuth verification; the unverified-app warning is gone
+question: D-34 left Usuals live without OAuth verification. Where does it stand now?
+answer: "Approved. The author submitted verification on 2026-10-15 (M7 U11) and Google's Third Party Data Safety Team approved it by 2026-10-17 for project 85811622726 (calendar-usuals). The approval email names one scope, `calendar.events.owned`; `calendar.calendarlist.readonly` is not named, and whether it needed approval at all (it may count as non-sensitive) was not checked: Verification Center or Data Access says. Per the email, a new scope or any change to the consent screen's configuration needs a new verification request, so the scopes and branding stay as they are unless that is the point.\n\nA fresh install and sign-in on 2026-10-17 went smoothly, with one dialog before it: Chrome's \"Proceed with caution: this extension is not trusted by Enhanced Safe Browsing\", which users with Enhanced Safe Browsing see for extensions from publishers new to the store. It is not about OAuth and nothing in the code changes it; Google trusts a publisher once it has followed the Developer Program Policies for some months.\n\nStill to check: the consent screen's publishing status (Google Auth Platform → Audience). An earlier note recorded it as External, in Testing, test user me@; in Testing only listed test users can sign in, which would explain a friend of the author being shown a request-access screen on 2026-10-16. If it says Testing, switch it to In production. The other explanation for that screen is a work or school account whose admin restricts apps (chrome.identity signs in with the Chrome profile's account).\n\nThe store showed 4 users on 2026-10-17. The store counts installed Chrome profiles that check for updates, not Google accounts, so the author's profiles and the friend's install each count, sign-in or not; unpacked builds do not count. Who the fourth is was not worked out."
+supersedes: D-34
+state: live
+
+### D-36
+date: 2026-10-17
+milestone: M8
+scope: extension
+title: Sign-in tries Chrome's getAuthToken first and falls back to launchWebAuthFlow with a Web application client
+question: How does Usuals sign in where chrome.identity.getAuthToken does not work (Brave, Edge, Opera, Arc)?
+answer: getAuthToken stays the first path, so Chrome behaves as before. When it fails (except a Chrome user closing the consent window), an implicit-grant launchWebAuthFlow with a separate Web application OAuth client takes over, its token cached with its expiry in chrome.storage.session and renewed silently with prompt=none; the working path is remembered in chrome.storage.local. The fallback is off until WEB_AUTH_CLIENT_ID is filled in.
+state: live
+
+### D-37
+date: 2026-10-17
+milestone: M8
+scope: extension
+title: A press with Shift already down is followed with mouse events, since Chrome starts no drag from it
+question: Why did holding Shift before dragging an item create a single event, and how is it fixed?
+answer: Chrome starts no HTML drag from a Shift-press (Blink treats it as extending the selection; only links and images are exempt), so no dragstart fired. The row now hands a Shift-press to content.tsx, which follows the pointer with mousemove/mouseup, shows the same tooltip and preview, swallows the release on the grid and creates the event there, weekly while Shift is held. The drag tooltip also says 'Hold Shift to repeat weekly' from the start of every drag.
+state: live
+
+### D-4
+date: 2026-09-06
+milestone: M2
+scope: extension
+title: The reorder insertion line is drawn with ::before / ::after on the row wrapper
+question: How to mark a drop point while reordering?
+answer: With `::before` / `::after` on the row wrapper, never an inserted element, so marking a drop point never reflows the list out from under the pointer.
+state: live
+
+### D-5
+date: 2026-09-06
+milestone: M2
+scope: extension
+title: A duplicated item gets a ' copy' suffix
+question: What does Duplicate name the copy?
+answer: The copy lands directly under the original with every field and a ` copy` suffix on the name, so two items cannot resolve each other's drop placeholder (`waitForEvent` matches on name). Duplicate lives in the template panel. Rename is double-click → inline pre-selected input; Enter and blur commit, Escape cancels. Moving between calendars is a drop on another category's header or empty space; the category chips on the add form stayed.
+state: live
+
+### D-6
+date: 2026-09-06
+milestone: M5
+scope: extension
+title: Template fields are omitted from events.insert when unset, and reminderMin is checked against undefined
+question: How do description, location, colorId and reminderMin map onto the event body?
+answer: Straight onto the `events.insert` body, each omitted when unset: an empty `location` is a real value to the API, and sending `reminders` at all turns off the calendar's defaults. `reminderMin: 0` means "at start", so every check is against `undefined`, never falsy. No new scope, no new endpoint. The fields live in a per-item panel collapsed by default, opened from the row's chevron, which stays tinted while any field is set.
+state: live
+
+### D-7
+date: 2026-09-06
+milestone: M5
+scope: extension
+title: The drag preview and drop placeholder draw in the item's colorId
+question: What colour does the drag preview use?
+answer: The item's `colorId`, so what you see while dragging is the colour the event will be.
+state: live
+
+### D-8
+date: 2026-09-06
+milestone: M7
+scope: publishing
+title: OAuth scopes are narrowed to calendar.events.owned and calendar.calendarlist.readonly
+question: Which Calendar scopes does the extension request, given store review and OAuth verification?
+answer: `calendar.events.owned` (create events on calendars the user owns; it also grants read on them, which phase 6 will need) and `calendar.calendarlist.readonly` (group pool items by calendar), replacing the blanket `auth/calendar`. Calendars whose `accessRole` is not `owner` are filtered out of the sidebar, since they cannot be written under this scope. The consent screen in Google Cloud must list the new scopes, and an existing cached token may need re-consent.
+state: live
+
+### D-9
+date: 2026-09-06
+milestone: M5
+scope: extension
+title: Capturing an existing calendar event into the pool is removed
+question: Keep the capture feature (drag an event onto the sidebar, or an Add to pool button in Google's event dialog)?
+answer: Built (commits 009b2c4..1496596) and removed (4ab49c5). It cost a second API round trip and a DOM observer on Google's dialog markup — not worth that surface for a pool you fill once; typing an item is faster. Phase 5 has since given `PoolItem` the fields a capture would fill, so reviving it would be cheaper, but the DOM observer on Google's markup is still the reason not to.
+state: live
+
+<!-- emerald: inbox.format.md -->
+---
+format: inbox
+title: Inbox
+language: 22
+claims: none
+---
+
+What another project's session hands this document: a fact it found, a finding about this project, a gate it knows of. Until M44 the only channel was the author's clipboard, and three hand-offs of six never arrived; a message to another session lasts only as long as that session. A row lasts as long as the document.
+
+`from` is the sending document's path, absolute — `F:/projects/me/me.emd` — and never a session's title, because a title stops meaning anything when the session ends and a path is where the sender's own record can be read. `refs` is the sender's names for the same things in its own document, so the owner can ask that document rather than the session that wrote it.
+
+The rules are a convention and not a guarantee: the engine does not know which session writes a row (D-138), so nothing here can enforce them. A sender writes a row once, with `state: new`, and never edits it. The owner moves `state` and fills what it became. A foreign session writes to no other format of this document.
+
+What it became is three columns, because the engine names a link's target by its first text column and only some formats have a unique one: `answered_by` and `became_unit` are links, to a decision and a unit; `became` is text for everything else — an open question or a review entry by its ref, a rule or a term by its name, or why it was dropped.
+
+A text .emd is rewritten whole on every write, so a row written from another project while a session here is writing is the concurrent-writers case and nothing new: the plugin's writers take the document's lock in turn, a batch applies whole or not at all, a copy is taken before it, and the app's save refuses to overwrite a change it has not seen. A session is told a row arrived by running `node dist-plugin/server.mjs watch <this document> --format inbox --match state=new` under its Monitor tool: one line per new row, naming its subject, and silence for every other write (M44 U3, D-441).
+
+An inbox row makes no claim.
+
+| column | type | points at | unit | per | required | values | min | max | note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| subject | text |  |  |  | yes |  |  |  | The hand-off in a line: what `start_here` lists and what the text .emd heads the row with. |
+| from | text |  |  |  | yes |  |  |  | The sending document's absolute path — `F:/projects/me/me.emd`. Not a session's title: a title means nothing once the session ends. |
+| sent_on | date |  |  |  | yes |  |  |  | The day it was sent. |
+| body | text |  |  |  | no |  |  |  | The fact or finding in full, in markdown, written for a session that has none of the sender's context. |
+| refs | text |  |  |  | no |  |  |  | The sender's own refs for it, in its own document — `me.emd D-10, D-18`. |
+| state | enum |  |  |  | yes | new, triaged, applied, dropped |  |  | A sender writes `new`, and `start_here` lists those. `triaged`: the owner has read it and knows what it will become. `applied`: it became that. `dropped`: read and not acted on, and `became` says why. |
+| answered_by | link | decision |  |  | no |  |  |  | The decision it became or answered. |
+| became_unit | link | unit |  |  | no |  |  |  | The unit it became. |
+| became | text |  |  |  | no |  |  |  | Anything else it became, by ref or name — an open question, a review entry, a rule, a term — or why it was dropped. |
+
+## rows
+
+### Usuals' privacy policy is live on kfireliyahu.com: Google's OAuth verification can start
+from: F:/projects/kfireliyahu.com/site.emd
+sent_on: 2026-10-12
+body: "The privacy policy is **live on the verified domain**, over HTTPS:\n\n- **Policy:** https://kfireliyahu.com/calendar-usuals/privacy\n- **Entry page (links to it):** https://kfireliyahu.com/calendar-usuals\n\n**What is published:** PRIVACY.md as of commit 93bc1aa (the Export bullet included), word for word, with the Google API Services section and its Limited Use sentence intact. Title, main heading and og:site_name read exactly `Usuals` on both pages.\n\n**Effective date:** `12 October 2026`, the day the page first answered on kfireliyahu.com, as your row asked (\"publish with the date the page goes live\"). The `*Effective [launch date]*` line in PRIVACY.md is still a placeholder on your side; set it to the same day if you want the two copies to match.\n\n**The domain:** kfireliyahu.com is served by GitHub Pages from the public repo kfireliyahu/kfireliyahu.github.io, with a GitHub-issued certificate for kfireliyahu.com and www (valid to 2027-01-10, renewed automatically). www redirects to the apex. The redirect from plain http:// to https:// is switched on and may take a little longer to apply everywhere; https:// works now.\n\n**Also on the entry page now:** the steady-shot demo clips (four MP4s, in your order, with your step lines and alt text), the store screenshots as the player's poster (light or dark with the page), your finished icon (cropped to its artwork) beside the name, and a Chrome Web Store button marked \"Coming soon\". Send the listing's URL in a row when it is published and the button goes live.\n\n**When PRIVACY.md changes**, a row here as before; the site replaces the body and keeps its own effective date unless you say otherwise."
+refs: site.emd S1 U5, S1 U13; inbox rows on the privacy policy (2026-10-11); commit eebe1cb
+state: applied
+became_unit: M7 U6
+became: M7 U6 marked built after checking both pages live; PRIVACY.md's Effective line set to 12 October 2026 to match. OAuth verification is next (D-18); the store listing URL goes to site.emd when published.
+
+<!-- emerald: milestone.format.md -->
+---
+format: milestone
+title: Milestone
+language: 13
+claims: none
+---
+
+A milestone of docs/07-roadmap.md, as a row (M27 U1). Until this format a milestone was text on a unit, so a roadmap had nothing to order and nothing to say about the milestone itself — what it was for, and whether it was still open.
+
+`unit.milestone` links here and names a milestone by its `ref`, which is why `ref` is unique: a document stored as text writes a link as its target's name.
+
+`position` is the order and `ref` is not. Since D-249 the numbers are not the sequence, and a plan that is reordered changes positions rather than renaming milestones.
+
+A milestone makes no claim.
+
+| column | type | points at | unit | per | required | unique | values | min | max | note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ref | text |  |  |  | yes | yes |  |  |  | The milestone as the roadmap names it — `M27`. What a unit's `milestone` names it by, so it is unique. |
+| title | text |  |  |  | yes | no |  |  |  | The roadmap heading's clause, verbatim — `The development pack, the first pack after the ledger`. |
+| goal | text |  |  |  | yes | no |  |  |  | What the milestone is for, in a sentence or two: what is true when it is done. |
+| state | enum |  |  |  | yes | no | planned, open, closed |  |  | `planned` is scoped and not started; `open` is the one being built; `closed` was closed by the author — never by a session. A milestone dissolved or stopped short is `closed`, and its goal says so. |
+| position | integer |  |  |  | yes | yes |  |  |  | Where it sits in the plan, so a roadmap has something to order by. Not the number in `ref`: since D-249 numbers are not the sequence. Gaps are left on purpose, so a milestone can be put between two. |
+
+## rows
+
+### M0
+title: Foundations
+goal: The sidebar works end to end: injected into Google Calendar, items grouped by the user's calendars, drag-and-drop creates the event, and the extension builds and loads cleanly with icons, token retry and drop guards.
+state: closed
+position: 0
+
+### M1
+title: Per-item duration
+goal: An item carries its own duration, so a drop creates an event of the right length instead of always 60 minutes.
+state: closed
+position: 10
+
+### M10
+title: Month view and all-day usuals
+goal: The monthly usuals (rent, bills, a haircut, a monthly review) get the same one-drag placing as the weekly ones. In Month view a usual dropped on a date becomes an all-day event, with no hour and no duration, and Shift makes it repeat monthly. The first update after launch (M7), not part of it (D-28).
+state: planned
+position: 77
+
+### M2
+title: Edit and reorder items
+goal: A typo or a wrong calendar no longer means delete and retype: items can be renamed in place, reordered, moved between calendars and duplicated.
+state: closed
+position: 20
+
+### M3
+title: Shift-drop for weekly recurrence
+goal: Holding Shift on drop creates a weekly-repeating event, because most pool items are routines and creating them one week at a time is the whole reason the sidebar exists. Ships with undo, since one stray shift-drop creates an infinite series.
+state: closed
+position: 30
+
+### M4
+title: Event / task switch
+goal: Dropped. Was to let an item create a Google Task instead of an event. Closed without being built; the number is kept so the other phases keep the names they were discussed under.
+state: closed
+position: 40
+
+### M5
+title: Item templates
+goal: An item carries its whole configuration — description, location, colour, reminder — so dropping it produces the event you would otherwise have typed by hand.
+state: closed
+position: 50
+
+### M6
+title: Weekly targets
+goal: Optional. An item shows 2/3 for the visible week and dims once its target is met — the feature that turns the sidebar from a shortcut into a planning tool. Build it if the tool sticks.
+state: planned
+position: 60
+
+### M7
+title: Open source and Chrome Web Store launch
+goal: The project is public on GitHub under an open-source licence with a donation link, and listed on the Chrome Web Store with a verified OAuth client, homepage and privacy policy. Usable without a mouse: the keyboard path is a launch blocker.
+state: open
+position: 70
+
+### M8
+title: Backlog
+goal: Smaller items tracked so they are not silently forgotten. Not committed scope; a unit moves to a real milestone when it is picked up.
+state: open
+position: 80
+
+### M9
+title: A sidebar that belongs in Google Calendar
+goal: The pool reads as part of Google Calendar rather than a panel bolted onto it: no "Weekly Pool" title, Google's own surfaces, type and controls, calendars shown the way Google's "My calendars" shows them, and pool items that look like the events they become. Someone who has never seen the extension should assume Google made it. Reference screenshots (private, gitignored): `design-ref/01-our-sidebar-beside-week-view.png`, `02-google-left-sidebar.png`, `03-google-event-editor.png`.
+state: closed
+position: 75
+
+<!-- emerald: open_question.format.md -->
+---
+format: open_question
+title: Open question
+language: 4
+claims: none
+---
+
+A question the project is deliberately carrying: docs/engine.md's H-numbers, docs/status.md's "Open, and carried" list, and the parity gaps that src/parity.test.ts keeps honest.
+
+These live in three files today and the three disagree, because closing one in status.md does not close it in engine.md and nothing checks. A question that is answered in one place and open in another is worse than a question nobody wrote down, and that is what this format is for.
+
+`opened_by` and `answered_by` are both links to a decision, and the pair is the whole shape: a question exists because some decision left it open, and it stops existing because some later decision answered it. A question with an `answered_by` and a `state` of `open` is a contradiction the document can now be asked for.
+
+Both links are optional, and in this migration that is not tidiness — H10 was opened by D-226, which belongs to M19 and has not been migrated, so its `opened_by` is empty because the engine refuses a link to a row that is not there rather than dangling. A partial migration leaves real holes, and they are visible rather than silently wrong.
+
+An open question makes no claim.
+
+| column | type | points at | unit | per | required | values | min | max | note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ref | text |  |  |  | yes |  |  |  | How the project already names it — `H10`, `parity gap #11`. Not the row id. |
+| question | text |  |  |  | yes |  |  |  | The question itself, as a question. A statement of a problem is not one and cannot be answered. |
+| opened_by | link | decision |  |  | no |  |  |  | The decision that left this open. Empty when that decision is not in this document — which is what a partial migration looks like from the inside. |
+| answered_by | link | decision |  |  | no |  |  |  | The decision that answered it. Empty while it is open; a row carrying one with `state: open` is a contradiction worth asking for. |
+| state | enum |  |  |  | yes | open, answered, dropped |  |  | `dropped` is the third state — a question that stopped being worth answering, which is different from one that was answered and different again from one still live. |
+| answer | text |  |  |  | no |  |  |  | The answer in words, for a question answered by a fact rather than a decision — an npm name being free, a support case closed (M44 U5, D-444). A question a decision answered names it in `answered_by`; one answered by a fact says it here, and needs no decision row made up to hold it. |
+
+## rows
+
+### Q-1
+question: Rewrite the git history before it goes public, and how far: drop node_modules/, dist/, .claude/settings.local.json, agent.md and the overview .docx from every commit, or squash to one fresh initial commit?
+answered_by: D-13
+state: answered
+
+### Q-10
+question: What happens to an item's reminder when it becomes an all-day event, where "10 minutes before" would fire at 23:50 the night before: drop it, or use Google's all-day default (the day before at 09:00)?
+opened_by: D-28
+state: open
+
+### Q-11
+question: Should Week and Day view's all-day row take drops too, as all-day events with Shift for weekly, now that all-day placing exists? Today it shows the hint "Drop on a time slot".
+opened_by: D-28
+state: open
+
+### Q-2
+question: Which licence: MIT, or something like GPL-3.0 / MPL-2.0 that keeps forks of a donation-funded project open?
+answered_by: D-20
+state: answered
+
+### Q-3
+question: Which donation channel: GitHub Sponsors, Ko-fi, Buy Me a Coffee, or several via FUNDING.yml?
+answered_by: D-15
+state: answered
+
+### Q-4
+question: Which author identity do public commits carry — the personal Gmail, or the public account's GitHub noreply address?
+answered_by: D-19
+state: answered
+
+### Q-5
+question: Which custom domain hosts the homepage and privacy policy?
+answered_by: D-16
+state: answered
+
+### Q-6
+question: In the light theme, muted #9aa0a6 text on white is 2.6:1 and fails WCAG AA — darken it (e.g. to #5f6368-ish), changing the sidebar's current look, or keep it?
+state: answered
+answer: Darkened, in M9 U9 (5940bc2): the light theme's muted text is #5f6368, Google's secondary grey, about 5.8:1 on its page colour. The dark theme's #9aa0a6 already passed and is unchanged.
+
+### Q-7
+question: Build M6 weekly targets (2/3 per week, dimmed when met) now, or wait until the tool has proven itself in daily use?
+state: open
+
+### Q-8
+question: Should the pool stay a separate sidebar beside Google's left nav, or become part of it — a "Pool" section injected under "My calendars" in Google's own menu — when that menu is open?
+opened_by: D-21
+answered_by: D-23
+state: answered
+
+### Q-9
+question: What does a monthly repeat mean: the same date each month (simple, but a usual dropped on the 29th–31st skips every shorter month), or also Google's "the 2nd Tuesday" and "the last day"? Recommended: the same date, with the tooltip warning on the 29th–31st.
+opened_by: D-28
+state: open
+
+<!-- emerald: review_entry.format.md -->
+---
+format: review_entry
+title: Review entry
+language: 4
+claims: none
+---
+
+What a unit session left for the author to drive: docs/review.md, which reached 1,214 lines and thirty entries with no way to ask which four were live. That file is frozen as of D-238 and this format is what sorts it.
+
+`state` is the column whose absence made the graveyard, and it is the whole reason this format exists rather than the prose staying prose. Thirty entries with no state is a queue nobody can triage; thirty rows with one is four `match` calls. The finding review.md was built on still stands — four real documents, and nothing else, ever rewrote this design — and what failed was the deferral, not the writing down.
+
+An entry is deliberately four prose columns rather than one body. `do`, `should`, `breaks` and `not_tried` are the four questions the file's own template asks, and separating them is what lets a session be handed `breaks` alone: "where nothing checked it" is the half that predicts the next expensive bug, and it was buried in the middle of a bullet list.
+
+`unit` is required. An entry with no unit is a note, and this project already has somewhere to put notes.
+
+A review entry makes no claim — which is gap #1 of the four D-238 predicted, met for the second time in this document.
+
+| column | type | points at | unit | per | required | values | min | max | note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| unit | link | unit |  |  | yes |  |  |  | The unit this is about. Required: an entry with no unit is a note rather than something to drive. |
+| do | text |  |  |  | yes |  |  |  | The screen, the route and the file to open, in order. Named by route and file, never by "the screen you added" — the reader has no memory of the work. |
+| should | text |  |  |  | yes |  |  |  | The figure, the row, the message. Precise enough to be wrong, which is the only kind of claim a review can reject. |
+| breaks | text |  |  |  | no |  |  |  | Where it breaks, usually wherever nothing checked it. Said plainly. This is the column worth reading on its own. |
+| not_tried | text |  |  |  | no |  |  |  | What could not be tried in the session that built it, and why — a real document, a running model, a Mac. |
+| state | enum |  |  |  | yes | open, accepted, fault, dropped |  |  | **The column whose absence made the graveyard.** `open` has not been driven or was outranked and still stands. `accepted` was driven and holds. `fault` was driven and is wrong, and work follows from it. `dropped` stopped mattering — usually because the milestone it belonged to stopped. |
+
+## rows
+
+### 1) npm run build, reload the unpacked extension, open Google Calendar with the hamburger nav OPEN; then in DevTools > Application > Extension storage (local) delete primaryCalendarName and reload. 2) Close the nav with the hamburger, delete primaryCalendarName again, reload, wait 5 s, then open the nav. 3) Reload once more with the nav closed (cache present). 4) Create an item named "חצי חינם" in the calendar "הפתוחה" and one named "workout"; hover each chip; double-click the Hebrew one to rename; open its details and type a Hebrew location and description; drag it over the week grid (with and without Shift) and drop it; press Undo. 5) Open the composer's calendar dropdown and pick "ימי הולדת"; fold and unfold the Hebrew sections; make a calendar empty to see it under "No items yet". 6) Set a display name on a calendar in Google's settings if possible (summaryOverride) and reload.
+unit: M9 U7
+should: 1) The primary section/option/details read "Kfir Raphael Eliyahu", never the account's email address, and primaryCalendarName is written to local storage. 2) With the nav closed it shows the address or the name (whichever the DOM allows) and switches to "Kfir Raphael Eliyahu" within about a second of the nav opening. 3) The name shows at load with no flash of the address beyond the calendar fetch. 4) The Hebrew chip has its name at the right edge with ", 1h" to its left and controls unfolding on the left; "workout" is unchanged (name left, controls right). The rename field, location and description start at the right. The drag preview and loading placeholder show the Hebrew name right-aligned; the tooltip reads "חצי חינם · Sun, Oct 11, 7:00 - 8:00 PM" with the name intact; the toasts read ""חצי חינם" added!" and ""חצי חינם" removed" in correct order. 5) Hebrew section titles and empty rows right-align and truncate with the ellipsis on the left; the closed calendar select shows the Hebrew name right-aligned with correct order; the options list renders RTL. 6) The overridden name appears everywhere.
+breaks: The page matcher in src/names.ts (findPrimaryName): if Google's calendar checkboxes do not carry the calendar name as aria-label/aria-labelledby/<label>, or the Google Account button's aria-label is not in the top document or lacks the name, it silently falls back to the address. If the nav's list is removed from the DOM when closed, step 2 relies on the observer firing when it is re-added. Second most likely: the mirrored chip's hover controls and the duration select's width in RTL, and the right-aligned Hebrew name in the wide calendar select leaving a gap after the colour dot.
+not_tried: Could not load the extension in Chrome or open the real Google Calendar page, so Google's actual DOM for "My calendars" and the account button is assumed, not observed; findPrimaryName was only exercised on a hand-made mock DOM (normal case, other account, list not found, no other calendars, unreadable primary entry). RTL rendering was checked on a mock page with approximate styles, not with content.css in the real sidebar. A Google Calendar UI in Hebrew (html dir=rtl), multiple signed-in accounts (/u/1) and Arabic names were not tried.
+state: accepted
+
+### Calendar Settings → Appearance: switch Light ↔ Dark without reloading.
+unit: M8 U2
+should: Sidebar, tooltip and preview follow within ~3 s.
+not_tried: Device default × OS-theme combinations were not reported separately.
+state: accepted
+
+### Create a Web application OAuth client in the extension's Cloud project with redirect URI https://hkihoifbohighgoackpcinobeabpjnbp.chromiumapp.org/, paste its ID into WEB_AUTH_CLIENT_ID in src/background.ts, build, and load the unpacked extension in Brave. Open Google Calendar in Week view.
+unit: M8 U21
+should: A Google sign-in window opens once; after approving, the sidebar lists the calendars and a drop creates an event. Reloading the tab an hour later still works without a new window. In Chrome, nothing changes: no second sign-in window.
+state: open
+
+### Drag an item over the grid, pressing and releasing Shift mid-drag.
+unit: M3 U2
+should: Tooltip appends “↻ repeats weekly” and the preview turns dashed, toggling live.
+state: accepted
+
+### Drop at the very bottom of a day column.
+unit: M8 U8
+should: 11:45 PM on the same day.
+state: accepted
+
+### Hover an item, click its pencil (Edit details), change the colour, then type a location and pause, and type a description and click away.
+unit: M8 U23
+should: The pencil reads as Edit details. A quiet '✓ Saved' appears and fades after each change: at once for the colour, after a pause in typing or on leaving the field for text. The details still reach the event on the next drop.
+state: open
+
+### In Week view, hold Shift, then press on an item and drag it to a time slot; release with Shift still down. Repeat releasing Shift before letting go, press Escape mid-drag once, and do an ordinary drag without Shift.
+unit: M8 U24
+should: The Shift-first drag shows a grabbing cursor, the tooltip and a dashed ↻ preview, and creates a weekly series; releasing Shift first makes a single event; Escape cancels with nothing created; Google's quick-create dialog never opens. An ordinary drag's tooltip says 'Hold Shift to repeat weekly' until Shift goes down.
+state: open
+
+### Load the new build over an existing pool; rename an item in one tab or machine and watch another.
+unit: M8 U1
+should: The pool is intact after migration; the rename appears elsewhere within ~15 s.
+not_tried: Over-quota fallback (>8 KB description) and two different Google accounts on one Chrome profile.
+state: accepted
+
+### On an item's duration select choose Custom… and type 1h20, then try 20, 1:20, 2.5h and an invalid value; do the same in the composer. Drag the 1h20 item onto the grid.
+unit: M8 U25
+should: Presets now run 15m to 4h; Custom… accepts the forms above rounded to 5 minutes (5m to 24h), Enter sets and Escape keeps the old value, invalid text is refused. The chip reads '1h 20m', and the drag preview, placeholder and created event all span 1h 20m.
+state: open
+
+### Pick an item with its calendar icon, click a time slot, double-click, Shift-click; Escape; then Tab to the icon, Enter, schedule from the form.
+unit: M7 U2
+should: Click-to-place creates the event and Google's quick-create never opens; with nothing picked Google's own clicks work as before; the keyboard form schedules and Escape closes it.
+state: accepted
+
+### Rebuild and reload the extension, open Google Calendar week view (light theme, then dark). 1) Tab to an item's calendar button, Enter: the form opens with focus on the Day field. Pick another day, Tab to Start, Tab to Repeat and choose the weekly option, press Enter. 2) Click the schedule button again, then Shift-click a time on the grid. 3) Open an existing item's details that had a reminder set before this change (e.g. '1 hour before' and 'At start'), and one with 'Default reminder'. 4) On the default one press 'Add notification', type 60 in the count, Tab to the unit, choose hours, then press ×. 5) Open the colour dot dropdown with the keyboard (Tab, Alt+Down or Space), pick Tomato, then 'Calendar colour'. 6) Drop the item onto the grid and open the created event.
+unit: M9 U6
+should: 1) The Repeat option reads 'Weekly on <weekday of the chosen day>' and changes when the day changes; Enter creates a weekly series on that weekday at the chosen time, the toast says 'repeats weekly', and focus returns to the schedule button. 2) Shift-click creates a weekly series even though the form says 'Does not repeat'. 3) '1 hour before' shows '1 | hours', 'At start' shows '0 | minutes', the default one shows 'Add notification'; opening details changes nothing in storage. 4) After Add, focus is in the count showing '30 | minutes'; typing 60 stays '60 | minutes' while typing (stored 60); choosing hours then shows '60 | hours' (stored 3600); × brings back 'Add notification' with keyboard focus on it, and the item then drops with the calendar's default reminders. 5) Every colour option is reachable by keyboard, the field shows only the dot and ▾ with a visible focus ring, the chip repaints immediately, and a screen reader announces 'Colour for <name>' and the colour's name. 6) The event has the item's location, description, colour and one popup reminder of exactly the shown amount. Everything is legible in both themes and nothing overflows the 280px rail.
+breaks: The dot-only colour select (text painted transparent; forced-colours/high-contrast mode may show the text over the dot, or an odd width with Google Sans); NotificationRow's local count/unit resync (an item edited on another machine while the row is open, or blur after typing past 4 weeks); focus moves after Add notification / × (effect-based); Enter in the schedule form on a FieldSelect; the notification row's width with real Google Sans at 248px.
+not_tried: Could not load the extension in Chrome on Google Calendar, so none of the live behaviour, live page colours, real font widths, screen-reader output or Shift paths were exercised. Checked only: tsc, vite build, a node script for the reminder round trip (every minute 0..40320 and the old presets) and the weekday wording, and a static HTML mock with the built CSS in light and dark showing the layout fits.
+state: accepted
+
+### Reload the extension and Google Calendar, week view, light theme, Google's menu closed. (1) Resize the window to about 1000, 700, 450 and 300 px tall, with the pool expanded and the composer open, then with the composer closed, then collapsed to the strip. (2) Make the window narrow enough that Google would scroll sideways and check the bottom edge. (3) With the pool expanded, click Google's ☰ to open its menu, wait, then close it; repeat with the pool already collapsed by you; then with the menu open click the strip's chevron to open the pool, then close the menu. (4) Reload with Google's menu left open. (5) Keyboard only: Tab to "Hide sidebar", Enter; Enter again on the strip's chevron. (6) Switch Google to Dark (Settings > Appearance) and repeat 1 and 3. (7) Optional: set Google's language to Hebrew and reload.
+unit: M9 U8
+should: (1) At every height the "About · Support ↗" footer is fully visible with its top divider and 12 px below the text; the header is 64 px; the list scrolls between them; at ~300 px the composer itself scrolls (thin scrollbar on hover) instead of pushing the footer out. The 40 px strip spans exactly top to bottom. No flashing scrollbar while the composer opens. (2) The page shows no horizontal scrollbar caused by the shift. (3) Opening ☰ turns the pool into the 40 px strip at the same time as Google's nav slides in, and the grid's width barely changes; closing ☰ brings the pool back expanded. If you had collapsed it yourself it stays collapsed. Opening the pool from the strip with the menu open keeps both open until you close the menu, after which the pool stays open. Nothing about this changes the collapsed state stored after a reload with the menu closed. (4) The pool loads straight as the strip, without first sliding to 280 px. (5) Focus lands on the strip's chevron after hiding and on "Hide sidebar" after showing, with a visible ring. (6) Same in dark. (7) Sidebar on the left, English in normal order, Google's layout filling the rest with no gap and no overlap.
+breaks: Detection depends on [role=main] being the grid only: if Google's nav is inside it, the pool never steps aside (harmless, but the feature is dead). If Google animates its nav as an overlay at your window width, the pool also stays (by design). In RTL, if Google's root is positioned with a physical left:0 it would overlap the sidebar by 280 px. overflow-x: clip on Google's root could hide a popup that sticks out past the root's left edge (it was under the sidebar anyway). Repeated ☰ toggling during the 200 ms transition could leave the strip/expanded state one step behind until the next resize or click.
+not_tried: Nothing was run in Chrome: the extension could not be loaded here, so the scrollbar diagnosis of the clipping, the nav geometry threshold (120 px), the transition feel, both themes, focus moves and the Hebrew right-to-left page are all untested. Only `npm run build` and `tsc --noEmit` were run, both clean.
+state: accepted
+
+### Reload the extension and the Google Calendar tab (Week view). In the sidebar footer click Export and open the downloaded usuals-<date>.json. Delete one usual in the sidebar and rename another, then click Import and choose that file. Import the same file again. Then edit the file: change one item's id, and give another a colorId of "99"; import it. Finally import any other .json file.
+unit: M8 U18
+should: Export downloads usuals-2026-10-11.json (today's date) holding every usual under its calendarId with the calendar's name, and the toast says "Exported N usuals". The first import brings back only the deleted usual, at the end of its calendar, and leaves the renamed one renamed: "Imported 1 usual". The second import says "Nothing new to import". The edited file adds the item with the new id as a copy, the colour-99 one without its colour. The unrelated file says "That file is not a Usuals export". After a reload everything imported is still there.
+breaks: Whether a[download] on a blob made in the content script downloads with the given name on calendar.google.com, rather than opening the JSON in a tab. An import big enough to pass sync's 100 KB falls back to "saved on this device only", as any edit would.
+not_tried: Not driven in Chrome; the file format's round trip and validation were run under node only.
+state: accepted
+
+### Reload the extension at chrome://extensions and reload the Google Calendar tab with DevTools open. Use the sidebar: drop an item, click-to-place one, collapse and reopen the sidebar, open and close Google's main menu, resize the window. Check the console shows no [Usuals] lines. Then run localStorage.setItem('usualsDebug', '1') in that console, reload, and repeat; then localStorage.removeItem('usualsDebug'). (Renamed from [WeeklyPool] and wlpDebug in d8326e0, D-27.)
+unit: M7 U9
+should: With the switch off, no [WeeklyPool] log lines at all during normal use. With it on, 'Sidebar injected.' at load, an 'adjustLayout: shifting' line on each collapse, menu toggle and resize, 'Calendar time zone' on each create, and a 'Place' or 'Drop' line with the datekey and date. Removing the key quiets them again at once, without a reload. Events are created exactly as before.
+breaks: Any [WeeklyPool] console.log with the switch off; logs not returning with it on; any change in drop, place, collapse or layout behaviour.
+not_tried: Not loaded in Chrome: only tsc, the build and a grep of dist/content.js and dist/background.js (the one console.log left is inside the gated helper). Not tried with site data blocked for calendar.google.com, where the switch reads as off.
+state: accepted
+
+### Reload the extension at chrome://extensions and reload the Google Calendar tab, in Week view with Google's main menu (☰) open. In Google's left list: create a calendar (⊕ next to Other calendars → Create new calendar, then back), recolour one from its ⋮ menu, rename one in its settings, and delete the new one. Then close Google's menu, recolour a calendar from Settings, and open the menu again. Also make a change in a second tab and come back after a minute.
+unit: M8 U19
+should: Each change shows in the sidebar about a second after Google's own list shows it, with no loading flash: a new calendar appears at the end under the calendars without items, a recolour changes its section's dot and its items' chips, a rename changes the heading, a deleted calendar's section disappears. Items, folded sections and the composer's chosen calendar stay as they were. With the menu closed nothing happens until it is opened again.
+breaks: If Google's rows do not hold the checkbox inside the [data-id] element, the reading is always empty and nothing refreshes (only coming back to the tab after a minute does). A recolour that Google applies without touching a style attribute or the row's children would also be missed.
+not_tried: Nothing driven on the live page: no signed-in Calendar was available to the session. Typecheck and build pass.
+state: accepted
+
+### Reload the extension at chrome://extensions and reload the Google Calendar tab. In Week view, type a name in the composer without adding it. Press d (Day), w (Week), m (Month), y (Year), a (Schedule), and pick a custom view from the view menu. Open Settings (gear) and come back. Hide weekends (view menu) and check Week again. Finally set the default view to Day in Settings and open calendar.google.com/calendar/r directly.
+unit: M8 U17
+should: The sidebar shows in Week (7 days or Mon–Fri) and Day, and is gone in Month, Year, Schedule, the custom view and Settings, where Google's grid fills the whole width with no 280 px gap. The half-typed name is still in the composer after returning. In Day view a drop and a click-to-place land at the slot aimed at, and the schedule form offers only that day. Picking an item and then pressing m un-picks it.
+breaks: A bare /r reads the grid, so it shows for a moment late or not at all if Google draws the grid slowly; a custom 5- or 7-day view starting on the week's first day reads as a week there. A drag in progress when the view changes by keyboard was not handled beyond clearing the tooltip.
+not_tried: Nothing was driven in a real Google Calendar tab: the session had no signed-in Calendar to load the unpacked extension into. Whether Chrome's Navigation API fires currententrychange for Google's pushState in a content script is unverified; the 500 ms check covers it either way.
+state: accepted
+
+### Reload the extension. Calendar Settings → General → Time zone: (GMT-04:00) New York, Windows stays on Israel time; reload the Calendar tab. Week view: gutter reads GMT-04. Drop, click-to-place and keyboard-form an item at 10:00; Shift-drop one at 10:00 on Sun Oct 25. Then set the zone back to Jerusalem and drop at 10:00.
+unit: M8 U14
+should: Console logs `Calendar time zone → {kind:'iana', id:'America/New_York'} …T14:00:00.000Z`; each event shows 10:00–11:00 on the grid (17:00 Israel); the form's Today and default time follow New York; the series stays at 10:00 across both DST changes. Back on Jerusalem: `{kind:'iana', id:'Asia/Jerusalem'}` and the same event as before the fix.
+breaks: If the gutter label is not found on the real DOM, the primary zone is still used — correct unless the primary calendar's zone differs from the display zone.
+not_tried: Not run in Chrome yet.
+state: open
+
+### Remove and reinstall the unpacked extension; then in Google Calendar switch to Month, Year and Schedule view, click Open Week view, and later dismiss the pill with ×. Also open Settings.
+unit: M8 U22
+should: Install opens Calendar in Week view once. In Month/Year/Schedule a small pill at the bottom left offers Open Week view for the same date, in the page's light or dark theme, without moving Google's layout; × hides it for good, also after reload. No pill in Week, Day or Settings.
+state: open
+
+### Run `npm run build`, reload the extension at chrome://extensions, then reload Google Calendar in week view with Google's hamburger menu closed. In DevTools, select the `#weekly-life-pool-sidebar` element and check its inline style for `--wlp-page`. Compare the sidebar's background with Google's top bar right next to it. Hover the category list, then move the pointer away, then Tab into an item row. Hover the collapse chevron. Switch Google Calendar to Dark (Settings > Appearance) and repeat without reloading. Collapse the sidebar to the 40 px strip in both themes.
+unit: M9 U2
+should: `--wlp-page` is set (an rgb() value, about rgb(248, 250, 253) in light). The sidebar and Google's top bar look like one continuous colour, with no line at the sidebar's right edge, in light and in dark (after a dark switch the colour changes within about 3 s, no reload). Text is Google Sans; calendar titles are 16 px medium in normal case (not capitals); item rows are 32 px tall, 4 px apart, names 14 px. The list shows a thin scrollbar thumb only while hovered or while focus is inside it, and no grey track. The chevron's hover is a visible grey circle. In dark the + New item pill is a slightly lighter grey than the sidebar. The collapsed strip uses the same background as the expanded sidebar. Tab still reaches the pill, the chevron and every row with a visible focus ring.
+breaks: The surface read: if Google has no `[role="banner"]`, or its header and ancestors are transparent or semi-transparent, `--wlp-page` is absent and the constants (#f8fafd / #1f1f1f) stand in, which may not match the dark page exactly. Long calendar names at 16 px now truncate with an ellipsis. Hover on the schedule/details panel buttons is now translucent over the panel. Nothing checked the thin scrollbar's actual width on Windows or whether Chrome repaints scrollbar-color on hover.
+not_tried: Could not load the extension into Chrome or open Google Calendar from this session, so nothing visual was seen: the sampled colour, both themes, the strip, scrollbar and type sizes are all unobserved. Only `npm run build` and `tsc --noEmit` were run (both clean).
+state: accepted
+
+### Run npm run build, reload the extension at chrome://extensions, reload Google Calendar in week view. Look at the sidebar header; click "+ New item" twice; hover it. Tab from the page into the sidebar until the pill and then the chevron are focused, and press Enter/Space on each. Switch Google Calendar to Dark (Settings > Appearance) and repeat. Collapse with the chevron, check the 40 px strip, expand again, then reload the page with the form closed.
+unit: M9 U1
+should: No "Weekly Pool" title or calendar icon. Header is the same height as Google's top bar (bottom edges line up, ~64 px). Left: a raised rounded-rectangle button with a plus and "New item" in Google Sans, white with a soft shadow in light, a grey a step lighter than the sidebar in dark, looking like Google's own "Create" next to it; hover deepens the shadow. First click hides the add form and the plus is a plus; next click shows it, focuses the "New item…" input, and the plus has turned into a cross. Both controls show a blue focus ring when tabbed to and act on Enter/Space; a screen reader reads "New item, button, expanded/collapsed". Chevron collapses to the 40 px strip whose button expands again. Form open/closed survives a reload.
+breaks: Google's global button styles beating the !important resets (font, padding or background of the pill wrong); the dark pill colour #37393b not matching Google's real dark Create; the shadow looking too heavy or clipped by the sidebar's overflow:hidden at the top/left edge; the focus ring's 2 px offset clipped at the header's left padding.
+not_tried: Could not load the extension in Chrome or open Google Calendar from this session, so nothing was seen rendered in either theme; checked only that tsc is clean and the build emits the new classes. No screen reader run.
+state: accepted
+
+### Shift-drop an item onto Week view; then Undo from the toast; then a plain drop and Undo.
+unit: M3 U1
+should: A weekly series with no end at the dropped time; Undo on it removes every instance ("Weekly series … removed"); a plain drop's Undo removes only that event.
+state: accepted
+
+### Week view, drop an item; then in DevTools on calendar.google.com: `$$('[data-eventid]').map(e => atob(e.dataset.eventid.replace(/-/g,'+').replace(/_/g,'/')))`
+unit: M8 U3
+should: The placeholder fades as soon as the chip renders. `data-eventid` decodes to `<eventId>_<YYYYMMDD> <calendar email>` (base64url, no padding) — the instance form `waitForEvent` handles.
+not_tried: Day view and Month view chips were not sampled.
+state: accepted
+
+### npm run build, reload the unpacked extension at chrome://extensions. Before reloading Google Calendar, if an older build left the form closed, keep it that way (or run chrome.storage.local.set({formOpen:false}) from the extension's service-worker console). Reload Google Calendar in week view, Light, without clicking anything. 1) Look at the sidebar's top band beside Google's top bar. 2) Press a key Google uses (e.g. 'w', 'm') straight after load. 3) Type a long title (~30 characters) and a Hebrew one. 4) Tab from the title: Add, chevron, calendar, duration, then the list. 5) Click an empty calendar's row under "No items yet". 6) Collapse with the chevron using Enter, then expand from the strip with Enter. 7) Shrink the window to ~300 px tall. 8) Reload while the calendars are loading (or with the network offline for the error state). 9) Switch Google Calendar to Dark and look again.
+unit: M9 U11
+should: No "+ New item" button. The top band is the composer's first row: "Add title" on its underline, the blue Add pill, then the round chevron at the right edge, all vertically centred in a band whose bottom lines up with Google's top bar (64 px); the calendar/duration row and the hint sit under it, then the divider. The composer shows even though an old build stored it closed, and chrome.storage.local no longer has a formOpen key. Nothing in the sidebar takes focus on load, so Google's keyboard shortcuts work at once. Long titles scroll inside the field without pushing Add or the chevron; Hebrew starts at the right. Tab order follows the reading order above. The empty-calendar row selects that calendar (dot and name) and puts the caret in the title. Collapsing moves focus to the strip's chevron, expanding moves it back to the header's chevron. In a short window the header and footer stay whole and the calendar row and hint scroll inside the composer. While loading or on error the header shows only the chevron, at the right. Chips still lift with a shadow on hover, and Add gets its shadow on hover, in both themes.
+breaks: The title field is only ~145 px wide beside Add and the chevron, so typed titles may feel cramped; the 40 px title field may sit a pixel or two off Google's top bar centre line; Google's global button styles beating .wlp-header-hide's margin so the lone chevron sits on the left while loading; the chevron between Add and the calendar field in tab order may feel odd to keyboard users; .wlp-composer as a flex column scroll container squashing its rows instead of scrolling; the renamed --wlp-shadow missing somewhere and leaving the chip/Add hover flat.
+not_tried: Nothing was seen rendered: the extension cannot be loaded into Chrome from this session. Only npx tsc --noEmit and npm run build were run (both clean) and the built CSS was checked for the new classes. The formOpen key removal, focus handling, short-window scrolling, both themes and screen-reader output are untested.
+state: accepted
+
+### npm run build, reload the unpacked extension, open Google Calendar in Light. 1) Click "+ New item" to open the form. 2) Look at it beside Google's own event editor (open any event > More options). 3) Tab from the title: Add (if text typed), calendar dropdown, duration dropdown; on the calendar dropdown press Down/Up, type a calendar's first letter, Alt+Down to open, Escape to close. 4) Type "test" and press Enter; type "test2" and press Shift+Enter. 5) Pick a calendar with a long name. 6) Click an empty calendar's row under "No items yet". 7) Switch Google Calendar to Dark (Settings > Appearance) and repeat 1-2.
+unit: M9 U5
+should: Row 1: "Add title" in 18px on a thin grey underline that turns into a 2px blue line while focused, with a blue "Add" pill to its right (greyed and unclickable while the title is empty). Row 2: a grey field with the selected calendar's round colour dot, its name and a ▾ caret, filling the row, then a grey "1h ▾" field. No chip cloud anywhere. Keyboard: arrows change the calendar and the dot follows; Escape closes the open list and focus stays on the select; a focus ring shows on each select. Enter and Shift+Enter both add the item to the chosen calendar and clear the title with focus kept in it. A long name ends in an ellipsis inside the field, never pushing the duration off the row. The empty-calendar row opens the form with that calendar selected and focus in the title. In Dark, fields are a grey one step lighter than the page (~#2f3133), text light, Add a light-blue pill with dark text.
+breaks: Google's global input/select/button styles beating a rule (a native arrow or border showing, wrong font); the calendar select not shrinking (min-width) so the duration field overflows; field-sizing:content on the duration select being ignored and the field taking its widest option; the --wlp-field colour-mix declared only in the light block resolving with light values in Dark; Lightning CSS's color-mix fallback blocks reordering custom properties.
+not_tried: Nothing was seen rendered: the extension cannot be loaded into Chrome from this session, and serving a static mock on localhost was refused by the permission system, so layout, both themes, ellipsis, focus rings and screen-reader announcements are untested. Only tsc --noEmit and npm run build were run (both clean).
+state: accepted
+
+### npm run build, reload the unpacked extension, open Google Calendar week view (light theme). 1) Look at the list. 2) Click a section's title row (e.g. Work); click it again. 3) Tab to a section title and press Enter/Space. 4) Fold a section, then drag an item from another section onto its title row and drop. 5) Click a row under "No items yet" (e.g. Gaming), type a name, Enter. 6) Drag the only item out of a section into another section. 7) On a second computer or tab, check the fold. 8) Switch Google Calendar to dark theme and repeat 1-2.
+unit: M9 U3
+should: 1) Calendars with items are sections: coloured rounded square, name at 16 px sentence case, chevron pointing up at the right; no eye icon, no "Hidden" strip; empty calendars appear once at the bottom under a single "No items yet" caption as grey rows. Calendars hidden before this update show as folded sections (chevron down, item count). 2) Items disappear and the chevron turns down with a count; second click restores them. 3) Same via keyboard; focus ring visible on the row; screen reader says "<calendar name>, expanded/collapsed, button". 4) The folded title row lights up blue while aimed at; on drop the item is at the top of that section and the section is unfolded. 5) The add form opens (if closed) with Gaming's chip selected and the cursor in the name field; after Enter, Gaming moves up into its own section, unfolded, with the item. 6) The emptied calendar moves down into the "No items yet" rows. 7) The fold matches. 8) Text, hover and drop highlight all readable on the dark surface.
+breaks: Google's global stylesheet overriding the h3/button resets (title row too tall, wrong font, a default button background); the chevron rotation selector; drop highlight on the folded header being covered by the toggle's hover; focus not landing in the name input after clicking an empty row while the form animates open; the section jumping position when it gets its first item or loses its last, which may feel disorienting mid-drag.
+not_tried: Could not load the extension in Chrome, so nothing was seen rendered in either theme, no drag was performed, and no screen reader was run; only npm run build and tsc --noEmit were checked. Cross-device sync of the fold was not tested.
+state: accepted
+
+### npm run build, reload the unpacked extension, open Google Calendar week view in Light. 1) Look at a section with items, including one item given Peacock or Tangerine in its details. 2) Hover a chip, then move away. 3) Click in the page, then Tab into the list until focus reaches an item's duration, Tab on to its calendar icon, press Enter, then Escape. 4) Drag a chip a little and look at the image under the pointer, then over the week grid with and without Shift, and drop. 5) Double-click a name, type, Enter. 6) Drag a chip above another, and onto another calendar's heading. 7) Open details, Duplicate. 8) Switch Google Calendar to Dark (Settings > Appearance) and repeat 1-4.
+unit: M9 U4
+should: 1) Each item is a filled chip in its event colour with 4px corners, 12px text reading "name, 1h" (name medium, duration regular), no controls, text readable on every colour (dark text on Peacock/Tangerine/pastels, white on Tomato/Grape/Blueberry/Basil/Graphite). 2) A soft shadow and the calendar, chevron and x icons appear on hover in the chip's text colour; they vanish on leave and the name widens again. 3) The icons appear as soon as focus is in the row; each icon shows an inset ring in the chip's text colour when focused; Enter opens the schedule form with the icon still visible and the chip ringed blue; Escape returns focus to the icon. 4) The drag image is the chip without icons; over the grid the preview is a solid chip of the same colour with the name and a shadow; Shift dashes its border and adds the repeat glyph; the drop pulses a flat chip of the same colour and the event appears. 5) The rename field sits in the chip in its text colour with an underline and commits. 6) The blue drop line shows between chips and the move lands. 7) A copy appears under the original as a chip. 8) Same results on the dark page; chips keep their colours.
+breaks: The drag image (an off-screen clone passed to setDragImage, removed on the next tick) may come out blank or show the default ghost; field-sizing:content on the duration select may not apply, leaving a gap after the duration; the API's calendar backgroundColor may not equal the colour Google paints the calendar's events, so a chip may not match its grid events exactly, most likely in the dark theme where Google may tint event colours; the ring of the picked chip touches neighbouring chips in the 4px gap.
+not_tried: Nothing ran in Chrome: no extension load, so neither theme, the hover/focus reveal, the drag image, the grid preview, the placeholder or any of the flows were seen. Only npx tsc --noEmit and npm run build were run, and contrast was computed in Node for Google's 11 event colours and some calendar colours.
+state: accepted
+
+### npm run build, reload the unpacked extension, reload Google Calendar in Week view (Light), DevTools console open, at least two calendars with pool items and one without. 1) With ☰ closed, Tab to the sidebar footer's "Dock in Google's menu (experiment)" and press Enter. 2) Open ☰. 3) Close ☰, open it again. 4) Untick and re-tick a pool calendar's checkbox in Google's "My calendars", then tick/untick several quickly. 5) Drag a nested chip onto the week grid and drop; another with Shift held; Undo one from the toast (under the list). 6) Drag a chip onto another calendar's nested list, then onto the Google row of a calendar that has no items. Reorder within one list. 7) Fold and unfold a calendar's items with its count button; check the sidebar after closing ☰. 8) By keyboard: Tab to a chip, open its calendar icon with Enter (schedule popover), Escape; open details with Enter, Tab past the last field; open "+ New item" with Enter, add an item to a calendar without items, Escape. Click outside an open popover. 9) With an item picked, click a time on the grid. 10) Double-click a nested chip to rename. 11) Switch weeks, switch to Day and Month view and back, open Settings (gear) and come back, fold Google's own "My calendars" and unfold it. 12) Switch Google Calendar to Dark (Settings > Appearance) and back with ☰ open. 13) Reload with ☰ open. 14) Press the switch again under the list.
+unit: M9 U10
+should: 1) The button turns blue with a ✓, focus stays on it; nothing else changes while ☰ is closed. 2) The separate sidebar disappears (no 40 px strip), the grid takes the full width beside Google's nav; under each pool calendar with items, indented in line with its checkbox, a small "N items ˄" control and its chips (about 200 px wide, names ellipsized, duration whole); nothing under calendars without items; after the list, before "Other calendars", "+ New item", and the switch; console shows "[WeeklyPool] dock: under N calendar row(s)" once. 3) Closing ☰ brings the sidebar back exactly as before the experiment; reopening docks again with no strip flash. 4) Items stay under their own rows with no visible flicker (at most a "put back (redraw n)" line per change, n rising slowly); no "giving up". 5) Preview, tooltip, placeholder and event creation as from the sidebar; Shift makes it weekly; toast shows under the list and Undo works. 6) The chip moves to that calendar (top of its list); a calendar that had no items gets its own nested list; reorder lands where the line showed. 7) Folding leaves only the count; the sidebar's section for that calendar is folded too. 8) Each popover opens beside the chip/button with focus inside; Escape and Tab-out close it and put focus back on the control that opened it; the new item appears under its calendar's row; outside clicks close it. 9) The event is placed and the popover closes. 10) Rename saves. 11) Items stay under their rows; when "My calendars" is folded the separate sidebar shows instead and the nested items come back on unfold. 12) Colours switch with the page and stay readable, popover too. 13) It docks again after load. 14) The pool returns to the separate sidebar at once, the button shows no tick, still off after a reload. No console errors at any step.
+breaks: Most likely: nothing docks because Google's calendar rows are not found with confidence (row taller than 64 px, the checkbox's direct parent holds other checkboxes, or the primary calendar's name is still the address) — console says "calendar rows not found". Next: Google's renderer removes foreign siblings on every draw so it gives up ("taken out 9 times in a row") or flickers; a virtualized or absolutely positioned list making our containers overlap rows; a duplicate-named calendar (e.g. one in "Other calendars" with a pool calendar's name) silently keeping the sidebar; the indent or ~200 px width too tight; drags starting in the nav blocked or a blank drag image; row drops not reaching our document listener; the popover placed over the wrong spot or behind Google's layers; Google's shortcuts or row handlers no longer firing for clicks inside our containers (they stop propagation); screen readers announcing the list's count oddly with our extra items.
+not_tried: Nothing ran in Chrome against Google Calendar: no extension load, so the anchoring against Google's real nav, its re-render behaviour, drag from the nav, row drops, the popover's position and focus handling, both themes, RTL pages, a narrow window where Google overlays its nav, and screen-reader output were not seen. Ran: npx tsc --noEmit -p tsconfig.json, npm run build, and 26 checks of dock.ts against a hand-made mock nav in Chromium with a virtual clock and manual frames (anchoring, duplicate/missing rules, li/listitem/div rows, redraw and move re-placement, refresh, hidden list fallback, fight give-up, spaced redraws).
+state: dropped
+
+### npm run build, reload the unpacked extension, reload Google Calendar in Week view (Light), DevTools console open. 1) With Google's menu (☰) closed, look at the sidebar footer, Tab to "Dock in Google's menu (experiment)" and press Enter. 2) Open ☰. 3) Close ☰, open it again. 4) In the docked Pool section, drag a chip onto the week grid and drop; drag another with Shift held; Undo one from the toast. 5) Click an item's calendar icon, click a time on the grid; pick again and use the schedule form's Schedule button. 6) Open an item's details, change the notification and colour; double-click to rename; drag an item onto another calendar's title row. 7) Fold and unfold the Pool title row, use its + to open the form and add an item. 8) Switch weeks, switch to Day and Month view and back, open Settings (gear) and come back, fold Google's own "My calendars". 9) Switch Google Calendar to Dark (Settings > Appearance) and back with ☰ open. 10) Reload the page with ☰ open. 11) Press the switch again in the docked footer.
+unit: M9 U10
+should: 1) The button turns blue with a ✓ and focus stays on it; nothing else changes while ☰ is closed. 2) The separate sidebar disappears entirely (no 40 px strip), the grid takes the full width beside Google's nav, and a "Pool" row with a chevron and + appears right after Google's "My calendars" list, above "Other calendars", with the calendar sections and chips under it; console shows "[WeeklyPool] dock: under \"My calendars\"" once. 3) Closing ☰ brings the sidebar back exactly as before the experiment (user's own collapsed choice, page shifted right); reopening docks again, no strip flash. 4) Preview, tooltip, placeholder and event creation work as from the sidebar; Shift makes it weekly; the toast shows inside the Pool section and Undo works. 5) Both place the event; the picked chip is ringed. 6) Edits save; the details' notification row fits on one line without a horizontal scrollbar; move lands. 7) Folding hides everything but the Pool row; the form opens under it. 8) The Pool section stays under "My calendars" (at most a "put back (n)" line per change); if Google folds "My calendars" or the route has no list, the sidebar shows instead and the Pool returns when the list does. 9) Colours switch with the page and stay readable. 10) It docks again after load. 11) The pool returns to the separate sidebar at once, the button shows no tick, and after a reload it is still off. No console errors at any step.
+breaks: Most likely: the dock never appears because Google's "My calendars" title row has no aria-expanded button (or it has aria-haspopup), or the climb meets the mini month first — then the sidebar just stays and the console says "not found". Next: Google's nav re-render removing the foreign node so often it gives up ("giving up for this page"); the section placed inside "My calendars" (after the list rather than after the section) so Google's fold hides it; a drag from inside the nav not starting or the drag image coming out blank (the off-screen clone sits inside Google's nav, which may clip or transform it); Google keyboard shortcuts or nav handlers no longer firing on clicks inside the Pool because the container stops propagation; the composer, schedule form or details too wide for the nav and clipped; focus lost when the switch moves the pool.
+not_tried: Nothing ran in Chrome: no extension load, so the anchor search against Google's real nav, the re-attach behaviour, drag from inside the nav, the fit at the nav's real width, both themes, RTL pages, a narrow window where Google overlays its nav, and screen-reader output were not seen. Only npx tsc --noEmit -p tsconfig.json and npm run build were run.
+state: dropped
+
+<!-- emerald: unit.format.md -->
+---
+format: unit
+title: Unit
+language: 14
+claims: none
+---
+
+One unit of work, as docs/07-roadmap.md writes it: a checkbox, a clause, a date and the decision it produced. The roadmap is the plan of record and it is read end to end far too often — twenty-eight times, measured — because a session that wants to know what U4 was has no way to ask for one line.
+
+A unit is where the project's own cadence lives: one unit per session, then commit and start fresh. So the questions this format has to answer are "which units of M20 are built", "what landed on this date" and "which decision came out of this one", and they are three `match` calls rather than three greps.
+
+`decision` is optional and that is a real state rather than missing data: a unit that was dropped before it was built produced no decision, and a unit still open has not produced one yet. `landed` is empty for the same reason.
+
+`ref` carries its milestone — `M20 U0` rather than `U0` — because a unit id is only unique inside its milestone and a link printed on another format's row has to be readable on its own. `milestone` is kept beside it anyway, because that is what gets filtered on.
+
+`milestone` links to a row of `milestone` and a text document writes it as that row's `ref` (M27 U1); `match:{milestone:M20}` finds it by that name (M27 U2). `files` is what a unit touches, written when it is planned and corrected when it lands, and it replaced the `Files:` line a brief used to end with. `undone_by` is the decision that reversed a unit after it was built, so work undone is counted rather than reconstructed (D-286). `blocks` is the units it waits on, a link to several rows (M27 U2). `in_progress`, `taken_by` and `started` are a session at work on it (M27 U6): a session takes a unit with `update_format_rows`, addressing it by `ref` and expecting it still `planned`, so two that try at once cannot both get it.
+
+A unit makes no claim.
+
+| column | type | points at | unit | per | required | unique | values | min | max | note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ref | text |  |  |  | yes | yes |  |  |  | The unit as the roadmap names it, with its milestone — `M20 U0`, `M20 T1`. Unique on its own, which `U0` is not. |
+| milestone | link | milestone |  |  | yes | no |  |  |  | `M20` — the `milestone` row it belongs to, written by its `ref`. What gets filtered on, which is why it is a column of its own as well as part of `ref`; `match` takes the name as well as the id. |
+| scope | text |  |  |  | yes | no |  |  |  | `engine`, or the pack the unit belongs to — `ledger`. So `match:{state:planned, scope:engine}` is the engine's handoff and a parked pack's planned units never show up in it. |
+| title | text |  |  |  | yes | no |  |  |  | The clause the roadmap gives it, verbatim — `the pack is staged, and the rail is the engine's`. |
+| landed | date |  |  |  | no | no |  |  |  | The day it was committed. Empty for a unit that is open or was dropped, which is a state rather than a missing figure. |
+| decision | link | decision |  |  | no | no |  |  |  | The decision this unit produced. Empty for a unit that produced none — dropped before it was built, or not built yet. |
+| state | enum |  |  |  | yes | no | planned, in_progress, built, dropped |  |  | `built` is committed and in the roadmap as ticked. `in_progress` is a session working on it now, set when it is handed out and moved on when it lands (M27 U6). `dropped` was scoped and then deliberately not built — M20's tail has seven of those and they are the reason this column is not a boolean. |
+| brief | text |  |  |  | no | no |  |  |  |  |
+| files | text |  |  |  | no | no |  |  |  | What the unit touches: written when it is planned and corrected when it lands (D-286). It replaces the `Files:` line a brief used to end with. |
+| undone_by | link | decision |  |  | no | no |  |  |  | The decision that reversed this unit after it was built — M25 U4 by D-283 — so work undone is counted rather than reconstructed from transcripts (D-286). Empty for work that stands. |
+| blocks | links | unit |  |  | no | no |  |  |  | The units that have to be built before this one can be — M27 U3 waiting on U2 (M27 U2, D-300). Several, in order, and empty for a unit nothing holds up. A unit is ready when every one of these is built. |
+| taken_by | text |  |  |  | no | no |  |  |  | Who took it — the driver or the session that set it `in_progress` (M27 U6). Kept after it lands, so a unit says who built it. Called `claimed_by` until D-420: a format's band says Claims, and one word meant two things on one screen. |
+| started | date |  |  |  | no | no |  |  |  | The day it went `in_progress` (M27 U6). Shown beside the state, because a session that dies leaves its unit `in_progress` for ever and only the date says so. |
+
+## rows
+
+### M0 U1
+milestone: M0
+scope: extension
+title: sidebar, drag-and-drop event creation and loading placeholder
+landed: 2026-05-02
+state: built
+brief: Sidebar injected into Google Calendar, items grouped by the user's real calendars, drop on a `[role=gridcell]` creates the event at the snapped 15-minute slot, live tooltip, toasts, collapsible sidebar, pulsing placeholder until Google renders the event.
+files: `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/background.ts`
+
+### M0 U2
+milestone: M0
+scope: extension
+title: extension icons and their generator script
+landed: 2026-09-05
+state: built
+brief: Superseded by M7 U10 (2026-10-12): the blue calendar glyph was replaced by the Usuals icon, and `scripts/generate-icons.mjs` was removed (6599107) because re-running it would have overwritten the new PNGs. The icons' sources are now `icons/icon.svg` and `icons/icon16.svg`.
+files: `icons/`, `scripts/generate-icons.mjs`, `manifest.json`
+
+### M0 U3
+milestone: M0
+scope: extension
+title: manifest.json and icons/ copied into dist/ by the build
+landed: 2026-09-05
+state: built
+files: `vite.config.ts`
+
+### M0 U4
+milestone: M0
+scope: extension
+title: stale-token retry: 401 → removeCachedAuthToken → replay once
+landed: 2026-09-05
+state: built
+files: `src/background.ts`
+
+### M0 U5
+milestone: M0
+scope: extension
+title: month-view / all-day drop guard
+landed: 2026-09-05
+state: built
+files: `src/content.tsx`
+
+### M1 U1
+milestone: M1
+scope: extension
+title: per-item duration
+landed: 2026-09-05
+decision: D-1
+state: built
+files: `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css`
+
+### M10 U1
+milestone: M10
+scope: extension
+title: place a usual in Month view as an all-day event; Shift repeats monthly
+decision: D-28
+state: planned
+brief: Per D-28; settle Q-9 and Q-10 first. (1) calendarGrid.ts: a month-cell test beside isTimeGridCell (a [role=gridcell] with a datekey, inside [role=main], not the mini month in Google's left nav, which is gridcells too; check on the live page), and isWeekOrDayView becomes a check that also accepts /r/month and a bare /r showing a month grid. (2) content.tsx: eventBody gets an all-day form, start {date} and end {date: next day} with no timeZone, and RRULE:FREQ=MONTHLY for Shift; reminders per Q-10. (3) Drag feedback: a highlighted cell and the tooltip "<name> · Sat, Oct 24 · all day · ↻ repeats monthly" instead of the time-grid preview; the loading placeholder either sits in the cell or is skipped for the toast alone. waitForEvent's id match should still work, as month chips carry data-eventid. (4) Click-to-place on a month cell, and a month mode for the schedule form (a date, no start time). (5) README, D-26's view list, and PRIVACY.md's description of what is created.
+files: `src/calendarGrid.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css`, `README.md`, `PRIVACY.md`
+
+### M2 U1
+milestone: M2
+scope: extension
+title: rename in place
+landed: 2026-10-09
+decision: D-5
+state: built
+brief: Built 2026-09-06, committed 2026-10-09 in 1780d72.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`
+
+### M2 U2
+milestone: M2
+scope: extension
+title: reorder and move between calendars by drag
+landed: 2026-10-09
+decision: D-3
+state: built
+brief: Built 2026-09-06, committed 2026-10-09 in 1780d72. Insertion line per D-4.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`
+
+### M2 U3
+milestone: M2
+scope: extension
+title: duplicate
+landed: 2026-10-09
+decision: D-5
+state: built
+brief: Built 2026-09-06, committed 2026-10-09 in 1780d72.
+files: `src/components/PoolSidebar.tsx`
+
+### M3 U1
+milestone: M3
+scope: extension
+title: Shift on drop adds RRULE:FREQ=WEEKLY
+landed: 2026-10-09
+state: built
+brief: bf6e607. `e.shiftKey` on drop → `recurrence: ['RRULE:FREQ=WEEKLY']`. `eventBody` already sent the IANA `timeZone` on start and end, which recurrence requires. A plain drop's body is unchanged.
+files: `src/content.tsx`, `src/background.ts`
+taken_by: agent 1 (M3 + M8 U3), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M3 U2
+milestone: M3
+scope: extension
+title: live "repeats weekly" tooltip and a distinct recurring preview
+landed: 2026-10-09
+state: built
+brief: bf6e607. Tooltip appends `· ↻ repeats weekly` live from `dragover.shiftKey`; preview gets `wlp-preview-recurring` (dashed border, ↻ glyph); toasts say "weekly".
+files: `src/content.tsx`, `src/content.css`
+blocks: ["M3 U1"]
+taken_by: agent 1 (M3 + M8 U3), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M3 U3
+milestone: M3
+scope: extension
+title: 5-second undo after drop
+landed: 2026-10-09
+state: built
+brief: f6064bd. Success toast holds 5 s with Undo; `DELETE_EVENT` in background.ts through `authedFetch` (401 retry kept; 410 counts as success). A recurring event's delete removes the series and the toast says so. Only the latest drop is undoable (the target lives on the toast). A successful Undo fades a still-pending placeholder.
+files: `src/content.tsx`, `src/background.ts`
+taken_by: agent 1 (M3 + M8 U3), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M4 U1
+milestone: M4
+scope: extension
+title: event / task switch
+decision: D-2
+state: dropped
+
+### M5 U1
+milestone: M5
+scope: extension
+title: item templates: description, location, colour, reminder
+landed: 2026-10-09
+decision: D-6
+state: built
+brief: Built 2026-09-06, committed 2026-10-09 in 1780d72.
+files: `src/poolItem.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css`
+
+### M5 U2
+milestone: M5
+scope: extension
+title: drag preview and placeholder in the item's colour
+landed: 2026-10-09
+decision: D-7
+state: built
+brief: Built 2026-09-06, committed 2026-10-09 in 1780d72.
+files: `src/content.tsx`, `src/content.css`
+
+### M5 U3
+milestone: M5
+scope: extension
+title: capture an existing calendar event into the pool
+landed: 2026-09-05
+state: built
+brief: Drag onto the sidebar, then an Add to pool button in Google's event dialog. Removed in 4ab49c5.
+undone_by: D-9
+
+### M6 U1
+milestone: M6
+scope: extension
+title: targetPerWeek on the item, as a chip on the row
+state: planned
+files: `src/poolItem.ts`, `src/components/PoolSidebar.tsx`
+
+### M6 U2
+milestone: M6
+scope: extension
+title: count the visible week's events and dim an item once its target is met
+state: planned
+brief: `events.list` with `timeMin`/`timeMax` for the visible week, matching on `summary` (read is covered by `calendar.events.owned`). Derive the visible week from the datekeys in the current view — reuse `findDatekey` / `datekeyToDate` in `content.tsx` rather than parsing the URL. Cache counts per (calendar, week) and invalidate on drop, or the sidebar refetches on every render.
+files: `src/content.tsx`, `src/background.ts`, `src/components/PoolSidebar.tsx`
+blocks: ["M6 U1"]
+
+### M7 U1
+milestone: M7
+scope: publishing
+title: narrowed OAuth scopes and owner-only calendar filter
+landed: 2026-10-09
+decision: D-8
+state: built
+brief: Built 2026-09-06, committed 2026-10-09 in 7df4170. Check the Cloud consent screen lists both new scopes.
+files: `manifest.json`, `src/components/PoolSidebar.tsx`, `README.md`
+
+### M7 U10
+milestone: M7
+scope: publishing
+title: the Usuals icon replaces the placeholder calendar glyph
+landed: 2026-10-12
+state: built
+brief: 6599107. Designed in a Cowork session from a prompt written here: three rounded event chips in Google Calendar event colours (Banana #F6BF26, Peacock #039BE5, Sage #33B679), the middle one pulled out to the right as if being dragged onto the week; a label bar, soft shadow and diagonal facet on each; no text, no calendar page, no Google logo (D-27). `icons/icon.svg` (128, artwork in Chrome's 96×96 safe area with 16 px padding) is the source for 32 to 128 px; `icons/icon16.svg` is a hand-tuned, pixel-aligned 16 px version (flat chips, only the middle one labelled), checked against an auto-downscale at ×8 and kept because it is sharper. The four PNGs (RGBA, 16/32/48/128) were exported in the Cowork session; manifest.json unchanged. `scripts/generate-icons.mjs` (M0 U2) drew the old glyph and would have overwritten them, so it is removed (6599107); there is no in-repo exporter now, and a change to the icon means re-exporting the PNGs from the SVGs. The SVGs are also copied into dist/ by M0 U3's build step (small; can be excluded from the store zip if wanted). Handed to site.emd's inbox the same day. Open risk: the three colours are three of the four hues of Google's logo (shades differ, no red); if Web Store or OAuth review calls it Google-like branding, recolour one chip. Unverified: not seen in Chrome's toolbar on a real profile.
+files: `icons/icon.svg` (new), `icons/icon16.svg` (new), `icons/icon16.png`, `icons/icon32.png`, `icons/icon48.png`, `icons/icon128.png`, `scripts/generate-icons.mjs` (removed)
+taken_by: the google-calendar-pool session, with a Cowork session for the design
+started: 2026-10-12
+
+### M7 U11
+milestone: M7
+scope: publishing
+title: OAuth verification: scope justifications and a demo video
+landed: 2026-10-17
+decision: D-34
+state: built
+brief: "Submit Google's OAuth verification for the calendar-usuals project (D-34). **Submitted by the author on 2026-10-15; approved by 2026-10-17 (D-35)** for `calendar.events.owned`.\n\nJustifications as submitted, drafted 2026-10-14 from src/background.ts:\n- calendar.calendarlist.readonly: Usuals shows the user's saved usual events in a panel beside Google Calendar, grouped under the user's own calendars with each calendar's name and colour. It reads the calendar list (calendarList.list) only to show those groups and to let the user choose which calendar a usual belongs to. It does not read events or calendar contents.\n- calendar.events.owned: When the user drags a usual onto a time, or schedules it with the day and time form, Usuals creates that one event (events.insert) in the calendar the user chose, which must be one they own. If the user clicks Undo right after, it deletes that same event (events.delete). It never reads, changes or deletes any other event. events.owned is the narrowest scope that allows creating events in the user's own calendars.\n\nThe demo video as made: a first plan of ten captioned shots was more than Google asks, so the author recorded a simpler one: 55 s, silent, no captions (Captura, 2026-10-15). It shows the store page and install; the extension's manifest at chrome-extension://hkihoifbohighgoackpcinobeabpjnbp/manifest.json with `oauth2.client_id` highlighted at about 0:08; Google Calendar opening the sign-in popup by itself, the account chooser, the unverified-app warning and the consent screen naming Usuals with both permissions ticked; the panel showing the account's calendar; a usual added, dragged onto the week, opened in Google's own event view, another placed and undone, and the Schedule form. The demo account was a new Gmail made for it, in a fresh Chrome profile. The popup's address bar shows accounts.google.com but cuts the URL before client_id, so the manifest shot is the one that shows it. Uploaded to YouTube as Unlisted on the demo Gmail account's channel, because YouTube is switched off for me@kfireliyahu.com; its link is not recorded here.\n\nTo get the consent screen again on an account that has already granted access: revoke Usuals at myaccount.google.com/connections and reload Calendar (authedFetch drops the revoked token and asks again), or revoke it at chrome://identity-internals. Uninstalling and reinstalling the extension does not, since the grant lives in the Google account.\n\n**Checked 2026-10-17, answering D-35's open points:** Google Auth Platform → Audience reads publishing status **In production**, user type **External**. So Testing mode did not cause the friend's request-access screen of 2026-10-16; the likelier cause is a work or school account whose admin restricts apps (or blocks unverified ones, which verification may now have cleared). Not yet retried. The same page's OAuth user cap reads **2 users / 100**: Google accounts that granted access while a requested scope was unapproved, counted for the project's lifetime and never reset. Google says the cap does not apply once every sensitive or restricted scope requested is approved, and that an \"unverified app\" screen means a requested scope is still unapproved. The author's fresh sign-in after approval showed no such screen, so `calendar.calendarlist.readonly` needs no approval of its own (it is not sensitive); nothing more to submit. The 2 counts Google accounts; the store's 4 users count Chrome installs."
+taken_by: the author, with a Claude Code session drafting
+started: 2026-10-15
+
+### M7 U2
+milestone: M7
+scope: publishing
+title: keyboard path: select an item, then pick a slot
+landed: 2026-10-09
+decision: D-10
+state: built
+brief: dfc53ea. A calendar-icon button on each row picks the item (Enter/Space/click; Escape un-picks). An inline form offers Day (the visible week's days, else today + 6), Start (15-min steps), Repeat weekly. While picked, a click on a time-grid cell places it, and Shift-click makes it weekly; window-capture listeners swallow Google's own click-to-create only then, plus a 500 ms double-click guard. Drop, click and form share one `createFromItem`. Datekey helpers moved to `src/calendarGrid.ts`. Toasts live in a `role=status` region, errors in `role=alert`. Main risk, unverified: whether Google's quick-create still opens on click-to-place.
+files: `src/calendarGrid.ts` (new), `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css`, `README.md`
+taken_by: agent 2 (keyboard path), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M7 U3
+milestone: M7
+scope: repo
+title: decide on the history rewrite and clean the repo for publication
+landed: 2026-10-09
+decision: D-13
+state: built
+brief: Two `git filter-repo` passes, in place with `--force` (D-13): `--invert-paths` dropped `node_modules/`, `dist/`, `.claude/`, `agent.md` and the overview .docx from every commit (~27 MB → ~96 KB); `--mailmap` rewrote every author and committer to `Kfir Raphael Eliyahu <me@kfireliyahu.com>` (D-19). Verified: no object holds the old address. The pre-rewrite bundle was moved to the Recycle Bin on 2026-10-09; emptying the bin removes it for good (D-17).
+files: whole history; `.gitignore`
+taken_by: Claude Code session, google-calendar-pool
+started: 2026-10-09
+
+### M7 U4
+milestone: M7
+scope: repo
+title: licence, CONTRIBUTING note and donation link in the README
+landed: 2026-10-10
+decision: D-25
+state: built
+brief: Done: FUNDING.yml (D-15), LICENSE + package.json + lockfile + README Support and License sections (D-20), and 5b3e027: CONTRIBUTING.md (issues welcome, pull requests not accepted for now, D-25) linked from the README's License section.
+files: `LICENSE`, `README.md`, `.github/FUNDING.yml`, `package.json`, `CONTRIBUTING.md`
+blocks: ["M7 U3"]
+taken_by: Claude Code session, google-calendar-pool
+started: 2026-10-09
+
+### M7 U5
+milestone: M7
+scope: repo
+title: push the rewritten history to a fresh repository, github.com/kfireliyahu/calendar-usuals
+landed: 2026-10-11
+decision: D-17
+state: built
+brief: Pushed on 2026-10-11 by a session at the author's request, as a PRIVATE repository: https://github.com/kfireliyahu/calendar-usuals (gh, account kfireliyahu), default branch `main` (the local branch was renamed from master), remote `origin`. Not a transfer (D-17). Before the push the history was rewritten a second time (D-30): the old personal address removed from code comments in every commit, the first two commit messages reworded. Still to do before it goes public: delete `F:\projects\google-calendar-pool.before-usuals-rewrite.bundle` (the pre-rewrite history, which still holds the address) once the new repository is checked, and make sure the first pre-rewrite bundle is gone from the Recycle Bin; then flip visibility to public on launch day.
+blocks: ["M7 U3","M7 U4"]
+taken_by: Claude Code session, google-calendar-pool
+started: 2026-10-11
+
+### M7 U6
+milestone: M7
+scope: publishing
+title: homepage and privacy policy
+landed: 2026-10-12
+decision: D-16
+state: built
+brief: Live 2026-10-12 on kfireliyahu.com (D-16), built by the site session: https://kfireliyahu.com/calendar-usuals and https://kfireliyahu.com/calendar-usuals/privacy, GitHub Pages from kfireliyahu/kfireliyahu.github.io, GitHub-issued certificate for the apex and www (to 2027-01-10, auto-renewed); www and http:// redirect (301) to https://kfireliyahu.com. Checked here the same day: the entry page's <title> and og:site_name are exactly "Usuals", with "Works with Google Calendar" beneath, the Google LLC trademark line, and a link to the policy; the policy page's og:site_name is "Usuals", and its <title> and h1 read "Usuals Privacy Policy" (the name still leads, which is what OAuth verification compares). The policy is PRIVACY.md word for word, Export bullet and Google API Services / Limited Use section included, effective 12 October 2026; PRIVACY.md's own Effective line set to the same day. The entry page also carries the demo clips, the store screenshots as poster, the icon, and a Chrome Web Store button marked "Coming soon": send site.emd the listing URL when it is published. PRIVACY.md is the source: when it changes, send site.emd a new inbox row. Next (D-18): start OAuth verification now.
+taken_by: the site session (site.emd S1 U5, S1 U13)
+started: 2026-10-12
+
+### M7 U7
+milestone: M7
+scope: publishing
+title: sidebar footer link and homepage_url
+landed: 2026-10-09
+state: built
+brief: 8338e64. Footer link "About · Support ↗" to `HOMEPAGE_URL`, now https://kfireliyahu.com/calendar-usuals (d8326e0, D-27; was /weekly-life-pool) (one constant in PoolSidebar.tsx; manifest.json repeats it as `homepage_url`). Pinned with an auto top margin, not sticky; absent when collapsed. The page itself does not exist yet (M7 U6).
+files: `src/components/PoolSidebar.tsx`, `manifest.json`
+blocks: ["M7 U6"]
+taken_by: agent 3 (links + polish), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M7 U8
+milestone: M7
+scope: publishing
+title: draft store upload, pinned key, new OAuth client
+landed: 2026-10-14
+decision: D-11
+state: built
+brief: "Order per D-11, amended by D-29 (reuse the calendar-usuals client: move its Item ID to the store id or pin the store key). Registration (5 USD, once) and publisher account: me@kfireliyahu.com; non-trader, declared by the author 2026-10-13; own launch day (D-18). Publisher name: Kfir Raphael Eliyahu, the real name, as on the commits (D-19). Done 2026-10-13: draft item uploaded; store id `hkihoifbohighgoackpcinobeabpjnbp`, checked against the public key (SHA-256 of the key's DER, first 32 hex digits as a–p); the key pinned as `key` in manifest.json so every unpacked build has that id. `npm run package` builds and writes release/usuals-<version>.zip (scripts/package.mjs: a plain ZIP from dist/, manifest without `key`, icon SVGs left out, source maps kept). Summary reworded to \"usual events\" (e946f6f), the ZIP rebuilt. Listing text, privacy-practices answers and test instructions drafted in store-listing.md (uncommitted); promo tile 440×280 and the two 1280×800 screenshots in design-ref/demo/store/. **Submitted for review by the author on 2026-10-13**; site.emd told the same day.\n\n**Approved and published by 2026-10-14**, automatically on approval (D-31): https://chromewebstore.google.com/detail/usuals/hkihoifbohighgoackpcinobeabpjnbp. OAuth verification was not done first: the consent screen is unverified (D-34), which is M7 U11. 0.1.1, the Information density fix (M8 U20), was submitted by the author on 2026-10-14 through Package → Upload new package. Five new 1280×800 screenshots in the style of Adobe Acrobat's listing (a headline and subline, the week in a browser window with a ring on the part that matters, a magnified card of it, a round icon badge) were made 2026-10-14 in design-ref/demo/store/listing/ as RGB PNGs, their HTML source and crops in listing/src/; whether they went up with 0.1.1 is not recorded here. site.emd was sent the listing URL on 2026-10-14 (its inbox, state new). Not confirmed here: the client's Item ID moved to the store id, the consent screen in production. Left from this unit's list, now elsewhere: make the repository public and delete the pre-rewrite bundle (M7 U5, D-31)."
+files: `manifest.json`, `scripts/package.mjs` (new), `package.json`, `README.md`, `.gitignore`
+blocks: ["M7 U2","M7 U6"]
+taken_by: the google-calendar-pool session, with the author in the dashboard
+started: 2026-10-13
+
+### M7 U9
+milestone: M7
+scope: extension
+title: quiet the [WeeklyPool] debug logs before the store build
+landed: 2026-10-10
+state: built
+brief: b8c2b28. The five debug traces (adjustLayout's shift on every resize, the time zone per create, Place and Drop datekeys, 'Sidebar injected') go through debugLog in src/debug.ts, which prints only when localStorage wlpDebug is '1' on calendar.google.com: localStorage.setItem('wlpDebug','1') in DevTools turns them on (read per call, so at once; reload for the load-time one), removeItem turns them off, no rebuild; README's Getting started says so. Always on, as console.warn/error, because a bug report needs them and they carry no personal data: failed sync and failed local save, invalid or unresolvable datekeys, a missing layout root, a cell with no date (now logs its datekey instead of the DOM cell, which could carry event titles), and a sidebar that fails to render. calendarZone.ts, names.ts and background.ts had no console calls; dist holds only the gated console.log.
+files: `src/debug.ts`, `src/content.tsx`, `src/layout.ts`, `README.md`
+taken_by: agent 12 (quiet logs), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M8 U1
+milestone: M8
+scope: extension
+title: chrome.storage.sync so the pool follows the user between machines
+landed: 2026-10-09
+state: built
+brief: 0d5ab2e. Layout in `chrome.storage.sync`: `item:<id>` per item, `order:<calendarId>` id lists, `hiddenCategories`, `poolSchema: 1` (written only with real content). Per-item keys keep each under 8 KB and let two machines edit different items; cap ~500 items. Sidebar UI state stays local. Migration: unsynced local edits (`poolMirror`) > sync if `poolSchema` > one-time copy of old local `poolItems` (old keys left as backup). Writes coalesced (1.5 s idle, 10 s max, 5 s apart; flushed on hide). Size-quota errors → local-only with a once-per-page toast; rate errors retried in 60 s. `onChanged` merges per key, ignores echoes, keeps open forms. Items of calendars not in this account are now kept rather than deleted on save. Tested against a fake quota-enforcing chrome.storage (24 checks), not in Chrome.
+files: `src/poolStore.ts` (new), `src/components/PoolSidebar.tsx`, `src/poolItem.ts`, `README.md`
+taken_by: agent 4 (storage.sync), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U10
+milestone: M8
+scope: extension
+title: remaining accessibility gaps: focus after Undo, dropdown names, round icon button rings
+landed: 2026-10-09
+state: built
+brief: 7d52b40. After a keyboard Undo, focus moves to the item's schedule button (or the focusable toast region if the row is gone); mouse focus untouched. Duration/reminder selects have aria-labels. Header and collapsed-strip icon buttons get the shared focus ring.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`
+taken_by: agent 5 (dark mode + a11y), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U11
+milestone: M8
+scope: repo
+title: package.json version matches the manifest's 0.1.0
+landed: 2026-10-09
+state: built
+brief: 336e77d. Was 1.0.0 in package.json and the lockfile root.
+
+### M8 U12
+milestone: M8
+scope: extension
+title: sync edge cases: simultaneous first run, orphaned calendars, two tabs over quota
+state: planned
+brief: Found by agent 4, left alone: (1) two machines with different old local pools updating before sync carries the first combine both pools instead of sync winning — nothing lost; (2) items of deleted or no-longer-owned calendars stay in sync forever and count against 100 KB; (3) two tabs on one machine while over quota can overwrite each other's local mirror; (4) the over-quota toast reappears each page load.
+files: `src/poolStore.ts`
+
+### M8 U13
+milestone: M8
+scope: extension
+title: last accessibility and CSS leftovers
+landed: 2026-10-09
+state: built
+brief: 7ff6587 (dead CSS removed; its message wrongly says chips replaced a dropdown), 723d00a (aria-labels on description/location/rename; focus ring on chips, swatches, Duplicate; error text #c5221f, 4.9:1), 1bc6eac (README Tailwind note), fa96bc7 (info #1967d2 4.7:1, success #137333 5.2:1). Review fixes in the same pass: f1ee8a7 (scroll listener leak on a second placement), 9371809 (a finished fade hid the next preview), 2024e06 (CREATE_EVENT read no `lastError`), e004612 (sidebar unmounted after an extension reload). Also 9564028: new item names trimmed.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`
+taken_by: agent 6 (review + leftovers), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U14
+milestone: M8
+scope: extension
+title: drops land at the wrong hour when Google Calendar's time zone differs from the OS
+landed: 2026-10-10
+state: built
+brief: 0b8aa21. Zone choice (`resolveCalendarZone`): the primary calendar's `timeZone` from calendarList if it agrees with the grid's `GMT±hh` gutter label (or no label is found); else the browser zone if it agrees; else the label as a fixed offset (`Etc/GMT∓N`, sign inverted, for whole hours); else the browser zone as before. "Agrees" = shows that offset within 7 days, because the label prints one offset per week. `wallToInstant` converts via Intl `formatToParts`, DST-safe. The schedule form's Today and default time use `calendarNow()`. Same-zone bodies proven byte-identical across every 15-min slot of 2026 in six browser zones. Unverified: the label finder on Google's real DOM, and whether the API accepts `Etc/GMT∓N`.
+files: `src/calendarZone.ts` (new), `src/calendarGrid.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx`
+taken_by: agent 7 (time zone), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M8 U15
+milestone: M8
+scope: extension
+title: overlapping placements share one placeholder element
+state: planned
+brief: A second drop/click/schedule before the first resolves moves the placeholder; the first's chip or error can hide the second early. Cosmetic. Fix = one element per placement. Found by the reviewer.
+files: `src/content.tsx`
+
+### M8 U16
+milestone: M8
+scope: extension
+title: small sync and UI races found in review
+state: planned
+brief: (1) A remote move of a picked item remounts its row and the form's autoFocus steals focus. (2) An `onChanged` arriving between a local commit and its save effect could revert that edit (rare, unconfirmed). (3) With an item picked, the all-day row says "Switch to Day or Week view" even in Week view. See also M8 U12.
+files: `src/poolStore.ts`, `src/components/PoolSidebar.tsx`
+
+### M8 U17
+milestone: M8
+scope: extension
+title: the sidebar shows in Week and Day view only
+landed: 2026-10-11
+decision: D-26
+state: built
+brief: 4f93103. isWeekOrDayView() and watchWeekOrDayView() in src/calendarGrid.ts read the view from the path after /r/, or from the grid's day columns on a bare /r; checked on the Navigation API's currententrychange and every 500 ms. content.tsx hides the mount (display none, starts hidden), calls resetLayout() from layout.ts, puts a picked item back (poolPickDone) and clears a pulsing placeholder; poolSidebarToggle only shifts the page while the view is shown. Hints now say 'Drop on a time slot' / 'Click a time slot to place here'. Known gap: a custom 5- or 7-day view starting where a week would reads as a week on a bare /r.
+files: `src/calendarGrid.ts`, `src/content.tsx`, `src/layout.ts`, `src/components/PoolSidebar.tsx`, `README.md`
+taken_by: Claude Code session, google-calendar-pool
+started: 2026-10-11
+
+### M8 U18
+milestone: M8
+scope: extension
+title: export and import the usuals as a JSON file
+landed: 2026-10-11
+state: built
+brief: 307e70a. Export and Import buttons at the start of the sidebar footer (shown once the pool has loaded). src/poolTransfer.ts: buildExport writes {format: "usuals-export", version: 1, exportedAt, calendars: [{calendarId, name?, folded?, items}]} for every calendar the pool holds anything for, those of other accounts included, as usuals-YYYY-MM-DD.json (Blob + a[download], no new permission); parseExport rebuilds each item from PoolItem's fields only (id and name required, durationMin 1-1440, reminderMin 0-40320, colorId one of Google's 11, text fields non-blank), counts and skips the rest, and refuses a non-export or a newer version with a toast-worded ImportError. Decided: import only adds (merge by id), never replaces or overwrites, so importing twice changes nothing. poolStore.mergePool appends new ids at the end of their calendar's order, unions the folded calendars, writes through the mirror and sync flush, and notifies subscribePool listeners. loadPool now returns the current pool once loaded instead of the first reading's cached promise (also fixes M8 U19's quiet refresh reading stale storage). Toast: "Imported N usuals", plus how many are for calendars this account does not have (kept, not shown) and how many were unreadable. Format round-trip and validation checked with a node script; not driven in Chrome. README feature and structure, PRIVACY.md Your choices updated.
+files: `src/poolStore.ts`, `src/components/PoolSidebar.tsx`, `README.md`, `PRIVACY.md`
+taken_by: Claude Code session, google-calendar-pool
+started: 2026-10-11
+
+### M8 U19
+milestone: M8
+scope: extension
+title: the sidebar picks up added, removed and recoloured calendars without a reload
+landed: 2026-10-11
+state: built
+brief: a67f1be. names.ts watchCalendarList(): a reading of Google's "My calendars" rows, each checkbox inside a [data-id] row as `data-id name --checkbox-color`, taken on body mutations (childList, and style/aria-label/data-id attributes) at most once a second; a different, non-empty reading calls back. An empty reading (Google's menu closed, list not drawn) is skipped, and the first drawing is not a change. PoolSidebar.tsx: fetchCalendars(quiet) refetches LIST_CALENDARS without the loading state; a failure only logs a warning; calendars still listed keep their items, hidden flag and the composer's choice from current state, new ones take what storage holds; the primary-name lookup is kept when unchanged. visibilitychange to visible also refetches, at most once a minute (VISIBLE_REFETCH_MS). The Retry button now calls fetchCalendars() rather than passing the click as `quiet`. Unverified on the live page: that each calendar row's checkbox sits inside the [data-id] row (D-23 saw data-id and --checkbox-color on the rows).
+files: `src/components/PoolSidebar.tsx`, `src/names.ts`
+taken_by: Claude Code session, google-calendar-pool
+started: 2026-10-11
+
+### M8 U2
+milestone: M8
+scope: extension
+title: dark mode to match Google Calendar's dark theme
+landed: 2026-10-09
+state: built
+brief: 5a213e2, 4d114ac, 9d4c0d2. All colours are `--wlp-*` variables (light/dark) on the sidebar root, tooltip and preview, switched by `data-wlp-theme`. Detection (theme.ts): luminance of the first ≥50%-opaque background walking up from `[role=main]` to `<html>` (dark below 0.18), else `<html>`'s `color-scheme`; re-checked on html/body attribute changes, body/head children, OS scheme changes, and every 3 s while visible. No Google class names assumed. `color-scheme: dark` for native controls. Text on calendar/event colours now picks white or #202124 by contrast. Light-theme side effects: the sidebar now paints white (was transparent), Retry is #1a73e8.
+files: `src/theme.ts` (new), `src/content.css`, `src/content.tsx`, `src/components/PoolSidebar.tsx`, `README.md`
+taken_by: agent 5 (dark mode + a11y), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U20
+milestone: M8
+scope: extension
+title: the time grid at any Information density: hours are measured, not assumed 60 px
+landed: 2026-10-14
+state: built
+brief: Found 2026-10-14 by the author with a fresh Google account whose Calendar Settings → Information density was "Comfortable" (theirs is "Responsive to your screen", which draws an hour 60 px tall). At Comfortable the hours are shorter, so no day column passed isTimeGridCell's 20 × 60 px floor: at a bare /r URL, where isWeekOrDayView reads the view from the grid, the sidebar never showed (switching to Day and back gave /r/week, which skips the grid read), and every drop said "Drop on a time slot". Fixed in d791710: calendarGrid.ts measures pixelsPerMinute from the day column's own height, which always spans midnight to midnight, and drop time, the drag preview and the loading placeholder in content.tsx all scale by it; the floor is now 24 × 16 px, still well over month cells and the all-day row. Tested by the author on their own account switched to Comfortable. Released as 0.1.1 (63ea416; release/usuals-0.1.1.zip, built by npm run package), submitted to the store by the author on 2026-10-14, **approved and published by 2026-10-15**; installed copies update themselves.
+files: `src/calendarGrid.ts`, `src/content.tsx`, `manifest.json`, `package.json`, `package-lock.json`
+taken_by: Claude Code session, calendar-usuals
+started: 2026-10-14
+
+### M8 U21
+milestone: M8
+scope: extension
+title: sign-in works in Brave and other Chromium browsers without Chrome's account
+landed: 2026-10-17
+decision: D-36
+state: built
+brief: Friend test 2026-10-17: Brave said not authorized / set up incorrectly. background.ts getAccessToken uses chrome.identity.getAuthToken only, which needs Chrome's own Google sign-in and is not supported in Brave (nor reliably in Edge, Opera, Arc). Fall back to chrome.identity.launchWebAuthFlow when getAuthToken fails: a Web application OAuth client in the same Cloud project with redirect https://<ext-id>.chromiumapp.org/, same two scopes; refresh with interactive:false (prompt=none) when the 1h token expires. Check the verified consent screen covers the new client.
+files: src/background.ts, README.md
+
+### M8 U22
+milestone: M8
+scope: extension
+title: a first-run user in Month view is led to Week view
+landed: 2026-10-17
+state: built
+brief: Friend test 2026-10-17: his Calendar opened in Month, where the sidebar hides (M8 U17), so after signing in he never saw what he added. On install open calendar.google.com/calendar/r/week; and in Month/Schedule/Year show a small Usuals pill offering 'Open Week view' instead of hiding outright. Not an automatic redirect on every visit. M10 U1 (placing in Month) is the longer answer.
+files: src/weekNudge.ts, src/background.ts, src/content.tsx, src/content.css, README.md, PRIVACY.md
+
+### M8 U23
+milestone: M8
+scope: extension
+title: edits to an item's details show they were saved, and the details button reads as edit
+landed: 2026-10-17
+state: built
+brief: Friend test 2026-10-17: location, notification, colour and description autosave with no feedback, so he did not know it saved; and the button that opens details was not recognisable as edit. Add a brief 'Saved' tick in the details panel after a change, and make the details control a pencil/'Edit details' (or open details on clicking the chip).
+files: src/components/PoolSidebar.tsx, src/content.css, README.md
+
+### M8 U24
+milestone: M8
+scope: extension
+title: Shift held before the drag starts still repeats weekly
+landed: 2026-10-17
+decision: D-37
+state: built
+brief: Friend test 2026-10-17 (Windows): Shift pressed before starting the drag did not make the drop weekly; Shift pressed mid-drag does. The drop reads e.shiftKey from the drop event. Suspects: Shift+mousedown on the draggable row extends a text selection so the drag carries the selection, or Windows' drag loop treats Shift as 'move' and reports it differently. Repro first, then also latch Shift seen at dragstart/mousedown. The hint under the composer already says Shift-drop repeats weekly but he did not notice it: make it more visible (e.g. a ↻ in the drag tooltip from the start).
+files: src/content.tsx, src/components/PoolSidebar.tsx, src/content.css, README.md
+
+### M8 U25
+milestone: M8
+scope: extension
+title: any duration, not only the six presets
+landed: 2026-10-17
+state: built
+brief: Friend test 2026-10-17: durations are DURATION_PRESETS 15/30/45/60/90/120 in poolItem.ts. Not an API limit: the Calendar API takes any end time. Add a Custom… option (or typed duration like 1h20, 5-minute steps) to the item and composer duration selects; durationOptions already keeps a stored off-preset value.
+files: src/poolItem.ts, src/poolTransfer.ts, src/components/PoolSidebar.tsx, src/content.css, README.md
+
+### M8 U3
+milestone: M8
+scope: extension
+title: waitForEvent resolves placeholders by event id, not by name
+landed: 2026-10-09
+state: built
+brief: 7520b08. The create handler returns `{ id, htmlLink, calendarId }`; `waitForEvent(eventId, itemName)` matches `[data-eventid]` (raw id, `<id>_` instance prefix, or base64url-decoded first token), on chips already rendered and on later mutations. A name-only match now fades after a 1.5 s grace instead of at once. The `data-eventid` format is unverified against the live DOM — check with the DevTools one-liner in the agent's test list.
+files: `src/content.tsx`
+taken_by: agent 1 (M3 + M8 U3), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U4
+milestone: M8
+scope: extension
+title: Tailwind spacing-scale classes generate no CSS
+landed: 2026-10-09
+state: built
+brief: 9f6f65b (a `PoolSidebar.tsx.bak` that commit added by accident was removed from history on 2026-10-13, D-32). 23 theme-dependent classes (spacing, font weight, white, rounded-md, ease-in-out) emitted no CSS; all are now bracket values matching the default theme, confirmed in dist/content.css. Visible side effects: toast gets 16px padding, headings lose default margins, Retry button styled, collapsed-strip icon buttons sized.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`
+taken_by: agent 3 (links + polish), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U5
+milestone: M8
+scope: extension
+title: an in-product hint that Shift-drop repeats weekly
+landed: 2026-10-09
+state: built
+brief: dfc53ea. A muted hint line under the add form, a hint in the schedule form, and Shift mentioned in the item name's tooltip.
+taken_by: agent 2 (keyboard path), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U6
+milestone: M8
+scope: repo
+title: README "How it works" mentions DELETE_EVENT and id matching
+landed: 2026-10-09
+state: built
+brief: 55433d5.
+files: `README.md`
+taken_by: agent 3 (links + polish), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U7
+milestone: M8
+scope: extension
+title: the Undo toast pauses while hovered or focused
+landed: 2026-10-09
+state: built
+brief: ee157a9. Every timed toast pauses while hovered or focused (read live from `:hover` / `activeElement`) and resumes with at least 2 s.
+taken_by: agent 3 (links + polish), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U8
+milestone: M8
+scope: extension
+title: a drop in the last 7.5 minutes of a column lands at 23:00
+landed: 2026-10-09
+state: built
+brief: b6130f2. `timeFromDrop` clamps the snapped start to 0–1425 min; drop, click-to-place and the hover hint share it.
+files: `src/content.tsx` `timeFromDrop`
+taken_by: agent 3 (links + polish), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M8 U9
+milestone: M8
+scope: extension
+title: invisible keyboard focus on Hide category, and no aria-label on the delete button
+landed: 2026-10-09
+state: built
+brief: 110a915. Hide-category shows on header hover, focus-within and its own focus-visible; focus rings on ×, hide/show; aria-labels on every icon-only button audited; colour swatches named with `aria-pressed`.
+files: `src/components/PoolSidebar.tsx`
+taken_by: agent 3 (links + polish), managed by the google-calendar-pool session
+started: 2026-10-09
+
+### M9 U1
+milestone: M9
+scope: extension
+title: header without a title: a Google-style "+ New item" pill and the collapse control
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: 58416cc. Header title and calendar icon removed. Header (`.wlp-header`, now 8/12/8/16 px padding, no bottom border, 64 px tall to match Google's top bar) holds a `<button class="wlp-new-pill">` "+ New item" on the left and the unchanged collapse chevron (iconBtnCls) on the right. The pill took over the pencil's job: it toggles `formOpen` (still persisted in chrome.storage.local, still focuses the input on open), aria-label "New item", aria-expanded; class `wlp-new-pill-open` rotates its plus 45deg into a cross while the form is open (choice made: toggle rather than open-only, so the form can still be hidden). Styling in content.css: 48 px tall, 16 px radius like Google's current Create (rounded rectangle, not a full pill), Google Sans 14/500, new tokens `--wlp-pill` (#fff light, #37393b dark) and `--wlp-pill-shadow` / `--wlp-pill-shadow-hover` (Google's two-layer elevation, rgba(60,64,67) light, black dark); hover/active are a color-mix state layer of --wlp-text. Colours are hardcoded tokens, not read live: Google's Create can only be found by class name or its translated label, both ruled out by D-21. Collapsed strip untouched (label still "Show Weekly Pool"). README feature line updated. U5: the composer opened from this pill is the existing `formOpen` max-height block; the pill's toggle is `setFormOpen`. Unverified: not loaded in Chrome; the dark pill grey #37393b is from memory of Google's dark Create, not measured; rendering against Google's global button styles, the focus ring and the 280 px fit not seen.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`, `README.md`
+taken_by: agent 1 (header pill), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U10
+milestone: M9
+scope: extension
+title: experiment: the pool as a section inside Google's left nav
+landed: 2026-10-10
+decision: D-22
+state: built
+brief: Dropped from history on 2026-10-13 (D-32), so the ids in this brief no longer resolve. e1c31d4 (reworks aa690a0 at the author's request, 2026-10-10: items nest under each calendar's own row in Google's 'My calendars' instead of one 'Pool' section). Experiment behind a per-device flag, off by default (D-22): `dockInNav` in chrome.storage.local, same footer toggle; while ☰ is open and the rows are found, the separate sidebar hides and clearLayout gives the page its room back. Anchoring (dock.ts findAnchors): per calendar, the checkbox outside [role=main] and our own nodes whose accessible name (names.ts checkboxName) equals the calendar's name; climb to the first li/[role=listitem], else the last ancestor holding no other checkbox; believed only if shown and ≤64 px tall. No dependence on the 'My calendars' fold button. All-or-nothing: a calendar with items whose name is on no checkbox, on two, or shared by another pool calendar (duplicate names cannot be told apart) means no dock and the separate sidebar; calendars without items need no row (if found uniquely they still take dropped chips). All rows must share one parent (the list). List semantics: one container per calendar with items, placed as a sibling right after the row (not inside it: Google's row is a one-line, likely fixed-height flex box whose content Google re-renders); it is an li when the row is an li, role=listitem when the row has that role, so the list stays a list of items; inside, a fold button (count + chevron, aria-expanded, name 'N items in the pool for <calendar>') and a ul labelled 'Pool items for <calendar>'. Fold reuses the synced hiddenCategories (U3). Indent measured from the checkbox's offset (fallback 32 px), ~200 px chips; tokens via .wlp-dock-host in content.css, theme kept by applyTheme. One React root: every container and the bar are portals. Re-render: one MutationObserver on body, callback skips [role=main], our nodes, tooltip/preview, then schedules one check per animation frame (before paint, so no flicker); the check verifies rows/containers/bar in place and only then re-searches and re-places everything in one pass, keeping the same host elements (focus restored). Budget: passes <1 s apart are one redraw episode (Google may draw a list in steps); >8 re-placings within one episode = fight, or >20 episodes per minute = give up for the page (retry by switching the flag on again); rows gone (e.g. Google folds 'My calendars') = sidebar meanwhile, looks again 5 s. Popover (DockPopover, in the sidebar mount, 280 px, fixed, beside the chip, below it if no room): role=dialog, focus moves in (ScheduleForm autofocus, details' location, composer title), Escape or Tab past either end closes and returns focus to the opener, outside press closes; a press on the grid while picked still places (content script's capture handler runs first). Composer: '+ New item' quiet text button once in a bar after the list (with toasts and the switch), opening the composer in the popover — not a '+' on Google's rows (collides with the ⋮), and present even when no calendar has items. Drag: grid drops never check the drag's origin (confirmed: content.tsx reads poolItem + gridcell under pointer), Shift-drop, click-to-place, rename, reorder within a list, move by dragging onto another calendar's nested list or onto its Google row (document capture listener + calendarAtRow; index 0). Removed: findMyCalendars/TOGGLE_SELECTOR, #wlp-dock, the 'Pool' header and fold, dockFolded; sidebar tree restored to pre-aa690a0 markup plus the switch. Default-path changes (all no-ops with the flag off): renderItem/composerForm/toastRegion extracted (verified identical markup when not docked), names.ts outsideSidebar also skips .wlp-dock-host, applyTheme queries .wlp-dock-host, nav-change focus check also looks in dock hosts. Keep/drop is the author's after a day of use: keep if no lost drops, no layout fights, no console errors; drop if it needs class names, flickers, or is too narrow — then Q-8 is answered 'separate sidebar'. Verified: tsc, build, and 26 checks of dock.ts against a mock nav in Chromium (virtual clock): anchoring, duplicate/missing rules, li/listitem/div rows, aria-labelledby names, redraw and move re-placement with the same hosts, refresh on fill/empty, hidden list → fallback and back, fight → give-up, spaced redraws keep docking. Unverified: nothing ran in Chrome against Google Calendar — whether Google's rows are li/listitem and ≤64 px, whether its renderer removes foreign siblings on every draw (then it gives up), whether its list is a plain stacked flow (a virtualized/absolute list would overlap), the real indent and width, drag start inside the nav and the off-screen drag image, row drops, the popover's position and keyboard flow, theme switch, RTL pages, screen-reader output.
+files: `src/dock.ts`, `src/components/PoolSidebar.tsx`, `src/content.tsx`, `src/content.css`, `src/layout.ts`, `src/names.ts`, `README.md`
+undone_by: D-23
+blocks: ["M9 U3","M9 U4"]
+taken_by: agent 10 (per-calendar dock rework), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U11
+milestone: M9
+scope: extension
+title: the add-item composer is always open; no "+ New item" button
+landed: 2026-10-10
+decision: D-24
+state: built
+brief: 23fb17c. Removed the "+ New item" pill, the formOpen state and its storage read/write (the old key is now removed from chrome.storage.local), the open/close max-height animation, formSettled/formReady/formMounted, the focus-on-open effect, and the --wlp-pill/--wlp-pill-shadow-hover tokens and .wlp-new-pill CSS (--wlp-pill-shadow, still used by chips and the filled button, is renamed --wlp-shadow). Header choice: the composer's title row (Add title + Add) is the header, a 64 px band level with Google's top bar, with the collapse chevron at its end; a chevron-only row would be a band of nothing else. While loading or on error the header shows only the chevron, pushed to the end. The calendar/duration row and hint follow in .wlp-composer, which shrinks and scrolls in short windows as before. Empty-calendar rows preset the calendar and focus the title; nothing focuses the title on load. Unverified: not loaded in Chrome — the title field is now ~145 px wide beside Add and the chevron (cramped for long names?), the 64 px band's alignment with Google's top bar, the short-window scroll of .wlp-composer, the formOpen key removal, and focus moving to the strip/header chevron on collapse/expand.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`, `README.md`
+taken_by: agent 11 (composer always open), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U2
+milestone: M9
+scope: extension
+title: Google's surfaces, type and scrollbar
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: 156f2b9. Surface: theme.ts gained `detectSurface(theme)` and a `PageLook {theme, surface}`; `watchTheme` now calls back with both and re-applies when either changes. The surface is read by walking from `[role="banner"]` (else <body>) up to the first background with alpha >= 0.5; it is used only if fully opaque and its luminance agrees with the theme, else null. content.tsx sets it on the sidebar mount as inline `--wlp-page`; content.css `--wlp-surface: var(--wlp-page, #f8fafd)` light / `var(--wlp-page, #1f1f1f)` dark. Sidebar's right border removed. `--wlp-hover` is now `color-mix(text 8%, transparent)` in both themes (translucent state layer). Dark `--wlp-pill` is now `color-mix(text 12%, var(--wlp-surface))` (~#373737 on the fallback) instead of the remembered #37393b; light pill stays #fff. Type/spacing tokens on `#weekly-life-pool-sidebar`: `--wlp-font` ('Google Sans', Roboto, Arial, sans-serif), `--wlp-type-name` 14px, `--wlp-type-section` 16px, `--wlp-weight-section` 500, `--wlp-row-height` 32px, `--wlp-gutter` 16px. `.wlp-sidebar` uses the font and 14px base. Applied: `.wlp-item` min-height 32px, padding 0 12px, 14px (text-[13px] removed; rename input 14px too), list gap 4px; `.wlp-cat-header` min-height 40px, padding 4px gutter; new `.wlp-cat-title` (16/500, --wlp-text, sentence case, truncate) on the category h3, replacing the 11px uppercase label (design choice: the brief's ~16px medium section titles made uppercase untenable, so U3 inherits sentence case already done; U3 still owns chevron/collapse, folding hide/show, empty sections). Form, hidden strip, footer and "No calendars found" use the 16px gutter. Scrollbar: `.wlp-scroll` on the category list, `scrollbar-width: thin`, thumb `--wlp-scrollbar` (text at 24% light / 30% dark) shown only on :hover / :focus-within, transparent track. Note Tailwind/Lightning CSS emits color-mix custom properties inside `@supports (color: color-mix(in lab, red, red))` with a `var(--wlp-text)` fallback before it; fine in Chrome. Unverified: not loaded in Chrome; whether Google Calendar has a `[role=banner]` whose ancestor chain paints the page colour (else the constants stand in); the actual sampled colour in light and dark; thin scrollbar width on Windows and the hover reveal; 16px titles and 32px rows at 280px width; the translucent hover over fields in the schedule/details panels.
+files: `src/theme.ts`, `src/content.tsx`, `src/content.css`, `src/components/PoolSidebar.tsx`, `README.md`
+blocks: ["M9 U1"]
+taken_by: agent 2 (surfaces and type), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U3
+milestone: M9
+scope: extension
+title: calendar sections styled like "My calendars"
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: ae55c57. Each calendar with items renders as a section (`.wlp-cat-group`): title row `.wlp-cat-header` > `<h3 class=wlp-cat-heading>` > `<button class=wlp-cat-toggle aria-expanded aria-controls=wlp-section-<calendarId>>` holding a 12 px rounded-square colour marker `.wlp-cat-marker`, the name `.wlp-cat-title` (16/500, ellipsis), a muted item count `.wlp-cat-count` only when folded (with sr-only ", N items"), and a 20 px chevron `.wlp-cat-chevron` (up when open, rotated 180deg via `[aria-expanded=false]`). Whole row is the button (APG disclosure-in-heading); accessible name = calendar name. Hover is `--wlp-hover`, 20 px radius; header inset 8 px + button 8 px so the marker sits on the 16 px gutter. Hide/show folded in: the fold IS the stored `hidden` flag (synced `hiddenCategories`, no schema change), so previously hidden calendars open folded; eye icon, `.wlp-cat-hide/.wlp-cat-show` and the Hidden strip removed; `toggleCategoryHidden` renamed `toggleSection`. Folded sections stay in the add form's chips (the effect that reset the form's calendar when hidden is removed; chips now list all `categories`). Folding a section ends a pick in it (unchanged pick effect). addItem and moveItem set `hidden:false` on the receiving calendar so a placed item is visible. Drag: header dragover still targets index 0; a folded header and an empty row get `.wlp-drop-into` (accent-soft bg, primary text). EMPTY-SECTION CHOICE: calendars with zero items are not sections; they are gathered after the sections in `.wlp-empty-group` (role=group) under one quiet caption "No items yet", as 32 px `<button class=wlp-empty-row>` rows (marker, name in secondary text, a + shown on hover/focus/drop). Click/Enter calls `startAddTo(id)`: sets the form's calendar, opens the form, focuses the name input (one step). Each row is a drop target. Chosen over hiding them (would lose the drag target) or folding them under a toggle (would make drag-in two steps). Consequence: a calendar jumps from the empty group to its section position when it gets its first item and back when emptied. U4: item rows live in `<div id=wlp-section-<id> class=wlp-items-list>` rendered only when open; the dropBefore/After line logic is unchanged. U10: the section row is self-contained (header + toggle + list) and the empty rows are plain buttons, reusable inside Google's nav. README feature lines updated. Unverified: not loaded in Chrome; nothing seen rendered (either theme, 280 px fit, Google's global h3/button styles against the resets, chevron rotation, hover/drop highlights); drag into a folded header / empty row and the jump on first item not exercised; screen-reader announcement of the toggle and count not heard; startAddTo focus while the form animates open not observed; cross-device sync of the fold not tested.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`, `README.md`
+blocks: ["M9 U2"]
+taken_by: agent 3 (calendar sections), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U4
+milestone: M9
+scope: extension
+title: pool items look like the events they become
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: b0af7c7. Items are chips after Google's week-view event chips: fill = eventColorHex(colorId, calendar colour), passed as CSS vars --wlp-chip / --wlp-chip-text on .wlp-item; 4px radius, 28px min height, 12px type, name 500 (.wlp-item-name, truncates first), then an aria-hidden comma and the duration <select> in 400 weight with field-sizing:content ("workout, 1h"). Text colour from new theme.ts chipTextOn(): higher-contrast of white / #202124, pure black when neither reaches 4.5:1, so every colour is >=4.5:1 (checked on Google's 11 event colours plus common calendar colours); readableTextOn is kept for the composer's category chips. Everything on the chip (controls, focus rings, rename underline) uses currentColor, not theme greys. Schedule / details / delete are 20px round .wlp-item-btn inside .wlp-item-actions, folded to max-width 0 + opacity 0 at rest and shown on .wlp-item:hover, :focus-within, or .wlp-item-active (schedule form or details open); still in tab order with labels; .wlp-item-btn-on marks the open one (chevron svg rotates). Picked = ring (1px surface gap + 3px primary), fill unchanged. Hover = --wlp-pill-shadow. Drag image: setChipDragImage() clones the row as .wlp-item-ghost (fixed, off screen), copies select values, setDragImage at the grab offset, removes it next tick. Grid preview (content.tsx showPreview) is now the solid chip: colour fill, chipTextOn text, 4px radius, Google Sans 12px/500, elevation shadow; Shift dashes its border in currentColor; the old --wlp-event-color tint rules are gone. Loading placeholder uses chipTextOn too. Removed: hasTemplate() (the 'configured' blue chevron cue had no place on a coloured chip; U6 may want a configured cue back), --wlp-surface-raised. Design choices: colours come from the API data (calendar backgroundColor, EVENT_COLORS hex), not read off Google's rendered chips, because a chip's colorId cannot be known from the DOM; text contrast chosen for AA rather than copying Google's white-on-saturated. For U6: the colour swatches still live in ItemDetails; a colour change re-renders the chip immediately. For U10: chip look is entirely .wlp-item + the two CSS vars + chipTextOn, but the vars and --wlp-pill-shadow/--wlp-surface/--wlp-primary are defined on #weekly-life-pool-sidebar, so chips mounted elsewhere need those tokens. Unverified: not loaded in Chrome — the look in either theme, the drag image (off-screen clone + setDragImage), field-sizing on the select, focus-within reveal while tabbing, the grid preview and placeholder, and every flow (rename, reorder, move between calendars, duplicate, drag to grid, Shift-drop, click-to-place) are untested at runtime; only tsc and vite build were run.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`, `src/content.tsx`, `src/theme.ts`, `src/poolItem.ts`, `README.md`
+blocks: ["M9 U2"]
+taken_by: agent 4 (item chips), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U5
+milestone: M9
+scope: extension
+title: the add-item composer speaks the event editor's language
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: 7f8fa59. Composer rebuilt in the event editor's vocabulary: row 1 is the title (.wlp-title-field wrapping input.wlp-title-input, placeholder "Add title", 18px, 1px secondary underline -> 2px primary on focus-within, clear button inside) with a filled blue "Add" pill (.wlp-btn-filled, disabled when empty, aria-label "Add item") beside it; row 2 is a calendar dropdown (colour dot + name + Google's caret, grows to fill) and a duration dropdown (content-sized). Chip cloud, .wlp-input-row/.wlp-input-add/.wlp-cat-chip CSS and the --wlp-icon-faint token removed; readableTextOn is now unused (left exported in theme.ts). Dropdowns are native <select>s in a new FieldSelect component (value, label, onChange, optional dot colour, title, className): chosen over a custom listbox because the browser supplies arrow keys, type-to-find, Escape, focus return and the accessible name, and the open list is drawn above the page instead of being clipped by the form's overflow:hidden max-height animation; the trade-off is that the open list shows names without dots. Reusable for U6: classes .wlp-gfield (grey field on input/textarea/select; inputs focus with a 2px primary bottom line, selects with a 2px inset ring), .wlp-gselect (+ .wlp-gselect-caret, .wlp-gselect-dot, .wlp-gselect-has-dot; logical insets for RTL), .wlp-btn-filled, .wlp-title-field; tokens --wlp-field and --wlp-field-hover (mixed from the live --wlp-surface with 6% primary and 4% text, declared once and resolved per theme: ~#e3e9f3 light, ~#2f3133 dark), --wlp-field-height 36px, --wlp-field-radius 4px, --wlp-type-title 18px. durationOptions(value) helper extracted from DurationSelect. Enter in the title adds exactly as before (Shift+Enter too, unchanged); startAddTo still presets the calendar select and focuses the title. Hint shortened to "Shift-drop repeats weekly · Enter on an item’s calendar icon schedules it" and tied to the title via aria-describedby. Design choices: a single calendar still shows the dropdown (says which calendar); scaled Google's 22px/40px down to 18px/36px for the 248px column. README feature line updated. Unverified: nothing was seen rendered — the extension could not be loaded into Chrome and a local mock could not be served; dark-theme colours, select ellipsis on long calendar names, field-sizing on the duration select, and screen-reader output are untested.
+files: `src/components/PoolSidebar.tsx`, `src/content.css`, `README.md`
+blocks: ["M9 U1"]
+taken_by: agent 5 (composer), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U6
+milestone: M9
+scope: extension
+title: details and schedule panels use the editor's fields
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: de2af31. ScheduleForm: Day and Start are FieldSelects (accessible names still "Day"/"Start", visible captions dropped as in Google's editor; Day keeps autoFocus and refreshDays on focus); the Repeat weekly checkbox is a FieldSelect named "Repeat" with "Does not repeat" / repeatLabel(day) = "Weekly on <weekday>" (en-US long weekday of the chosen day); Cancel is the new .wlp-btn-text, Schedule is .wlp-btn-filled; Enter-submits handler and closePick's .wlp-schedule check unchanged. ItemDetails: icon column (pin, bell, calendar, notes) then Location ("Add location"), NotificationRow, calendar name (plain text, not a select — moving calendars stays drag-only) + colour as FieldSelect dotOnly ("Calendar colour" + Google's 11 names, unknown colorId kept as an option), Description ("Add description"), Duplicate as text button. NotificationRow: reminderMin undefined = calendar default, shows "Add notification" (sets 30 min, focuses count); else count number input + unit select (minutes/hours/days/weeks) + × (back to undefined, focuses Add). Stored value is still minutes; splitReminder shows it in the largest whole unit (60 -> 1 hours), clamped to 40320 (API max) only on edit; local count/unit kept while typing. Design choice: Google's "Notification ▾" method select left out (we only set popups, and it would not fit 248px); there is no "no reminder" state because none was ever stored. Accessible names now say Notification: "Notification for X", "Notification unit for X", "Use the default notification for X", "Add notification for X", "Colour for X". Panels lost their bordered card (fields sit on the surface). New CSS: .wlp-btn-text, .wlp-btn-icon, .wlp-details-row/-icon/-calendar/-row-top, .wlp-notify-count, .wlp-gselect-dot-only, .wlp-schedule-day; FieldSelect gained dotOnly, autoFocus, onFocus. Removed: swatches, .wlp-field, .wlp-schedule-btn/-field/-label/-repeat, .wlp-dup-btn, tokens --wlp-panel/--wlp-border/-subtle/-hover, REMINDER_PRESETS/formatReminder, theme.ts readableTextOn. poolItem.ts gained REMINDER_UNITS, splitReminder, reminderUnitMin, MAX_REMINDER_MIN, DEFAULT_REMINDER_MIN. Checked: tsc clean, build ok, node script round-trips every minute 0..40320 and old presets, weekday wording; static mock with dist CSS in light and dark fits 280px. Unverified: not loaded in Chrome on Google Calendar — real Google Sans widths, live page colours, the transparent-text colour select on Windows (incl. forced colours), focus moves after Add/×, screen reader output, Shift paths (unchanged code).
+files: `src/components/PoolSidebar.tsx`, `src/content.css`, `src/poolItem.ts`, `src/theme.ts`, `README.md`
+blocks: ["M9 U5"]
+taken_by: agent 6 (details and schedule panels), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U7
+milestone: M9
+scope: extension
+title: names as Google shows them: the primary calendar's label, and right-to-left text
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: 864530b. Calendars show `summaryOverride || summary` (calendarList has no fields mask, so the override already came back). The primary calendar, when its summary is still its address and it has no override, gets its name from the page (new src/names.ts, no new scope): a checkbox in Google's calendar list that comes before the first of the user's other calendars (by accessible name: aria-label, aria-labelledby or <label>) and whose name also appears in a page label carrying the account's address (the Google Account button), not equal to another calendar's name; exactly one must survive (a shorter name inside a longer one is dropped), otherwise the address stays. If none of the other calendars' names is found among the checkboxes, nothing is read. While unfound, a MutationObserver on body re-checks at most once a second and disconnects once found; the name is cached in chrome.storage.local (primaryCalendarName, keyed by calendar id) and shown at once on the next load, replaced by a fresh reading. RTL: dir="auto" on section titles, empty-calendar rows, composer title input and calendar <option>s (Chrome carries the option's direction to the closed select), details calendar/location/description, rename input, item name span, drag preview; the chip row gets dir from textDirection(name) so a Hebrew chip mirrors (name at right, ", 1h" to its left, controls unfold left) — chip CSS made logical. Toasts and the drop tooltip isolate the name with FSI/PDI instead of dir=auto, since they are English sentences. Design choice: calendar-name labels follow the brief and right-align (text-align:start) rather than staying left beside the dot as Google's own nav does. Unverified: the matcher against Google's real page (that "My calendars" checkboxes carry the calendar name as accessible name, that the account button's aria-label holds name and address in the main document, whether the list stays in the DOM with the nav closed); the extension was not loaded in Chrome. Logic checked on a mock DOM; RTL rendering of select/chip/ellipsis checked on a mock page. A Hebrew-UI Google page (html dir=rtl) was not considered.
+files: `src/names.ts`, `src/components/PoolSidebar.tsx`, `src/content.tsx`, `src/content.css`, `README.md`
+taken_by: agent 7 (names and RTL), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U8
+milestone: M9
+scope: extension
+title: the sidebar fits the viewport and coexists with Google's own nav
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: edceff7. Clipping: the sidebar was `height: 100vh`, which counts a horizontal scrollbar along the bottom of the window as page; the shifted Google root (translateX + narrowed width) can overflow to the right and give the page one, so the column ran ~15 px below the visible area (matches the footer cut at y≈933 in 01). Fix: the sidebar is held by `top:0; bottom:0` (a fixed box's insets exclude scrollbars), Google's root gets `overflow-x: clip` (clip, not hidden, so it is no scroll container and sticky headers still work), and the column is `.wlp-column` (flex 1 1 0, min-height 0) with header/footer flex-shrink 0, the list `.wlp-list` (flex 1 1 0, min-height 0, scrolls), and the composer allowed to shrink and scroll inside itself once its open animation ends (formSettled), for windows under ~330 px. Nav: the default sidebar steps aside to its 40 px strip while Google's main menu is open and comes back when it closes. Reason: Google's nav (256 px) takes nearly the room the pool gives up (240 px), so the week keeps its width and the two transitions compose instead of squeezing the grid twice; one side panel at a time, as Google's own side panels are. The auto-collapse is never saved; opening the pool from the strip while the menu is open keeps it beside the menu until the menu next changes. Detection is geometry, not ARIA: `layout.ts` measures the root's start edge to `[role=main]`'s start edge (>=120 px = open), re-read at most once a frame from a ResizeObserver on main, window resize and any click; no class names or translated labels. Layout code moved from content.tsx to new `src/layout.ts`; content.tsx no longer shifts the page from storage at load, the sidebar dispatches the shown width once (avoids a 280-then-40 jiggle). Keyboard: hiding/showing (by click or by the menu) moves focus to the toggle that replaces the removed one, only if focus was actually lost. RTL page (`dir=rtl` body): sidebar stays physically left with mount `dir=ltr` (its words are English; tooltip too), root is narrowed but translated by 0, since a narrowed start-aligned root already sits against the right edge; nav measured from the right edge. Mirroring the sidebar to the right in RTL was considered and left for later (chevrons, toasts, bidi of English strings). For U10: the nav watcher is `watchGoogleNav` in layout.ts; a docked mode should bypass the auto-collapse and adjustLayout, and its result answers Q-8. Unverified: not loaded in Chrome, so the scrollbar diagnosis, that [role=main] excludes Google's nav (if it includes it, the pool never steps aside, harmlessly), that Google's root sits flush right in RTL, and both themes are untested.
+files: `src/layout.ts`, `src/content.tsx`, `src/components/PoolSidebar.tsx`, `src/content.css`, `README.md`
+taken_by: agent 8 (viewport and nav), managed by the google-calendar-pool session
+started: 2026-10-10
+
+### M9 U9
+milestone: M9
+scope: extension
+title: dark-theme pass over the new look
+landed: 2026-10-10
+decision: D-21
+state: built
+brief: 5940bc2. Driven by eye with the author in both themes on 2026-10-10: everything held except the drop tooltip (#wlp-drop-tooltip), which was an inverted box (light grey on the dark theme, dark on the light). It now follows the page's theme: white, --wlp-text and a #dadce0 border in light; color-mix of 12% --wlp-text into the surface, --wlp-text and a #5f6368 border in dark. Settles Q-6: the light theme's --wlp-text-muted is #5f6368 (about 5.8:1 on Google's page colour) instead of #9aa0a6 (2.6:1); dark's #9aa0a6 already passed.
+files: `src/content.css`
+blocks: ["M9 U1","M9 U2","M9 U3","M9 U4","M9 U5","M9 U6","M9 U7","M9 U8"]
+taken_by: the google-calendar-pool session, with the author
+started: 2026-10-10
+
+<!-- emerald: views.md -->
+---
+emerald: views
+---
+
+### decision entry
+answer: markdown
+milestone: header
+question: markdown
+ref: header
+scope: header
+title: line #1
+
+### decision start
+date: latest 5
+title: line
+
+### inbox entry
+body: markdown
+from: header
+refs: header
+sent_on: header
+subject: line #1
+
+### inbox start
+from: line
+state: is new
+subject: line
+
+### milestone entry
+goal: markdown
+ref: header
+title: line #1
+
+### milestone roadmap
+goal: line
+position: order
+title: line
+
+### milestone start
+state: is open
+title: line
+
+### open_question board
+question: card
+state: lanes
+
+### open_question entry
+question: line #1
+ref: header
+
+### open_question start
+question: line
+state: is open
+
+### review_entry entry
+do: line #1
+
+### review_entry start
+state: is open
+unit: line
+
+### unit board
+milestone: card
+state: lanes
+title: card
+
+### unit entry
+brief: markdown
+files: markdown
+milestone: header
+ref: header
+scope: header
+title: line #1
+
+### unit ready
+blocks: waits
+milestone: line
+state: ready planned done built dropped
+title: line
+
+### unit roadmap
+decision: line
+milestone: under
+started: line
+taken_by: line
+title: line
+
+<!-- emerald: changed.md -->
+---
+emerald: changed
+---
+
+decision: 2026-10-17
+inbox: 2026-10-18
+review_entry: 2026-10-17
+unit: 2026-10-17
